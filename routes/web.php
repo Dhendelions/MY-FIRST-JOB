@@ -5,6 +5,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GroupController;
 use App\Http\Controllers\SpreadsheetController;
+use App\Http\Middleware\EnsureWorkspaceAdminReauthentication;
 
 /*
 |--------------------------------------------------------------------------
@@ -27,10 +28,10 @@ Route::middleware('guest')->group(function () {
 });
 
 // Logout (Authenticated only)
-Route::post('/logout', [AuthController::class, 'logout'])->name('logout')->middleware('auth');
+Route::post('/logout', [AuthController::class, 'logout'])->name('logout')->middleware(['auth', EnsureWorkspaceAdminReauthentication::class]);
 
 // Protected Application Routes (Strictly Authenticated)
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', EnsureWorkspaceAdminReauthentication::class])->group(function () {
     
     // Dashboard & Overview
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
@@ -51,7 +52,10 @@ Route::middleware('auth')->group(function () {
 
     // Group Workspace & Sheets (Verified in GroupController)
     Route::get('/groups/{group}/workspace/{sheet?}', [GroupController::class, 'workspace'])->name('group.workspace');
+    Route::get('/groups/{group}/search-users', [GroupController::class, 'searchUsers'])->name('groups.users.search');
     Route::post('/groups/{group}/unlock', [GroupController::class, 'unlock'])->name('groups.unlock');
+    Route::post('/groups/{group}/leave', [GroupController::class, 'leaveWorkspace'])->name('groups.leave')->middleware('throttle:15,1');
+    Route::post('/groups/bulk-destroy', [GroupController::class, 'bulkDestroy'])->name('groups.bulk-destroy');
     Route::post('/groups/{group}/members', [GroupController::class, 'addMember'])->name('groups.members.add');
     Route::put('/groups/{group}/members/{member}', [GroupController::class, 'updateMemberRole'])->name('groups.members.update');
     Route::delete('/groups/{group}/members/{member}', [GroupController::class, 'removeMember'])->name('groups.members.remove');

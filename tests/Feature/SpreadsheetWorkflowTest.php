@@ -98,6 +98,24 @@ class SpreadsheetWorkflowTest extends TestCase
         $this->assertGreaterThan(0, $group->sheets()->count());
         $this->assertNotNull($group->sheets()->whereNotNull('metadata')->first());
         $this->assertGreaterThan(0, SpreadsheetCell::whereHas('row', fn ($query) => $query->whereIn('sheet_id', $group->sheets()->pluck('id')))->whereNotNull('formula')->count());
+
+        $analisa = $group->sheets()->where('name', 'Analisa')->firstOrFail();
+        $row5 = $analisa->rows()->where('sort_order', 5)->firstOrFail();
+        $columnC = $analisa->columns()->where('letter', 'C')->firstOrFail();
+        $columnM = $analisa->columns()->where('letter', 'M')->firstOrFail();
+        $sampleInput = SpreadsheetCell::where('row_id', $row5->id)->where('column_id', $columnC->id)->firstOrFail();
+        $formulaCell = SpreadsheetCell::where('row_id', $row5->id)->where('column_id', $columnM->id)->firstOrFail();
+
+        $this->assertSame('', $sampleInput->value);
+        $this->assertNotEmpty($sampleInput->format);
+        $this->assertSame('=C5+E5+G5+I5+K5', $formulaCell->formula);
+        $this->assertSame('0', $formulaCell->value);
+
+        $sampleFormulaColumn = $analisa->columns()->where('letter', 'E')->firstOrFail();
+        $sampleFormula = SpreadsheetCell::where('row_id', $analisa->rows()->where('sort_order', 4)->value('id'))
+            ->where('column_id', $sampleFormulaColumn->id)->firstOrFail();
+        $this->assertSame('=617.7+3317', $sampleFormula->formula);
+        $this->assertSame('', $sampleFormula->value);
     }
 
     public function test_adding_a_row_copies_the_data_row_presentation_and_keeps_formula_footer_last(): void
@@ -294,7 +312,7 @@ class SpreadsheetWorkflowTest extends TestCase
         $this->assertSame(0, $valueErrors);
     }
 
-    public function test_analisa_cost_margin_sticky_header_and_cream_rows(): void
+    public function test_analisa_cost_margin_sticky_headers_and_template_rows(): void
     {
         $user = User::create(['name' => 'Sticky Test Owner', 'email' => 'sticky@example.test', 'password' => 'password']);
         $group = FisheriesGroup::create([
@@ -310,6 +328,12 @@ class SpreadsheetWorkflowTest extends TestCase
         $analisaSheet = $group->sheets()->where('name', 'Analisa')->firstOrFail();
         $costSheet = $group->sheets()->where('name', 'Cost')->firstOrFail();
         $marginSheet = $group->sheets()->where('name', 'Margin')->firstOrFail();
+        $this->assertSame('analisa', $analisaSheet->metadata['identity_color']);
+        $this->assertSame('cost', $costSheet->metadata['identity_color']);
+        $this->assertSame('margin', $marginSheet->metadata['identity_color']);
+        $supportingSheet = $group->sheets()->get()->first(fn ($item) => strtolower($item->name) === 'pendukung');
+        $this->assertSame('pendukung', $supportingSheet->metadata['identity_color']);
+        $this->assertSame('rank', $group->sheets()->where('name', 'Rank')->firstOrFail()->metadata['identity_color']);
 
         // Test Analisa
         $analisaComp = Livewire::actingAs($user)
@@ -322,21 +346,51 @@ class SpreadsheetWorkflowTest extends TestCase
         $this->assertStringNotContainsString('solid #000000position:sticky', $analisaHtml);
         $this->assertStringNotContainsString('solid #000000 position:sticky', $analisaHtml);
         // Ensure sticky top and z-index 18 or 26 is rendered on data cells
-        $this->assertStringContainsString('position:sticky;top:calc(36px', $analisaHtml);
+        $this->assertStringContainsString('position:sticky;top:calc(var(--spreadsheet-column-header-height, 36px)', $analisaHtml);
         $this->assertStringContainsString('z-index:18', $analisaHtml);
         $this->assertStringContainsString('z-index:26', $analisaHtml);
 
         // Test Cost
         $costComp = Livewire::actingAs($user)
             ->test(SpreadsheetWorksheet::class, ['sheet' => $costSheet]);
-        $this->assertGreaterThanOrEqual(7, $costComp->get('freezeTopRowCount'));
+        $this->assertSame(7, $costComp->get('freezeTopRowCount'));
         $this->assertGreaterThanOrEqual(2, $costComp->get('freezeLeftColumnCount'));
+        $this->assertCount(7, $costComp->get('frozenRowTopOffsets'));
+        $this->assertSame([], $costComp->get('fixedTopRowOffsets'));
 
         // Test Margin
         $marginComp = Livewire::actingAs($user)
             ->test(SpreadsheetWorksheet::class, ['sheet' => $marginSheet]);
         $this->assertGreaterThanOrEqual(4, $marginComp->get('freezeTopRowCount'));
         $this->assertGreaterThanOrEqual(2, $marginComp->get('freezeLeftColumnCount'));
+    }
+
+    public function test_sheet_identity_colors_cycle_and_survive_rename(): void
+    {
+        [$group] = $this->createSheet();
+        $user = $group->creator;
+
+        $expected = ['analisa', 'cost', 'margin', 'pendukung', 'rank'];
+        foreach ($expected as $index => $identity) {
+            $response = $this->actingAs($user)->post(route('groups.sheets.add', $group), [
+                'name' => 'New Sheet ' . $index,
+            ]);
+            $response->assertRedirect();
+            $sheet = $group->sheets()->where('name', 'New Sheet ' . $index)->firstOrFail();
+            $this->assertSame($identity, $sheet->metadata['identity_color']);
+        }
+
+        $cycledSheet = $group->sheets()->where('name', 'New Sheet 0')->firstOrFail();
+        $this->actingAs($user)->put(route('sheets.rename', $cycledSheet), ['name' => 'Renamed Sheet'])
+            ->assertRedirect();
+        $this->assertSame('analisa', $cycledSheet->fresh()->metadata['identity_color']);
+
+        $nextSheet = $group->sheets()->create([
+            'name' => 'After Cycle',
+            'category' => 'custom',
+            'metadata' => ['identity_color' => \App\Models\SpreadsheetSheet::cyclicIdentityColorKey(10)],
+        ]);
+        $this->assertSame('analisa', $nextSheet->identityColorKey());
     }
 
     private function createSheet(): array

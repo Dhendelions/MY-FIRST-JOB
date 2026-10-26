@@ -13,6 +13,59 @@ class SpreadsheetFormulaEngine
     }
 
     /**
+     * Validate formula syntax.
+     * Returns null if valid, or an error description string if invalid.
+     */
+    public static function validateFormulaSyntax(?string $formula): ?string
+    {
+        if ($formula === null) {
+            return null;
+        }
+
+        $raw = trim($formula);
+        if (!str_starts_with($raw, '=')) {
+            return null;
+        }
+
+        $expr = trim(substr($raw, 1));
+        if ($expr === '') {
+            return 'Formula tidak boleh kosong setelah tanda sama dengan (=).';
+        }
+
+        if (substr_count($raw, '(') !== substr_count($raw, ')')) {
+            return 'Jumlah tanda kurung buka "(" dan tutup ")" tidak seimbang.';
+        }
+
+        if (preg_match('/[+\-*\/]$/', $expr)) {
+            return 'Formula berakhir dengan operator aritmatika yang tidak lengkap.';
+        }
+
+        if (preg_match('/[+\-*\/]{2,}/', $expr, $m)) {
+            if (!preg_match('/^[+\-*\/][\-]$/', $m[0])) {
+                return 'Terdapat operator berurutan yang tidak valid: "' . $m[0] . '"';
+            }
+        }
+
+        try {
+            $dummy = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+            $ws = $dummy->getActiveSheet();
+            $ws->setCellValue('A1', 1);
+            $ws->setCellValue('B1', 2);
+            $ws->setCellValue('A2', $raw);
+            $ws->getCell('A2')->getCalculatedValue();
+        } catch (\Throwable $e) {
+            $msg = $e->getMessage();
+            if (str_contains($msg, 'Formula Error:') || str_contains($msg, 'syntax error') || str_contains($msg, 'Parse error')) {
+                $cleaned = preg_replace('/^.*?Formula Error:\s*/i', '', $msg);
+                return 'Sintaks formula salah: ' . $cleaned;
+            }
+        }
+
+        return null;
+    }
+
+
+    /**
      * Parse and evaluate a formula string against a cell coordinate grid.
      * $grid is an associative array like ['A1' => 10, 'B1' => 25, 'C1' => 'Text'].
      *
@@ -379,7 +432,7 @@ class SpreadsheetFormulaEngine
                     case '*': $evalStack[] = $a * $b; break;
                     case '/':
                         if ($b == 0) {
-                            return '#DIV/0!';
+                            return '0';
                         }
                         $evalStack[] = $a / $b;
                         break;

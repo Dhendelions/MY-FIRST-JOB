@@ -114,7 +114,17 @@ class SpreadsheetWorksheet extends Component
         if (!$this->sheet->group->isMember($user->id)) {
             abort(403, 'Akses ditolak: Anda tidak memiliki wewenang pada workspace ini.');
         }
-        if ($this->sheet->group->hasPassword() && !request()->session()->get('sheet_unlocked_' . $this->sheet->id, false)) {
+
+        $userRole = $this->sheet->group->getMemberRole($user->id);
+        if ($this->sheet->isRestrictedForRole($userRole)) {
+            abort(403, 'Akses dibatasi: Hanya Leader yang memiliki izin untuk mengakses lembar kerja ' . $this->sheet->name . '.');
+        }
+
+        if ($userRole === 'admin' && !$this->sheet->group->isAdminSheetVerifiedForSession($user->id, $this->sheet->id)) {
+            abort(403, 'Lembar kerja ini memerlukan verifikasi password akun admin.');
+        }
+
+        if ($userRole !== 'admin' && !$this->sheet->group->isUnlockedForSession()) {
             abort(403, 'Lembar kerja ini harus dibuka dengan password terlebih dahulu.');
         }
     }
@@ -333,14 +343,21 @@ class SpreadsheetWorksheet extends Component
         foreach (SpreadsheetCell::whereIn('row_id', $rowIds)->get() as $cell) {
             $key = $cell->row_id . '_' . $cell->column_id;
             $this->cellsData[$key] = $cell->value ?? '';
+            $this->cellsFormula[$key] = $cell->formula ?? '';
             $this->cellsVersions[$key] = (int) ($cell->version ?? 1);
-            $this->updateCellPresentation($key, $cell->value ?? '', $this->cellsFormat[$key] ?? []);
+            // Prefer in-memory format (may include recent formatCell changes not yet fetched);
+            // fall back to DB format if key was never populated in memory.
+            if (!isset($this->cellsFormat[$key])) {
+                $this->cellsFormat[$key] = $cell->format ?? [];
+            }
+            $this->updateCellPresentation($key, $cell->value ?? '', $this->cellsFormat[$key]);
             if ($this->activeRowId === $cell->row_id && $this->activeColumnId === $cell->column_id) {
                 $this->activeCellVersion = (int) ($cell->version ?? 1);
                 $this->formulaValue = $cell->formula ?: ($cell->value ?? '');
             }
         }
     }
+
 
     /**
      * Set the currently active cell.
@@ -350,10 +367,20 @@ class SpreadsheetWorksheet extends Component
         $this->activeRowId = $rowId;
         $this->activeColumnId = $colId;
         $this->activeCellCoord = $coord;
-        $this->isEditingCell = true;
+        $this->isEditingCell = false;
         $key = "{$rowId}_{$colId}";
         $this->activeCellVersion = $this->cellsVersions[$key] ?? 0;
         $this->formulaValue = !empty($this->cellsFormula[$key]) ? $this->cellsFormula[$key] : ($this->cellsData[$key] ?? '');
+    }
+
+    public function startCellEdit(): void
+    {
+        $this->isEditingCell = true;
+    }
+
+    public function cancelCellEdit(): void
+    {
+        $this->isEditingCell = false;
     }
 
     public function finishCellEdit(int $rowId, int $colId, string $value, string $originalValue): void
@@ -379,16 +406,12 @@ class SpreadsheetWorksheet extends Component
      */
     public function updatedFormulaValue($value)
     {
-        if ($this->activeRowId && $this->activeColumnId) {
-            $this->isEditingCell = true;
-            $this->updateCell(
-                $this->activeRowId,
-                $this->activeColumnId,
-                $value,
-                $this->activeCellVersion
-            );
-            $this->isEditingCell = true;
-        }
+        // The formula bar is deliberately a draft field.  Persisting from this
+        // lifecycle hook would save one activity (and potentially one formula)
+        // per keystroke when it is bound by a client.  The explicit Enter action
+        // calls updateCell(), which gives cell editing and the formula bar one
+        // commit path and makes Escape safe.
+        $this->isEditingCell = true;
     }
 
     /**
@@ -401,6 +424,17 @@ class SpreadsheetWorksheet extends Component
 
         $key = "{$rowId}_{$colId}";
         $raw = $value !== null ? trim($value) : '';
+
+        // Validate formula syntax if raw begins with '='
+        if (str_starts_with($raw, '=')) {
+            $syntaxError = SpreadsheetFormulaEngine::validateFormulaSyntax($raw);
+            if ($syntaxError !== null) {
+                $this->dispatch('toast', message: $syntaxError, type: 'error');
+                $this->saveStatus = 'Formula tidak valid';
+                return;
+            }
+        }
+
         $expectedVersion ??= $this->cellsVersions[$key] ?? 0;
         $saveResult = DB::transaction(function () use ($rowId, $colId, $key, $raw, $expectedVersion) {
             $currentCell = SpreadsheetCell::where('row_id', $rowId)
@@ -423,6 +457,18 @@ class SpreadsheetWorksheet extends Component
                 ];
             }
 
+            // A stale editor must not silently replace a value saved by another
+            // member.  The caller refreshes its local state and can retry.
+            if ($expectedVersion > 0 && $currentVersion !== $expectedVersion) {
+                return compact('currentVersion', 'oldVal', 'oldFormula') + [
+                    'conflict' => true,
+                    'unchanged' => false,
+                    'rejected' => true,
+                    'formula' => $oldFormula ?: null,
+                    'displayVal' => $oldVal,
+                ];
+            }
+
             $formula = str_starts_with($raw, '=') ? $raw : null;
             $displayVal = $formula ? $oldVal : $raw;
             $currentVersion++;
@@ -432,16 +478,39 @@ class SpreadsheetWorksheet extends Component
             );
             $row = SpreadsheetRow::findOrFail($rowId);
             $column = SpreadsheetColumn::findOrFail($colId);
-            app(SpreadsheetActivityRecorder::class)->record(Auth::user(), $this->sheet, $formula ? 'formula_changed' : 'cell_changed', $column->letter . $row->sort_order, $oldFormula ?: $oldVal, $raw);
+            app(SpreadsheetActivityRecorder::class)->record(
+                Auth::user(),
+                $this->sheet,
+                $formula ? 'formula_changed' : 'cell_changed',
+                $column->letter . $row->sort_order,
+                $oldFormula ?: $oldVal,
+                $raw,
+                [
+                    'old_formula' => $oldFormula,
+                    'new_formula' => $formula,
+                    'old_value' => $oldVal,
+                    'new_value' => $displayVal,
+                ]
+            );
 
             return compact('currentVersion', 'oldVal', 'oldFormula', 'formula', 'displayVal') + [
-                'conflict' => (int) ($currentCell?->version ?? 0) !== $expectedVersion,
+                'conflict' => $expectedVersion > 0 && (int) ($currentCell?->version ?? 0) !== $expectedVersion,
                 'unchanged' => false,
+                'rejected' => false,
             ];
         });
 
         if ($saveResult['unchanged']) {
             $this->isEditingCell = false;
+            $this->skipRender();
+            return;
+        }
+
+        if ($saveResult['rejected'] ?? false) {
+            $this->isEditingCell = false;
+            $this->syncChanges();
+            $this->saveStatus = 'Konflik: data diperbarui';
+            $this->dispatch('toast', message: 'Sel sudah diubah pengguna lain. Nilai terbaru dimuat; silakan tinjau lalu ulangi perubahan.', type: 'warning');
             return;
         }
 
@@ -477,9 +546,56 @@ class SpreadsheetWorksheet extends Component
             $this->activeCellVersion = $currentVersion;
         }
 
+        $beforeData = $this->cellsData;
+        $beforeDisplay = $this->cellsDisplay;
+
         $this->evaluateAllFormulas();
         $this->recalculateSummary();
-        $this->saveStatus = $conflict ? 'Konflik: perubahan terakhir diterapkan' : 'Tersimpan ' . date('H:i:s');
+        $this->loadRecentActivities();
+        $this->dispatch('refreshActivityHistory');
+
+        $changedCells = [];
+        $rowMap = collect($this->rows)->pluck('sort_order', 'id');
+        $colMap = collect($this->columns)->pluck('letter', 'id');
+
+        foreach ($this->cellsData as $k => $val) {
+            if (($beforeData[$k] ?? null) !== $val || ($beforeDisplay[$k] ?? null) !== ($this->cellsDisplay[$k] ?? null)) {
+                [$rId, $cId] = explode('_', $k);
+                $cCoord = ($colMap[$cId] ?? '') . ($rowMap[$rId] ?? '');
+                if ($cCoord) {
+                    $changedCells[$cCoord] = [
+                        'val' => $val,
+                        'formula' => $this->cellsFormula[$k] ?? '',
+                        'display' => $this->cellsDisplay[$k] ?? $val,
+                        'version' => $this->cellsVersions[$k] ?? 1,
+                    ];
+                }
+            }
+        }
+
+        $rowObj = SpreadsheetRow::find($rowId);
+        $colObj = SpreadsheetColumn::find($colId);
+        $savedCoord = ($colObj?->letter ?? '') . ($rowObj?->sort_order ?? '');
+        $saveTime = date('H:i:s');
+
+        $this->saveStatus = $conflict ? 'Konflik: perubahan terakhir diterapkan' : 'Tersimpan ' . $saveTime;
+
+        // Named event parameters are exposed as a stable CustomEvent detail by
+        // Livewire. Passing one positional array here made the browser receive
+        // a nested payload, so it could not advance its optimistic cell version.
+        $this->dispatch(
+            'cell-updated-confirmed',
+            coord: $savedCoord,
+            rowId: $rowId,
+            colId: $colId,
+            version: $currentVersion,
+            val: $this->cellsData[$key] ?? $displayVal,
+            formula: $this->cellsFormula[$key] ?? ($formula ?? ''),
+            display: $this->cellsDisplay[$key] ?? ($this->cellsData[$key] ?? $displayVal),
+            changedCells: $changedCells,
+            saveTime: $saveTime,
+        );
+
         $this->dispatch(
             'toast',
             message: $conflict
@@ -487,6 +603,8 @@ class SpreadsheetWorksheet extends Component
                 : 'Sel tersimpan ke database',
             type: $conflict ? 'warning' : 'info'
         );
+
+        $this->skipRender();
     }
 
     public function syncChanges(): void
@@ -544,15 +662,27 @@ class SpreadsheetWorksheet extends Component
     {
         $this->recentActivities = SpreadsheetActivity::with(['user:id,name', 'sheet:id,name'])
             ->where('group_id', $this->sheet->group_id)->latest('committed_at')->limit(20)->get()
-            ->map(fn ($activity) => ['id' => $activity->id, 'actor' => $activity->user?->name ?? 'Pengguna', 'action' => $activity->action, 'sheet' => $activity->sheet?->name ?? '-', 'range' => $activity->cell_range, 'at' => $activity->committed_at->format('d M H:i')])->all();
+            ->map(fn ($activity) => [
+                'id' => $activity->id,
+                'actor' => $activity->user?->name ?? 'Pengguna',
+                'action' => $activity->action,
+                'sheet' => $activity->sheet?->name ?? '-',
+                'range' => $activity->cell_range,
+                'at' => $activity->committed_at->timezone('Asia/Jakarta')->format('d M H:i:s'),
+            ])->all();
     }
 
     /**
      * Toggle or set formatting on active cell (bold, italic, underline, color, bg, align, numFormat).
      */
-    public function formatCell(string $property, mixed $value = null)
+    public function formatCell(string $property, mixed $value = null, ?int $rowId = null, ?int $colId = null)
     {
         $this->authorizeAccess();
+
+        if ($rowId && $colId) {
+            $this->activeRowId = $rowId;
+            $this->activeColumnId = $colId;
+        }
 
         if (!$this->activeRowId || !$this->activeColumnId) {
             return;
@@ -674,10 +804,12 @@ class SpreadsheetWorksheet extends Component
     /**
      * Clear content of currently active cell.
      */
-    public function clearActiveCell()
+    public function clearActiveCell(?int $rowId = null, ?int $colId = null)
     {
-        if ($this->activeRowId && $this->activeColumnId) {
-            $this->updateCell($this->activeRowId, $this->activeColumnId, '');
+        $rId = $rowId ?? $this->activeRowId;
+        $cId = $colId ?? $this->activeColumnId;
+        if ($rId && $cId) {
+            $this->updateCell($rId, $cId, '');
         }
     }
 
@@ -979,6 +1111,23 @@ class SpreadsheetWorksheet extends Component
         }
         if (empty($lines)) return;
 
+        // Validate the complete paste before opening a write transaction. This
+        // keeps a malformed formula from leaving a partially pasted range.
+        foreach ($lines as $line) {
+            foreach (explode("\t", rtrim($line, "\r")) as $pastedValue) {
+                if (!str_starts_with($pastedValue, '=')) {
+                    continue;
+                }
+
+                $syntaxError = SpreadsheetFormulaEngine::validateFormulaSyntax($pastedValue);
+                if ($syntaxError !== null) {
+                    $this->saveStatus = 'Formula tidak valid';
+                    $this->dispatch('toast', message: $syntaxError, type: 'error');
+                    return;
+                }
+            }
+        }
+
         $startRowIdx = array_search($startRowId, array_column($this->rows, 'id'));
         $startColIdx = array_search($startColId, array_column($this->columns, 'id'));
 
@@ -1274,12 +1423,12 @@ class SpreadsheetWorksheet extends Component
             $this->freezeTopRowCount = max(0, (int) $matches[2] - 1);
         }
 
-        // On Analisa, Cost, and Margin, ensure freeze counts always cover headers and permanent summary
+        // Preserve the workbook's horizontal header behavior and enforce each template's row boundary.
         if (str_contains($sheetName, 'analisa') || str_contains($sheetName, 'analysis')) {
             $this->freezeTopRowCount = max($this->freezeTopRowCount, 5);
             $this->freezeLeftColumnCount = max($this->freezeLeftColumnCount, 2);
-        } elseif (str_contains($sheetName, 'cost')) {
-            $this->freezeTopRowCount = max($this->freezeTopRowCount, 7);
+        } elseif ($this->sheet->isCostWorksheet()) {
+            $this->freezeTopRowCount = 7;
             $this->freezeLeftColumnCount = max($this->freezeLeftColumnCount, 2);
         } elseif (str_contains($sheetName, 'margin')) {
             $this->freezeTopRowCount = max($this->freezeTopRowCount, 4);
@@ -1294,8 +1443,8 @@ class SpreadsheetWorksheet extends Component
             $left += (int) $column['width'];
         }
 
-        // The column heading occupies 36px. Offsets here are relative to the
-        // first data row; the view adds the column-heading height once.
+        // Row offsets use the configured row heights; the view adds the measured
+        // column-heading height once.
         $top = 0;
         foreach ($this->gridRows as $index => $row) {
             if ($index < $this->freezeTopRowCount) {
@@ -1307,7 +1456,7 @@ class SpreadsheetWorksheet extends Component
 
     /**
      * Keep the RM / Rendemen Fillet section and its cream summary rows in view
-     * on the Analisa, Cost, and Margin worksheets. Labels may be in merged cells,
+     * on the Analisa and Margin worksheets. Labels may be in merged cells,
      * therefore every cell in a row is inspected instead of relying on a fixed column.
      */
     private function loadAnalisaFixedRows(): void
@@ -1315,8 +1464,9 @@ class SpreadsheetWorksheet extends Component
         $this->fixedTopRowOffsets = [];
 
         $sheetName = mb_strtolower((string) ($this->sheet->name ?? ''));
-        if (!str_contains($sheetName, 'analisa') && !str_contains($sheetName, 'analysis')
-            && !str_contains($sheetName, 'cost') && !str_contains($sheetName, 'margin')) {
+        if ($this->sheet->isCostWorksheet()
+            || (!str_contains($sheetName, 'analisa') && !str_contains($sheetName, 'analysis')
+                && !str_contains($sheetName, 'margin'))) {
             return;
         }
 

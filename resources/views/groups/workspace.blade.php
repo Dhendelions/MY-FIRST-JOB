@@ -3,26 +3,34 @@
 @section('content')
 <div class="flex-1 flex flex-col min-h-0 bg-slate-100" 
      x-data="{ 
-        workspaceModal: null,
+        workspaceModal: {{ $isSheetRestricted ? "'modal-access-restricted'" : 'null' }},
         editSheetModal: false,
         renameSheetId: null,
         renameSheetName: '',
-        unlockSheetId: {{ $activeSheet?->id ?? 'null' }}
+        unlockSheetId: {{ $activeSheet?->id ?? 'null' }},
+        workspacePasswordError: ''
      }" 
      @open-add-sheet-modal.window="workspaceModal = 'modal-add-sheet'"
      @open-rename-modal.window="renameSheetId = $event.detail.id; renameSheetName = $event.detail.name; workspaceModal = 'modal-rename-sheet'"
-     @sheet-switch.window="unlockSheetId = $event.detail.sheetId; workspaceModal = 'modal-password-unlock'; $nextTick(() => $refs.unlockPassword.focus())">
+     @if($userRole !== 'leader')
+     @sheet-switch.window="unlockSheetId = $event.detail.sheetId; workspaceModal = 'modal-password-unlock'; $nextTick(() => $refs.unlockPassword.focus())"
+     @endif>
 
+    @persist('workspace-header-' . $group->id)
     <!-- 1. HEADER IDENTITAS WORKSPACE -->
-    <div class="bg-white border-b border-slate-200 px-4 sm:px-6 py-4 shadow-2xs reveal-on-scroll">
+    <div class="sticky top-0 z-30 bg-white border-b border-slate-200 px-4 sm:px-6 py-4 shadow-2xs">
         <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             
             <!-- Left: Avatar & Nama -->
             <div class="flex items-start sm:items-center gap-3.5">
-                <div class="w-13 h-13 rounded-2xl bg-gradient-to-tr from-sky-600 to-cyan-500 p-0.5 shadow-md shadow-sky-600/20 shrink-0">
-                    <div class="w-full h-full bg-white rounded-[14px] flex items-center justify-center font-black text-sky-700 text-lg">
-                        {{ strtoupper(substr($group->name, 0, 2)) }}
-                    </div>
+                <div class="w-13 h-13 rounded-2xl bg-gradient-to-tr from-sky-600 to-cyan-500 p-0.5 shadow-md shadow-sky-600/20 shrink-0 overflow-hidden">
+                    @if($group->avatar_url)
+                        <img src="{{ $group->avatar_url }}" alt="{{ $group->name }}" class="w-full h-full object-cover rounded-[14px]">
+                    @else
+                        <div class="w-full h-full bg-white rounded-[14px] flex items-center justify-center font-black text-sky-700 text-lg">
+                            {{ strtoupper(substr($group->name, 0, 2)) }}
+                        </div>
+                    @endif
                 </div>
 
                 <div class="space-y-1">
@@ -64,6 +72,14 @@
                             title="Kelola Anggota & Peran">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
                     </button>
+
+                    <!-- Tombol Riwayat Aktivitas Workspace -->
+                    <button @click="workspaceModal = 'modal-activity-history'" 
+                            class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs flex items-center gap-1.5 transition-colors"
+                            title="Riwayat Aktivitas Workspace">
+                        <svg class="w-4 h-4 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <span class="hidden sm:inline">Riwayat Aktivitas</span>
+                    </button>
                 </div>
 
                 <!-- Settings Button (Leader & Admin) -->
@@ -77,12 +93,74 @@
             </div>
         </div>
     </div>
+    @endpersist
 
     <!-- Sheet tabs are now only at the bottom via the Livewire component -->
 
-    <!-- 3. LEMBAR KERJA SPREADSHEET (LIVEWIRE COMPONENT) -->
+    <!-- 3. LEMBAR KERJA SPREADSHEET (LIVEWIRE COMPONENT / RESTRICTION) -->
     <div class="flex-1 flex flex-col min-h-0 overflow-hidden">
-        @if($activeSheet && !$requiresPasswordUnlock && !$requiresPasswordSetup)
+        @if($isSheetRestricted)
+            <div class="flex-1 flex flex-col items-center justify-center p-8 text-center bg-slate-50">
+                <div class="w-16 h-16 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center mb-4 shadow-sm">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                </div>
+                <h2 class="text-lg font-bold text-slate-800">Akses Lembar Kerja Dibatasi</h2>
+                <p class="text-xs sm:text-sm text-slate-500 max-w-md mt-1 mb-5">
+                    Lembar <strong>{{ $activeSheet?->name }}</strong> hanya dapat diakses oleh Leader tim. Peran Anda saat ini adalah <strong>{{ strtoupper($userRole) }}</strong>.
+                </p>
+                <div class="flex items-center gap-3">
+                    @php
+                        $accessibleSheet = $sheets->firstWhere(fn ($s) => !$s->isRestrictedForRole($userRole));
+                    @endphp
+                    @if($accessibleSheet)
+                        <a href="{{ route('group.workspace', [$group->id, $accessibleSheet->id]) }}" 
+                           class="px-4 py-2 rounded-xl text-xs font-semibold bg-sky-600 hover:bg-sky-500 text-white shadow-sm transition-colors">
+                            Buka Lembar {{ $accessibleSheet->name }}
+                        </a>
+                    @endif
+                    <button @click="workspaceModal = 'modal-access-restricted'" 
+                            class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-200 hover:bg-slate-300 text-slate-700 transition-colors">
+                        Pelajari Hak Akses
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tab Lembar Kerja di Bawah untuk Navigasi jika Lembar Dibatasi -->
+            <div class="h-10 bg-slate-100 border-t border-slate-200 px-4 flex items-center justify-between text-xs bottom-tabs shrink-0 select-none">
+                <div class="flex items-center space-x-1 overflow-x-auto py-1">
+                    @foreach($sheets as $sh)
+                        @php
+                            $isCurrent = $sh->id === $activeSheet?->id;
+                            $shRestricted = $sh->isRestrictedForRole($userRole);
+                            $sheetLabel = mb_strtolower($sh->name . ' ' . ($sh->category ?? ''));
+                            $tabPalette = match (true) {
+                                str_contains($sheetLabel, 'analisa') => ['active' => '#0369a1', 'idle' => '#e0f2fe', 'text' => '#075985'],
+                                str_contains($sheetLabel, 'cost') => ['active' => '#c2410c', 'idle' => '#ffedd5', 'text' => '#9a3412'],
+                                str_contains($sheetLabel, 'margin') => ['active' => '#6d28d9', 'idle' => '#ede9fe', 'text' => '#5b21b6'],
+                                str_contains($sheetLabel, 'pendukung') || str_contains($sheetLabel, 'supporting') => ['active' => '#047857', 'idle' => '#d1fae5', 'text' => '#065f46'],
+                                str_contains($sheetLabel, 'rank') => ['active' => '#be123c', 'idle' => '#ffe4e6', 'text' => '#9f1239'],
+                                default => ['active' => '#334155', 'idle' => '#e2e8f0', 'text' => '#334155'],
+                            };
+                            $tabStyle = $isCurrent
+                                ? "background-color: {$tabPalette['active']}; color: #ffffff; border-color: {$tabPalette['active']};"
+                                : ($shRestricted
+                                    ? 'background-color: #e2e8f0; color: #94a3b8; border-color: #cbd5e1;'
+                                    : "background-color: {$tabPalette['idle']}; color: {$tabPalette['text']}; border-color: {$tabPalette['active']};");
+                        @endphp
+                        <div class="relative group/tab flex items-center">
+                            <a href="{{ route('group.workspace', [$group->id, $sh->id]) }}"
+                               style="{{ $tabStyle }}"
+                               class="px-3 py-1 rounded-t-lg border font-medium transition-all flex items-center gap-1.5 {{ $isCurrent ? 'shadow-2xs font-bold' : '' }}">
+                                <span>{{ $sh->name }}</span>
+                                @if($shRestricted)
+                                    <svg class="w-3 h-3 text-slate-400" fill="currentColor" viewBox="0 0 20 20" title="Akses Dibatasi (Leader Only)"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" /></svg>
+                                @endif
+                            </a>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        @elseif($activeSheet && !$requiresPasswordUnlock && !$requiresPasswordSetup)
             @livewire('spreadsheet-worksheet', ['sheet' => $activeSheet], key($activeSheet->id))
         @else
             <div class="flex-1 flex items-center justify-center p-8 text-center">
@@ -91,8 +169,45 @@
         @endif
     </div>
 
+    <template x-teleport="body">
+    <div class="workspace-modal-layer">
     <!-- MODAL 1: Tambah Anggota Baru -->
-    <div x-show="workspaceModal === 'modal-add-member'" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
+    <div x-show="workspaceModal === 'modal-add-member'" 
+         x-data="{
+            searchQuery: '',
+            selectedUserId: null,
+            selectedUserName: '',
+            searchResults: [],
+            isSearching: false,
+            searchUsers() {
+                if (this.searchQuery.trim().length < 1) {
+                    this.searchResults = [];
+                    return;
+                }
+                this.isSearching = true;
+                fetch('{{ route('groups.users.search', $group->id) }}?name=' + encodeURIComponent(this.searchQuery))
+                    .then(res => res.json())
+                    .then(data => {
+                        this.searchResults = data.users || [];
+                        this.isSearching = false;
+                    })
+                    .catch(() => { this.isSearching = false; });
+            },
+            selectUser(user) {
+                if (user.is_member) return;
+                this.selectedUserId = user.id;
+                this.selectedUserName = user.name;
+                this.searchQuery = user.name;
+                this.searchResults = [];
+            },
+            resetSelection() {
+                this.selectedUserId = null;
+                this.selectedUserName = '';
+                this.searchQuery = '';
+                this.searchResults = [];
+            }
+         }"
+         class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
         <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
             <div class="fixed inset-0 bg-slate-900/70 backdrop-blur-xs transition-opacity" @click="workspaceModal = null"></div>
             <div class="relative bg-white rounded-2xl max-w-md w-full p-6 text-left shadow-2xl border border-slate-100 my-8">
@@ -103,7 +218,7 @@
                         </div>
                         <div>
                             <h3 class="text-base font-bold text-slate-800">Tambah Anggota Tim</h3>
-                            <p class="text-xs text-slate-500">Undang anggota ke workspace {{ $group->name }}</p>
+                            <p class="text-xs text-slate-500">Pilih pengguna terdaftar ke workspace {{ $group->name }}</p>
                         </div>
                     </div>
                     <button @click="workspaceModal = null" class="text-slate-400 hover:text-slate-600">
@@ -113,10 +228,62 @@
 
                 <form action="{{ route('groups.members.add', $group->id) }}" method="POST" class="mt-4 space-y-4">
                     @csrf
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">Email atau No. Kontak Terdaftar <span class="text-rose-500">*</span></label>
-                        <input type="text" name="email_or_phone" required placeholder="cth: nama@email.com" 
-                               class="w-full text-xs sm:text-sm px-3.5 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                    <input type="hidden" name="user_id" :value="selectedUserId" required>
+
+                    <!-- Pencarian Berdasarkan Nama Pengguna -->
+                    <div class="relative">
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Nama Pengguna Terdaftar <span class="text-rose-500">*</span></label>
+                        <div class="relative">
+                            <input type="text" 
+                                   x-model="searchQuery" 
+                                   @input.debounce.300ms="searchUsers()" 
+                                   placeholder="Ketik nama anggota..." 
+                                   autocomplete="off"
+                                   required 
+                                   class="w-full text-xs sm:text-sm px-3.5 py-2.5 pl-9 border border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                            <svg class="w-4 h-4 text-slate-400 absolute left-3 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                            <template x-if="selectedUserId">
+                                <button type="button" @click="resetSelection()" class="absolute right-3 top-2.5 text-xs text-slate-400 hover:text-rose-600 font-bold">✕</button>
+                            </template>
+                        </div>
+
+                        <!-- Autocomplete dropdown list -->
+                        <div x-show="searchResults.length > 0" 
+                             @click.away="searchResults = []"
+                             class="absolute left-0 right-0 mt-1 max-h-52 overflow-y-auto bg-white rounded-xl shadow-xl border border-slate-200 z-50 divide-y divide-slate-100" x-cloak>
+                            <template x-for="u in searchResults" :key="u.id">
+                                <div @click="selectUser(u)" 
+                                     :class="u.is_member ? 'opacity-50 cursor-not-allowed bg-slate-50' : 'cursor-pointer hover:bg-sky-50'"
+                                     class="p-2.5 flex items-center justify-between gap-2.5 transition-colors">
+                                    <div class="flex items-center gap-2.5 min-w-0">
+                                        <div class="w-7 h-7 rounded-full bg-slate-100 overflow-hidden shrink-0 flex items-center justify-center font-bold text-slate-600 text-xs">
+                                            <template x-if="u.avatar_url">
+                                                <img :src="u.avatar_url" class="w-full h-full object-cover">
+                                            </template>
+                                            <template x-if="!u.avatar_url">
+                                                <span x-text="u.name.substring(0, 2).toUpperCase()"></span>
+                                            </template>
+                                        </div>
+                                        <div class="truncate">
+                                            <p class="text-xs font-bold text-slate-800 truncate" x-text="u.name"></p>
+                                            <p class="text-[10px] text-slate-400 truncate" x-text="'ID: #' + u.id + ' • ' + u.role_title"></p>
+                                        </div>
+                                    </div>
+                                    <div class="shrink-0 text-right">
+                                        <template x-if="u.is_member">
+                                            <span class="text-[10px] font-semibold text-slate-400 bg-slate-100 px-2 py-0.5 rounded">Sudah Terdaftar</span>
+                                        </template>
+                                        <template x-if="!u.is_member">
+                                            <span class="text-[10px] font-semibold text-sky-600 bg-sky-100 px-2 py-0.5 rounded">Pilih</span>
+                                        </template>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+
+                        <template x-if="selectedUserId">
+                            <p class="text-[11px] text-emerald-600 font-medium mt-1">✓ Akun dipilih: <strong x-text="selectedUserName"></strong> (ID: #<span x-text="selectedUserId"></span>)</p>
+                        </template>
                     </div>
 
                     <div>
@@ -134,7 +301,10 @@
                         <button type="button" @click="workspaceModal = null" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors">
                             Batal
                         </button>
-                        <button type="submit" class="px-5 py-2 rounded-xl text-xs font-semibold bg-sky-600 hover:bg-sky-500 text-white shadow-md shadow-sky-500/20 transition-all">
+                        <button type="submit" 
+                                :disabled="!selectedUserId"
+                                :class="!selectedUserId ? 'opacity-50 cursor-not-allowed bg-slate-300 text-slate-500' : 'bg-sky-600 hover:bg-sky-500 text-white shadow-md shadow-sky-500/20'"
+                                class="px-5 py-2 rounded-xl text-xs font-semibold transition-all">
                             Tambahkan Anggota
                         </button>
                     </div>
@@ -236,7 +406,7 @@
                     </button>
                 </div>
 
-                <form action="{{ route('groups.update', $group->id) }}" method="POST" class="mt-4 space-y-4">
+                <form action="{{ route('groups.update', $group->id) }}" method="POST" enctype="multipart/form-data" class="mt-4 space-y-4">
                     @csrf
                     @method('PUT')
 
@@ -244,6 +414,25 @@
                         <label class="block text-xs font-semibold text-slate-700 mb-1">Nama Workspace <span class="text-rose-500">*</span></label>
                         <input type="text" name="name" value="{{ $group->name }}" required 
                                class="w-full text-xs sm:text-sm px-3.5 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                    </div>
+
+                    <!-- Foto Profil Workspace -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Foto Profil Workspace</label>
+                        <div class="flex items-center gap-3">
+                            <div class="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center">
+                                @if($group->avatar_url)
+                                    <img src="{{ $group->avatar_url }}" alt="{{ $group->name }}" class="w-full h-full object-cover">
+                                @else
+                                    <span class="font-bold text-sky-600 text-xs">{{ strtoupper(substr($group->name, 0, 2)) }}</span>
+                                @endif
+                            </div>
+                            <div class="flex-1">
+                                <input type="file" name="avatar" accept="image/png,image/jpeg,image/jpg,image/webp" 
+                                       class="w-full text-xs text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100 cursor-pointer">
+                                <p class="text-[10px] text-slate-400 mt-1">Format JPG, PNG, WEBP. Maksimal 2MB.</p>
+                            </div>
+                        </div>
                     </div>
 
                     @if($userRole === 'leader')
@@ -409,24 +598,104 @@
         </div>
     @endif
 
-    @if($group->hasPassword())
-        <div x-init="if ({{ $requiresPasswordUnlock ? 'true' : 'false' }}) workspaceModal = 'modal-password-unlock'"></div>
+    @if($requiresPasswordUnlock)
+        <div x-init="workspaceModal = 'modal-password-unlock'"></div>
         <div x-show="workspaceModal === 'modal-password-unlock'" x-transition.opacity class="fixed inset-0 z-[60] overflow-y-auto" x-cloak role="dialog" aria-modal="true" aria-labelledby="password-unlock-title" @keydown.escape.prevent @wheel.prevent @touchmove.prevent>
             <div class="flex items-center justify-center min-h-screen px-4 py-8">
                 <div class="fixed inset-0 bg-slate-950/50 backdrop-blur-sm" aria-hidden="true"></div>
                 <div x-transition.scale.origin.center x-ref="passwordUnlockDialog" class="relative bg-white rounded-2xl max-w-md w-full p-6 text-left shadow-2xl border border-slate-100">
-                    <h3 id="password-unlock-title" class="text-base font-bold text-slate-900">Masukkan Password Workspace</h3>
-                    <p class="text-xs text-slate-500 mt-1">Password diperlukan setiap kali Anda masuk kembali ke workspace.</p>
-                    <form action="{{ route('groups.unlock', $group->id) }}" method="POST" class="mt-5 space-y-4">
+                    <h3 id="password-unlock-title" class="text-base font-bold text-slate-900">{{ $userRole === 'admin' ? 'Verifikasi Password Akun' : 'Masukkan Password Workspace' }}</h3>
+                    <p class="text-xs text-slate-500 mt-1">{{ $userRole === 'admin' ? 'Admin wajib memasukkan password akun untuk membuka setiap lembar kerja.' : 'Password diperlukan setiap kali Anda masuk kembali ke workspace.' }}</p>
+                    <form action="{{ route('groups.unlock', $group->id) }}" method="POST" @submit.prevent="unlockWorkspace($event)" class="mt-5 space-y-4">
                         @csrf
                         <input type="hidden" name="sheet_id" :value="unlockSheetId">
-                        <input x-ref="unlockPassword" x-init="if ({{ $requiresPasswordUnlock ? 'true' : 'false' }}) $nextTick(() => $el.focus())" type="password" name="password" required autofocus placeholder="Password workspace"
+                        <input x-ref="unlockPassword" x-init="if ({{ $requiresPasswordUnlock ? 'true' : 'false' }}) $nextTick(() => $el.focus())" type="password" name="password" required autocomplete="off" autofocus placeholder="{{ $userRole === 'admin' ? 'Password akun Anda' : 'Password workspace' }}"
                             class="w-full text-sm px-3.5 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                        <p x-show="workspacePasswordError" x-text="workspacePasswordError" class="text-xs text-rose-600" role="alert"></p>
                         <button type="submit" class="w-full px-5 py-2.5 rounded-xl text-xs font-semibold bg-sky-600 hover:bg-sky-500 text-white">Masuk ke Workspace</button>
                     </form>
                 </div>
             </div>
         </div>
     @endif
-</div>
+
+    <!-- MODAL 6: Akses Dibatasi Berdasarkan Peran -->
+    <div x-show="workspaceModal === 'modal-access-restricted'" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
+            <div class="fixed inset-0 bg-slate-900/70 backdrop-blur-xs transition-opacity" @click="workspaceModal = null"></div>
+            <div class="relative bg-white rounded-2xl max-w-md w-full p-6 text-left shadow-2xl border border-slate-100 my-8">
+                <div class="flex items-start gap-4">
+                    <div class="w-12 h-12 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-bold text-slate-900">Akses Lembar Dibatasi</h3>
+                        <p class="text-xs text-slate-600 mt-1">
+                            Lembar <strong>{{ $activeSheet?->name }}</strong> dilindungi kebijakan hak akses dan hanya dapat diakses serta diedit oleh <strong>Leader</strong>.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="mt-4 p-3.5 rounded-xl bg-slate-50 border border-slate-200/60 text-xs space-y-2 text-slate-600">
+                    <div class="flex justify-between items-center">
+                        <span class="text-slate-500">Peran Anda saat ini:</span>
+                        <strong class="font-mono text-slate-800 uppercase px-2 py-0.5 rounded bg-slate-200/60">{{ $userRole }}</strong>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-slate-500">Lembar yang dapat diakses:</span>
+                        <span class="font-semibold text-emerald-600">Analisa, Cost</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-slate-500">Lembar dibatasi (Leader):</span>
+                        <span class="font-semibold text-amber-600">Margin, Pendukung, Rank</span>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex items-center justify-end gap-2.5">
+                    <button type="button" @click="workspaceModal = null" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors">
+                        Tutup
+                    </button>
+                    @php
+                        $fallbackSheet = $sheets->firstWhere(fn ($s) => !$s->isRestrictedForRole($userRole));
+                    @endphp
+                    @if($fallbackSheet)
+                        <a href="{{ route('group.workspace', [$group->id, $fallbackSheet->id]) }}" 
+                           class="px-4 py-2 rounded-xl text-xs font-semibold bg-sky-600 hover:bg-sky-500 text-white shadow-xs transition-colors">
+                            Buka Lembar {{ $fallbackSheet->name }}
+                        </a>
+                    @endif
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 7: Riwayat Aktivitas Workspace -->
+    <div x-show="workspaceModal === 'modal-activity-history'" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
+            <div class="fixed inset-0 bg-slate-900/70 backdrop-blur-xs transition-opacity" @click="workspaceModal = null"></div>
+            <div class="relative bg-white rounded-2xl max-w-2xl w-full text-left shadow-2xl border border-slate-100 my-8 overflow-hidden flex flex-col">
+                <div class="p-5 pb-3 border-b border-slate-100 flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-9 h-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center font-bold">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        </div>
+                        <div>
+                            <h3 class="text-base font-bold text-slate-800">Riwayat Aktivitas Workspace</h3>
+                            <p class="text-xs text-slate-500">Catatan pengeditan sel, formula, anggota, dan perubahan workspace {{ $group->name }}</p>
+                        </div>
+                    </div>
+                    <button @click="workspaceModal = null" class="text-slate-400 hover:text-slate-600">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+
+                <div class="p-0 flex-1 min-h-0">
+                    @livewire('workspace-activity-history', ['groupId' => $group->id], key('history-' . $group->id))
+                </div>
+            </div>
+        </div>
+        </div>
+    </div>
+    </template>
+    </div>
 @endsection

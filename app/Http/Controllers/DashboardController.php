@@ -22,6 +22,12 @@ class DashboardController extends Controller
     {
         $user = Auth::user();
 
+        // Re-entering a workspace from the dashboard requires an admin to
+        // authenticate again; no account password is retained in the session.
+        foreach ($user->groups()->pluck('fisheries_groups.id') as $groupId) {
+            $request->session()->forget('admin_sheet_verified_' . $groupId . '_' . $user->id);
+        }
+
         // 1. Fetch user's joined workspaces from database
         $search = $request->query('q');
 
@@ -38,6 +44,9 @@ class DashboardController extends Controller
         }
 
         $myGroups = $groupsQuery->latest()->get();
+        $manageableGroups = $myGroups
+            ->filter(fn (FisheriesGroup $group) => $group->isLeader($user->id))
+            ->values();
 
         // 2. Real-Time KPI Statistics (Purely based on user's actual database records)
         $totalWorkspaces = $userGroupIds->count();
@@ -64,6 +73,7 @@ class DashboardController extends Controller
         return view('dashboard', compact(
             'user',
             'myGroups',
+            'manageableGroups',
             'totalWorkspaces',
             'totalSheetsCount',
             'totalRecordedCells',
@@ -139,6 +149,7 @@ class DashboardController extends Controller
             return $createdGroup;
         });
 
+        $request->session()->put('workspace_unlocked_' . $group->id, true);
         $request->session()->put('sheet_unlocked_' . $group->sheets()->first()->id, true);
         return redirect()->route('group.workspace', $group->id)
             ->with('success', "Workspace '{$group->name}' berhasil dibuat! Password tersimpan dengan aman.");
@@ -211,6 +222,7 @@ class DashboardController extends Controller
 
         // Password sudah diverifikasi pada proses bergabung ini; akses berikutnya
         // setelah logout/login tetap akan meminta password lagi.
+        $request->session()->put('workspace_unlocked_' . $group->id, true);
         $request->session()->put('sheet_unlocked_' . $group->sheets()->first()->id, true);
 
         return redirect()->route('group.workspace', $group->id)->with('success', "Autentikasi berhasil! Selamat bergabung ke workspace {$group->name}.");

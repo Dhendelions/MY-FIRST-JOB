@@ -1,0 +1,11 @@
+# Environment dan secret
+.env
+.env.*
+!.env.example
+
+# Dependencies
+/vendor/
+/node_modules/
+
+# File cache dan log Laravel
+/storage/*.key

@@ -34,6 +34,13 @@ class SpreadsheetWorkbookCalculator
                     }
                     $coordinate = $letter . $row->sort_order;
                     if ($cell->formula) {
+                        if (!empty($cell->format['template_static_formula'])) {
+                            // Preserve the formula in storage while treating a
+                            // template's hard-coded sample expression as a
+                            // neutral zero for all dependent calculations.
+                            $worksheet->setCellValueExplicit($coordinate, 0, DataType::TYPE_NUMERIC);
+                            continue;
+                        }
                         if (str_contains($cell->formula, '[')) {
                             $this->setCachedValue($worksheet, $coordinate, $cell);
                             continue;
@@ -49,12 +56,21 @@ class SpreadsheetWorkbookCalculator
             }
         }
 
+        \PhpOffice\PhpSpreadsheet\Calculation\Calculation::getInstance($workbook)->clearCalculationCache();
+
         $updates = [];
         foreach ($formulaCells as [$worksheet, $coordinate, $cell]) {
             try {
                 $calcVal = $worksheet->getCell($coordinate)->getCalculatedValue();
-            } catch (\Throwable) {
-                $calcVal = '#VALUE!';
+                if ($calcVal === '#DIV/0!' || (is_string($calcVal) && str_contains($calcVal, '#DIV/0!'))) {
+                    $calcVal = 0;
+                }
+            } catch (\Throwable $e) {
+                if (str_contains($e->getMessage(), 'Division by zero') || $e instanceof \DivisionByZeroError) {
+                    $calcVal = 0;
+                } else {
+                    $calcVal = '#VALUE!';
+                }
             }
             $updates[$cell->id] = [
                 'original' => (string) ($cell->value ?? ''),

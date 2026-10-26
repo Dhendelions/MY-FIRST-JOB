@@ -13,9 +13,7 @@
 
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Interaksi modal/navigasi menggunakan Alpine. Dimuat eksplisit agar tetap
-         bekerja pada halaman tanpa komponen Livewire aktif. -->
-    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    
     <script>
         tailwind.config = {
             theme: {
@@ -139,6 +137,9 @@
         .spreadsheet-table .grid-cell-input.is-wrapped {
             white-space: normal;
         }
+        .workspace-modal-layer > .fixed.inset-0 {
+            z-index: 1000 !important;
+        }
 
         /* Print styles */
         @media print {
@@ -158,8 +159,8 @@
     </style>
 
     <script>
-        // Initialize lightweight IntersectionObserver for scroll reveal
-        document.addEventListener('DOMContentLoaded', () => {
+        // Reinitialize reveal effects after Livewire navigates between sheets.
+        const initializeRevealElements = () => {
             if ('IntersectionObserver' in window && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
                 const observer = new IntersectionObserver((entries) => {
                     entries.forEach(entry => {
@@ -174,7 +175,9 @@
             } else {
                 document.querySelectorAll('.reveal-on-scroll').forEach(el => el.classList.add('is-revealed'));
             }
-        });
+        };
+        document.addEventListener('DOMContentLoaded', initializeRevealElements);
+        document.addEventListener('livewire:navigated', initializeRevealElements);
     </script>
 
     <?php echo \Livewire\Mechanisms\FrontendAssets\FrontendAssets::styles(); ?>
@@ -182,10 +185,152 @@
 </head>
 <body class="h-full flex text-slate-800 antialiased font-sans" x-data="{ 
     mobileSidebarOpen: false,
-    activeModal: null,
+    activeModal: <?php echo \Illuminate\Support\Js::from(session('workspace_exit_target') ? 'modal-exit-verification' : (request()->query('open') === 'friends' ? 'modal-friend' : null))->toHtml() ?>,
+    workspaceExitGroupId: <?php echo \Illuminate\Support\Js::from(
+        isset($group, $userRole)
+            && in_array($userRole, ['admin', 'karyawan'], true)
+            && (int) session('admin_workspace_context.user_id', session('workspace_exit_context.user_id')) === (int) Auth::id()
+            && (int) session('admin_workspace_context.group_id', session('workspace_exit_context.group_id')) === (int) $group->id
+                ? $group->id
+                : null
+    )->toHtml() ?>,
+    get adminWorkspaceGroupId() {
+        return this.workspaceExitGroupId;
+    },
+    workspaceExitTarget: <?php echo \Illuminate\Support\Js::from(session('workspace_exit_target', ''))->toHtml() ?>,
+    get adminExitTarget() {
+        return this.workspaceExitTarget;
+    },
+    set adminExitTarget(val) {
+        this.workspaceExitTarget = val;
+    },
+    exitPasswordInput: '',
+    showExitPassword: false,
+    isSubmittingExit: false,
+    exitErrorMessage: '',
+    workspacePasswordError: '',
     toastMessage: '',
     toastType: 'info',
     showToast: false,
+    guardWorkspaceNavigation(event) {
+        if (!this.workspaceExitGroupId) return;
+        const link = event.target.closest('a[href]');
+        if (!link || link.target === '_blank' || event.defaultPrevented) return;
+
+        const destination = new URL(link.href, window.location.href);
+        if (destination.origin !== window.location.origin) return;
+
+        const workspacePath = `/groups/${this.workspaceExitGroupId}/workspace`;
+        if (destination.pathname === workspacePath || destination.pathname.startsWith(workspacePath + '/')) return;
+
+        event.preventDefault();
+        this.requestWorkspaceExit(destination.pathname + destination.search + destination.hash);
+    },
+    requestWorkspaceExit(destination) {
+        if (!this.workspaceExitGroupId) {
+            if (destination.includes('open=friends')) {
+                this.activeModal = 'modal-friend';
+            }
+            return;
+        }
+        this.workspaceExitTarget = destination;
+        this.exitPasswordInput = '';
+        this.showExitPassword = false;
+        this.isSubmittingExit = false;
+        this.exitErrorMessage = '';
+        this.activeModal = 'modal-exit-verification';
+    },
+    requestAdminExit(destination) {
+        this.requestWorkspaceExit(destination);
+    },
+    cancelExit() {
+        this.activeModal = null;
+        this.workspaceExitTarget = '';
+        this.exitPasswordInput = '';
+        this.showExitPassword = false;
+        this.isSubmittingExit = false;
+        this.exitErrorMessage = '';
+    },
+    submitExitVerification(event) {
+        if (this.isSubmittingExit) return;
+        this.isSubmittingExit = true;
+        this.exitErrorMessage = '';
+
+        const form = event.target;
+        const formData = new FormData(form);
+
+        fetch(form.action, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.getAttribute('content') || ''
+            }
+        })
+        .then(async response => {
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                const errorMsg = data.message || Object.values(data.errors || {}).flat()[0] || 'Password akun salah. Silakan coba lagi.';
+                throw new Error(errorMsg);
+            }
+            return data;
+        })
+        .then(data => {
+            this.isSubmittingExit = false;
+            this.exitPasswordInput = '';
+            if (data.redirect) {
+                window.location.href = data.redirect;
+            } else if (this.workspaceExitTarget && this.workspaceExitTarget !== 'logout') {
+                window.location.href = this.workspaceExitTarget;
+            } else {
+                window.location.href = '/dashboard';
+            }
+        })
+        .catch(err => {
+            this.isSubmittingExit = false;
+            this.exitPasswordInput = '';
+            this.exitErrorMessage = err.message || 'Verifikasi password gagal. Silakan coba lagi.';
+        });
+    },
+    initWorkspaceHistory() {
+        if (this.workspaceExitGroupId && window.history && window.history.pushState) {
+            window.history.pushState({ inWorkspace: true, groupId: this.workspaceExitGroupId }, '');
+            window.addEventListener('popstate', (e) => {
+                if (this.workspaceExitGroupId) {
+                    window.history.pushState({ inWorkspace: true, groupId: this.workspaceExitGroupId }, '');
+                    this.requestWorkspaceExit('<?php echo e(route('dashboard')); ?>');
+                }
+            });
+        }
+    },
+    unlockWorkspace(event) {
+        const form = event.target;
+        const password = form.elements.password;
+        this.workspacePasswordError = '';
+
+        fetch(form.action, {
+            method: 'POST',
+            body: new FormData(form),
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(async response => {
+            const result = await response.json();
+            if (!response.ok) {
+                const validationError = Object.values(result.errors || {}).flat()[0];
+                throw new Error(result.message || validationError || 'Verifikasi password gagal.');
+            }
+            return result;
+        })
+        .then(result => {
+            password.value = '';
+            window.Livewire.navigate(result.redirect);
+        })
+        .catch(error => {
+            password.value = '';
+            this.workspacePasswordError = error.message || 'Verifikasi password gagal.';
+        });
+    },
     viewProfileUserId: null,
     viewProfileData: null,
     viewProfileLoading: false,
@@ -225,7 +370,12 @@
         });
     }
 }" @toast.window="triggerToast($event.detail.message, $event.detail.type || 'info')"
-   @open-user-profile.window="openUserProfile($event.detail.userId)">
+   <?php if(isset($group, $userRole) && in_array($userRole, ['admin', 'karyawan'], true)): ?> @click.capture="guardWorkspaceNavigation($event)" <?php endif; ?>
+   @open-user-profile.window="openUserProfile($event.detail.userId)"
+   x-init="
+       <?php if(session('error')): ?> exitErrorMessage = <?php echo \Illuminate\Support\Js::from(session('error'))->toHtml() ?>; <?php endif; ?>
+       initWorkspaceHistory();
+   ">
 
     <!-- Flash message triggers -->
     <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(session('success')): ?>
@@ -282,7 +432,7 @@
                         Beranda / Ringkasan
                     </a>
 
-                    <button @click="activeModal = 'modal-friend'" 
+                    <button @click="<?php if(isset($group, $userRole) && in_array($userRole, ['admin', 'karyawan'], true)): ?> requestWorkspaceExit('<?php echo e(route('dashboard', ['open' => 'friends'])); ?>') <?php else: ?> activeModal = 'modal-friend' <?php endif; ?>"
                             class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800/60 hover:text-white transition-all text-left">
                         <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
@@ -299,26 +449,23 @@
                 </div>
 
                 <div class="space-y-1.5 max-h-56 overflow-y-auto pr-1">
-                    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php $__empty_1 = true; $__currentLoopData = Auth::user()->groups; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $g): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+                    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php $__currentLoopData = Auth::user()->groups; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $g): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                         <a href="<?php echo e(route('group.workspace', $g->id)); ?>" 
                            class="flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all <?php echo e(isset($group) && $group->id === $g->id ? 'bg-slate-800 text-sky-300 ring-1 ring-sky-500/30' : 'text-slate-300 hover:bg-slate-800/40'); ?>">
-                            <div class="w-8 h-8 rounded-lg bg-sky-600/30 border border-sky-500/40 flex items-center justify-center font-bold text-sky-300 text-xs shrink-0">
-                                <?php echo e(strtoupper(substr($g->name, 0, 2))); ?>
+                            <div class="w-8 h-8 rounded-lg bg-sky-600/30 border border-sky-500/40 flex items-center justify-center font-bold text-sky-300 text-xs shrink-0 overflow-hidden">
+                                <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($g->avatar_url): ?>
+                                    <img src="<?php echo e($g->avatar_url); ?>" alt="<?php echo e($g->name); ?>" class="w-full h-full object-cover">
+                                <?php else: ?>
+                                    <?php echo e(strtoupper(substr($g->name, 0, 2))); ?>
 
+                                <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
                             </div>
                             <div class="truncate flex-1">
                                 <p class="truncate font-semibold text-white"><?php echo e($g->name); ?></p>
                                 <p class="text-[10px] text-slate-400 truncate"><?php echo e($g->category); ?> • <?php echo e($g->sheets()->count()); ?> Lembar</p>
                             </div>
                         </a>
-                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
-                        <div class="px-3 py-3 rounded-lg bg-slate-800/30 border border-dashed border-slate-700/60 text-center">
-                            <p class="text-xs text-slate-400 mb-2">Belum ada workspace</p>
-                            <button @click="activeModal = 'modal-create-group'" class="text-xs bg-sky-500 hover:bg-sky-400 text-white font-medium px-3 py-1 rounded">
-                                + Buat Workspace
-                            </button>
-                        </div>
-                    <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
                 </div>
 
                 <div class="mt-3 px-2 flex gap-2">
@@ -349,7 +496,9 @@
             </div>
             <form action="<?php echo e(route('logout')); ?>" method="POST">
                 <?php echo csrf_field(); ?>
-                <button type="submit" title="Keluar / Logout" class="p-2 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition-colors">
+                <button type="submit" title="Keluar / Logout"
+                        @click="if (workspaceExitGroupId) { $event.preventDefault(); requestWorkspaceExit('logout'); }"
+                        class="p-2 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition-colors">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
                     </svg>
@@ -362,7 +511,7 @@
     <div class="flex-1 flex flex-col min-w-0 overflow-hidden bg-slate-50 page-transition">
         
         <!-- TOPBAR -->
-        <header class="h-16 bg-white border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between shadow-xs sticky top-0 z-30">
+        <header class="h-16 bg-white border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between shadow-xs sticky top-0 z-[100]">
             <div class="flex items-center gap-3">
                 <!-- Mobile sidebar toggle -->
                 <button @click="mobileSidebarOpen = !mobileSidebarOpen" class="lg:hidden p-2 rounded-md text-slate-600 hover:bg-slate-100">
@@ -466,6 +615,89 @@
         </main>
     </div>
 
+    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(isset($group, $userRole) && in_array($userRole, ['admin', 'karyawan'], true)): ?>
+        <div x-show="activeModal === 'modal-exit-verification' || activeModal === 'modal-admin-exit'" x-transition.opacity
+             class="fixed inset-0 z-[1100] overflow-y-auto" x-cloak role="dialog" aria-modal="true"
+             aria-labelledby="exit-verification-title" @keydown.escape.window="cancelExit()">
+            <div class="flex min-h-screen items-center justify-center px-4 py-8">
+                <div class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm" @click="cancelExit()"></div>
+                <div class="relative w-full max-w-md rounded-2xl bg-white p-6 text-left shadow-2xl">
+                    <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                        <div class="flex items-center gap-2.5">
+                            <div class="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                            </div>
+                            <div>
+                                <h2 id="exit-verification-title" class="text-base font-bold text-slate-900">Verifikasi Password</h2>
+                                <p class="text-xs text-slate-500">Otentikasi keamanan keluar workspace</p>
+                            </div>
+                        </div>
+                        <button type="button" @click="cancelExit()" class="text-slate-400 hover:text-slate-600 p-1" title="Tutup">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+                    </div>
+
+                    <p class="mt-3 text-sm leading-6 text-slate-600">
+                        Masukkan password akun Anda untuk melanjutkan navigasi keluar dari workspace <strong><?php echo e($group->name); ?></strong>.
+                    </p>
+
+                    <form action="<?php echo e(route('groups.leave', $group->id)); ?>" method="POST" @submit.prevent="submitExitVerification($event)" class="mt-4 space-y-4">
+                        <?php echo csrf_field(); ?>
+                        <input type="hidden" name="destination" x-model="workspaceExitTarget">
+                        
+                        <!-- Alert Pesan Kesalahan -->
+                        <div x-show="exitErrorMessage" x-cloak class="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-start gap-2">
+                            <svg class="w-4 h-4 text-rose-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            <span x-text="exitErrorMessage"></span>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1.5">
+                                Password Akun
+                            </label>
+                            <div class="relative">
+                                <input :type="showExitPassword ? 'text' : 'password'" 
+                                       name="password" 
+                                       x-model="exitPasswordInput"
+                                       required 
+                                       autocomplete="off" 
+                                       autofocus
+                                       placeholder="Masukkan password akun Anda..."
+                                       :disabled="isSubmittingExit"
+                                       class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:bg-slate-50 disabled:text-slate-400">
+                                <button type="button" 
+                                        @click="showExitPassword = !showExitPassword"
+                                        class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none"
+                                        title="Tampilkan / Sembunyikan Password"
+                                        tabindex="-1">
+                                    <svg x-show="!showExitPassword" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                                    <svg x-show="showExitPassword" x-cloak class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18"></path></svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end pt-2">
+                            <button type="button" @click="cancelExit()"
+                                    :disabled="isSubmittingExit"
+                                    class="rounded-xl px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-50">
+                                Batal
+                            </button>
+                            <button type="submit"
+                                    :disabled="isSubmittingExit"
+                                    class="rounded-xl bg-sky-600 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-sky-700 disabled:bg-sky-400 flex items-center justify-center gap-2">
+                                <svg x-show="isSubmittingExit" class="w-3.5 h-3.5 animate-spin text-white" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <span x-text="isSubmittingExit ? 'Memverifikasi...' : 'Verifikasi dan Lanjutkan'"></span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+
     <!-- TOAST NOTIFICATION COMPONENT -->
     <div x-show="showToast" 
          x-transition:enter="transform ease-out duration-300 transition"
@@ -474,7 +706,7 @@
          x-transition:leave="transition ease-in duration-100"
          x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0"
-         class="fixed bottom-5 right-5 z-50 max-w-sm w-full bg-slate-900 text-white rounded-xl shadow-2xl p-4 flex items-center gap-3 border border-slate-700" x-cloak>
+         class="fixed bottom-5 right-5 z-[9999] max-w-sm w-full bg-slate-900 text-white rounded-xl shadow-2xl p-4 flex items-center gap-3 border border-slate-700" x-cloak>
         <div :class="{
             'bg-emerald-500': toastType === 'success',
             'bg-sky-500': toastType === 'info',
@@ -527,7 +759,7 @@
                         <label class="block text-xs font-semibold text-slate-700 mb-1">Jenis Workspace</label>
                         <select name="workspace_type" class="w-full text-xs sm:text-sm px-3.5 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:outline-none bg-white">
                             <option value="manual">Manual (lembar kosong)</option>
-                            <option value="template">Template Okt Analisa</option>
+                            <option value="template">Template</option>
                         </select>
                     </div>
 
@@ -929,7 +1161,7 @@
 
     <?php echo \Livewire\Mechanisms\FrontendAssets\FrontendAssets::scripts(); ?>
 
-    <script src="<?php echo e(asset('js/spreadsheet-worksheet.js')); ?>"></script>
+    <script src="<?php echo e(asset('js/spreadsheet-worksheet.js')); ?>?v=<?php echo e(filemtime(public_path('js/spreadsheet-worksheet.js'))); ?>"></script>
 </body>
 </html>
 <?php /**PATH C:\Users\Crissencio Dheni S\Documents\JOB 1\resources\views/layouts/app.blade.php ENDPATH**/ ?>

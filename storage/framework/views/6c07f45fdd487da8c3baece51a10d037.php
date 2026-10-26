@@ -109,7 +109,45 @@
     </div>
 
     <!-- 3. KATALOG WORKSPACE TIM -->
-    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-6 space-y-6 reveal-on-scroll">
+    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-6 space-y-6 reveal-on-scroll"
+         x-data="{
+            manageableWorkspaces: <?php echo \Illuminate\Support\Js::from($manageableGroups->map(fn ($workspace) => ['id' => (int) $workspace->id, 'name' => $workspace->name])->values())->toHtml() ?>,
+            selectedWorkspaceIds: [],
+            showBulkDeleteConfirmation: false,
+            isDeleting: false,
+            get selectedWorkspaceDetails() {
+                return this.manageableWorkspaces.filter(workspace => this.selectedWorkspaceIds.includes(workspace.id));
+            },
+            cleanSelection() {
+                const validIds = new Set(this.manageableWorkspaces.map(workspace => workspace.id));
+                this.selectedWorkspaceIds = this.selectedWorkspaceIds.filter(id => validIds.has(id));
+            },
+            toggleWorkspace(workspace, checked) {
+                const selectedIds = new Set(this.selectedWorkspaceIds);
+                if (checked) {
+                    selectedIds.add(workspace.id);
+                } else {
+                    selectedIds.delete(workspace.id);
+                }
+                this.selectedWorkspaceIds = [...selectedIds];
+                this.cleanSelection();
+            },
+            toggleAllWorkspaces() {
+                this.cleanSelection();
+                this.selectedWorkspaceIds = this.selectedWorkspaceIds.length === this.manageableWorkspaces.length
+                    ? []
+                    : this.manageableWorkspaces.map(workspace => workspace.id);
+            },
+            submitBulkDelete(event) {
+                if (this.isDeleting || this.selectedWorkspaceIds.length === 0) {
+                    return;
+                }
+
+                this.isDeleting = true;
+                event.target.submit();
+            }
+         }"
+         x-init="cleanSelection()">
         
         <!-- Filter & Search Bar -->
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100">
@@ -134,10 +172,39 @@
             </form>
         </div>
 
+        <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($manageableGroups->isNotEmpty()): ?>
+            <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <div class="flex flex-wrap items-center gap-4">
+                    <label class="inline-flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer select-none">
+                        <input type="checkbox"
+                               :checked="selectedWorkspaceIds.length === manageableWorkspaces.length && manageableWorkspaces.length > 0"
+                               x-effect="$el.indeterminate = selectedWorkspaceIds.length > 0 && selectedWorkspaceIds.length < manageableWorkspaces.length"
+                               @change="toggleAllWorkspaces()"
+                               class="rounded border-slate-300 text-sky-600 focus:ring-sky-500">
+                        <span x-text="selectedWorkspaceIds.length === manageableWorkspaces.length && manageableWorkspaces.length > 0 ? 'Batalkan Semua Pilihan' : 'Pilih Semua yang Dapat Dikelola'">Pilih Semua yang Dapat Dikelola</span>
+                    </label>
+                    <span class="text-xs text-slate-500"><span x-text="selectedWorkspaceIds.length"></span> workspace dipilih</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button type="button" @click="selectedWorkspaceIds = []"
+                            :disabled="selectedWorkspaceIds.length === 0"
+                            class="rounded-lg px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-white disabled:cursor-not-allowed disabled:opacity-40">
+                        Batalkan Pilihan
+                    </button>
+                    <button type="button" @click="showBulkDeleteConfirmation = true"
+                            x-show="selectedWorkspaceIds.length > 0"
+                            class="rounded-lg bg-rose-600 px-3 py-2 text-xs font-semibold text-white shadow-xs transition hover:bg-rose-700">
+                        Hapus Workspace Terpilih
+                    </button>
+                </div>
+            </div>
+        <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+
         <!-- Grid Kartu Workspace -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php $__empty_1 = true; $__currentLoopData = $myGroups; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $grp): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
-                <div class="group relative bg-white rounded-2xl border border-slate-200 hover:border-sky-300 shadow-xs hover:shadow-xl transition-all duration-200 flex flex-col justify-between overflow-hidden">
+                <div class="group relative bg-white rounded-2xl border border-slate-200 hover:border-sky-300 shadow-xs hover:shadow-xl transition-all duration-200 flex flex-col justify-between overflow-hidden"
+                     :class="selectedWorkspaceIds.includes(<?php echo e($grp->id); ?>) ? 'border-sky-500 ring-2 ring-sky-200 bg-sky-50/30' : ''">
                     
                     <!-- Card Top Accent Header -->
                     <div class="h-2 bg-gradient-to-r from-sky-500 via-emerald-400 to-indigo-500"></div>
@@ -169,6 +236,17 @@
 
                             </span>
                         </div>
+                        <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($grp->isLeader($user->id)): ?>
+                            <label class="inline-flex items-center gap-2 text-xs font-medium text-slate-600" @click.stop>
+                                <input type="checkbox"
+                                       :checked="selectedWorkspaceIds.includes(<?php echo e($grp->id); ?>)"
+                                       @change="toggleWorkspace({ id: <?php echo e($grp->id); ?>, name: <?php echo \Illuminate\Support\Js::from($grp->name)->toHtml() ?> }, $event.target.checked)"
+                                       @click.stop
+                                       aria-label="Pilih workspace <?php echo e($grp->name); ?>"
+                                       class="rounded border-slate-300 text-sky-600 focus:ring-sky-500">
+                                Pilih workspace
+                            </label>
+                        <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
 
                         <!-- Description -->
                         <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($grp->description): ?>
@@ -239,6 +317,46 @@
                     </div>
                 </div>
             <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+        </div>
+
+        <div x-show="showBulkDeleteConfirmation" x-transition.opacity
+             class="fixed inset-0 z-[1100] overflow-y-auto" x-cloak role="dialog" aria-modal="true"
+             aria-labelledby="bulk-delete-workspaces-title" @keydown.escape.window="showBulkDeleteConfirmation = false">
+            <div class="flex min-h-screen items-center justify-center px-4 py-8">
+                <div class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm" @click="showBulkDeleteConfirmation = false"></div>
+                <div class="relative w-full max-w-lg overflow-hidden rounded-2xl bg-white text-left shadow-2xl ring-1 ring-black/5">
+                    <div class="h-1.5 bg-gradient-to-r from-rose-500 via-red-500 to-orange-400"></div>
+                    <div class="p-6">
+                        <p class="text-[11px] font-bold uppercase tracking-widest text-rose-600">Tindakan permanen</p>
+                        <h3 id="bulk-delete-workspaces-title" class="mt-1 text-lg font-bold text-slate-900">
+                            Hapus <span x-text="selectedWorkspaceIds.length"></span> workspace terpilih?
+                        </h3>
+                        <p class="mt-2 text-sm leading-6 text-slate-600">
+                            Workspace dan data terkaitnya, termasuk sheet, sel, anggota, formula, gambar, serta riwayat aktivitas, akan dihapus sesuai kebijakan aplikasi dan tidak dapat dipulihkan.
+                        </p>
+                        <ul class="mt-4 max-h-40 space-y-1 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                            <template x-for="workspace in selectedWorkspaceDetails" :key="workspace.id">
+                                <li class="flex items-center gap-2"><span class="text-rose-500">•</span><span x-text="workspace.name"></span></li>
+                            </template>
+                        </ul>
+                        <form action="<?php echo e(route('groups.bulk-destroy')); ?>" method="POST" @submit.prevent="submitBulkDelete($event)" class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                            <?php echo csrf_field(); ?>
+                            <template x-for="workspaceId in selectedWorkspaceIds" :key="workspaceId">
+                                <input type="hidden" name="groups[]" :value="workspaceId">
+                            </template>
+                            <button type="button" @click="showBulkDeleteConfirmation = false"
+                                    class="rounded-xl px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100">
+                                Batal
+                            </button>
+                            <button type="submit" :disabled="isDeleting || selectedWorkspaceIds.length === 0"
+                                    class="rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-rose-700">
+                                <span x-show="!isDeleting">Hapus Workspace</span>
+                                <span x-show="isDeleting">Menghapus...</span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>

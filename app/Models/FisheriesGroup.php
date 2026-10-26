@@ -59,6 +59,69 @@ class FisheriesGroup extends Model
     }
 
     /**
+     * Determine if this workspace is unlocked for the current session.
+     */
+    public function isUnlockedForSession(): bool
+    {
+        if (!$this->hasPassword()) {
+            return true;
+        }
+
+        $session = request()->hasSession() ? request()->session() : null;
+        if (!$session) {
+            return false;
+        }
+
+        if ($session->get('workspace_unlocked_' . $this->id, false)) {
+            return true;
+        }
+
+        // Check if any sheet in this workspace was unlocked
+        foreach ($this->sheets()->pluck('id') as $sheetId) {
+            if ($session->get('sheet_unlocked_' . $sheetId, false)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Admins must re-authenticate with their own account password for each
+     * sheet. The session stores only the
+     * verified sheet ID, never a password or password hash.
+     */
+    public function isAdminSheetVerifiedForSession(int $userId, int $sheetId): bool
+    {
+        if ($this->getMemberRole($userId) !== 'admin') {
+            return true;
+        }
+
+        if (!request()->hasSession()) {
+            return false;
+        }
+
+        return (int) request()->session()->get($this->adminVerificationSessionKey($userId), 0) === $sheetId;
+    }
+
+    public function markAdminSheetVerifiedForSession(int $userId, int $sheetId): void
+    {
+        request()->session()->put($this->adminVerificationSessionKey($userId), $sheetId);
+    }
+
+    public function clearAdminSheetVerificationForSession(int $userId): void
+    {
+        if (request()->hasSession()) {
+            request()->session()->forget($this->adminVerificationSessionKey($userId));
+        }
+    }
+
+    public function adminVerificationSessionKey(int $userId): string
+    {
+        return 'admin_sheet_verified_' . $this->id . '_' . $userId;
+    }
+
+    /**
      * Group creator.
      */
     public function creator(): BelongsTo
@@ -131,14 +194,25 @@ class FisheriesGroup extends Model
     /**
      * Avatar URL accessor.
      */
-    public function getAvatarUrlAttribute(): string
+    public function getAvatarUrlAttribute(): ?string
     {
-        if ($this->avatar && file_exists(public_path($this->avatar))) {
+        if (!$this->avatar) {
+            return null;
+        }
+
+        if (str_starts_with($this->avatar, 'http://') || str_starts_with($this->avatar, 'https://')) {
+            return $this->avatar;
+        }
+
+        // The database path is the source of truth. Rendering must not depend
+        // on a transient filesystem check during a Livewire/navigate response,
+        // otherwise a valid workspace image is replaced by the fallback after
+        // switching sheets. Legacy storage paths remain supported.
+        if (str_starts_with($this->avatar, 'storage/')) {
             return asset($this->avatar);
         }
 
-        $initials = urlencode($this->name);
-        return "https://ui-avatars.com/api/?name={$initials}&background=0284C7&color=FFFFFF&bold=true&size=128";
+        return asset(ltrim($this->avatar, '/'));
     }
 
     /**
@@ -163,15 +237,23 @@ class FisheriesGroup extends Model
                 return;
             }
 
-            foreach ($categories as $cat) {
+            foreach ($categories as $index => $cat) {
                 $sheet = $group->sheets()->create([
                     'name' => $cat['name'],
                     'category' => $cat['category'],
+                    'metadata' => [
+                        'identity_color' => self::sheetIdentityColorKey($index),
+                    ],
                 ]);
 
                 $sheet->initializeBlankGrid();
             }
         });
+    }
+
+    private static function sheetIdentityColorKey(int $index): string
+    {
+        return SpreadsheetSheet::cyclicIdentityColorKey($index);
     }
 
     /**

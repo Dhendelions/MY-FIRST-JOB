@@ -1,9 +1,29 @@
-<div class="flex-1 flex flex-col min-h-0 bg-white" 
-     wire:poll.10s="syncChanges"
-     x-data="spreadsheetWorksheet($wire)">
+{{-- Do not poll the worksheet root: a Livewire morph replaces the interactive
+     grid and caused cells to disappear after the first 10-second refresh. --}}
+<div class="flex-1 flex flex-col min-h-0 bg-white"
+     x-data="spreadsheetWorksheet($wire)"
+     style="--sheet-accent: {{ $sheet->identityColor()['active'] }};">
+
+    <style>
+        .grid-cell-td.is-selected {
+            box-shadow: inset 0 0 0 2px var(--sheet-accent) !important;
+            z-index: 25;
+        }
+        .grid-cell-td.is-editing {
+            box-shadow: inset 0 0 0 2px #0284c7 !important;
+            background-color: #ffffff !important;
+            z-index: 30;
+        }
+        .grid-cell-td.is-search-match {
+            background-color: rgba(254, 240, 138, 0.6) !important;
+        }
+        .toolbar-area {
+            border-top: 2px solid var(--sheet-accent);
+        }
+    </style>
 
     <!-- 1. TOOLBAR UTAMA SPREADSHEET (MODERN EXCEL & GOOGLE SHEETS STYLE) -->
-    <div class="bg-slate-50 border-b border-slate-200 px-3 py-1.5 flex flex-wrap items-center justify-between gap-2 text-xs toolbar-area shrink-0">
+    <div class="relative z-[60] bg-slate-50 border-b border-slate-200 px-3 py-1.5 flex flex-wrap items-center justify-between gap-2 text-xs toolbar-area shrink-0">
         
         <!-- Left: Undo / Redo & Cell Formatting Controls -->
         <div class="flex items-center flex-wrap gap-1">
@@ -21,15 +41,15 @@
             <span class="w-px h-5 bg-slate-300 mx-1"></span>
 
             <!-- Bold, Italic, Underline -->
-            <button wire:click="formatCell('bold')" type="button" title="Tebal (Bold)"
+            <button @click="formatCell('bold')" type="button" title="Tebal (Bold)"
                     class="p-1.5 rounded hover:bg-slate-200 font-bold text-slate-800 transition-colors">
                 <span class="w-4 h-4 flex items-center justify-center font-serif text-sm">B</span>
             </button>
-            <button wire:click="formatCell('italic')" type="button" title="Miring (Italic)"
+            <button @click="formatCell('italic')" type="button" title="Miring (Italic)"
                     class="p-1.5 rounded hover:bg-slate-200 italic font-serif text-slate-800 transition-colors">
                 <span class="w-4 h-4 flex items-center justify-center text-sm">I</span>
             </button>
-            <button wire:click="formatCell('underline')" type="button" title="Garis Bawah (Underline)"
+            <button @click="formatCell('underline')" type="button" title="Garis Bawah (Underline)"
                     class="p-1.5 rounded hover:bg-slate-200 underline text-slate-800 transition-colors">
                 <span class="w-4 h-4 flex items-center justify-center text-sm">U</span>
             </button>
@@ -45,17 +65,17 @@
                 </button>
                 <div x-show="alignOpen" @click.away="alignOpen = false" 
                      class="absolute left-0 mt-1 w-32 bg-white rounded-lg shadow-xl border border-slate-200 py-1 z-50 text-xs" x-cloak>
-                    <button wire:click="formatCell('align', 'left')" @click="alignOpen = false" 
+                    <button @click="formatCell('align', 'left'); alignOpen = false" 
                             class="w-full px-3 py-1.5 hover:bg-slate-100 flex items-center gap-2 text-slate-700">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h10M4 18h16"></path></svg>
                         <span>Kiri</span>
                     </button>
-                    <button wire:click="formatCell('align', 'center')" @click="alignOpen = false" 
+                    <button @click="formatCell('align', 'center'); alignOpen = false" 
                             class="w-full px-3 py-1.5 hover:bg-slate-100 flex items-center gap-2 text-slate-700">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M7 12h10M4 18h16"></path></svg>
                         <span>Tengah</span>
                     </button>
-                    <button wire:click="formatCell('align', 'right')" @click="alignOpen = false" 
+                    <button @click="formatCell('align', 'right'); alignOpen = false" 
                             class="w-full px-3 py-1.5 hover:bg-slate-100 flex items-center gap-2 text-slate-700">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M10 12h10M4 18h16"></path></svg>
                         <span>Kanan</span>
@@ -73,19 +93,19 @@
                 <div x-show="numFormatOpen" @click.away="numFormatOpen = false" 
                      class="absolute left-0 mt-1 w-44 bg-white rounded-lg shadow-xl border border-slate-200 py-1.5 z-50 text-xs" x-cloak>
                     <div class="px-3 py-1 text-[10px] uppercase font-bold text-slate-400">Format Angka</div>
-                    <button wire:click="formatCell('numFormat', 'general')" @click="numFormatOpen = false" 
+                    <button @click="formatCell('numFormat', 'general'); numFormatOpen = false" 
                             class="w-full px-3 py-1.5 hover:bg-slate-100 text-left text-slate-700">
                         Umum (Teks Otomatis)
                     </button>
-                    <button wire:click="formatCell('numFormat', 'currency')" @click="numFormatOpen = false" 
+                    <button @click="formatCell('numFormat', 'currency'); numFormatOpen = false" 
                             class="w-full px-3 py-1.5 hover:bg-slate-100 text-left text-slate-700 flex justify-between">
                         <span>Mata Uang (Rp)</span> <span class="text-slate-400 font-mono">Rp 1.000</span>
                     </button>
-                    <button wire:click="formatCell('numFormat', 'number')" @click="numFormatOpen = false" 
+                    <button @click="formatCell('numFormat', 'number'); numFormatOpen = false" 
                             class="w-full px-3 py-1.5 hover:bg-slate-100 text-left text-slate-700 flex justify-between">
                         <span>Angka Desimal</span> <span class="text-slate-400 font-mono">1.000,00</span>
                     </button>
-                    <button wire:click="formatCell('numFormat', 'percent')" @click="numFormatOpen = false" 
+                    <button @click="formatCell('numFormat', 'percent'); numFormatOpen = false" 
                             class="w-full px-3 py-1.5 hover:bg-slate-100 text-left text-slate-700 flex justify-between">
                         <span>Persentase (%)</span> <span class="text-slate-400 font-mono">100%</span>
                     </button>
@@ -101,11 +121,11 @@
                 </button>
                 <div x-show="colorOpen" @click.away="colorOpen = false" 
                      class="absolute left-0 mt-1 p-2 bg-white rounded-lg shadow-xl border border-slate-200 z-50 grid grid-cols-5 gap-1.5 w-36" x-cloak>
-                    <button wire:click="formatCell('color', '#0f172a')" @click="colorOpen = false" class="w-5 h-5 rounded bg-slate-900 border border-slate-300" title="Hitam Default"></button>
-                    <button wire:click="formatCell('color', '#0284c7')" @click="colorOpen = false" class="w-5 h-5 rounded bg-sky-600" title="Biru"></button>
-                    <button wire:click="formatCell('color', '#059669')" @click="colorOpen = false" class="w-5 h-5 rounded bg-emerald-600" title="Hijau"></button>
-                    <button wire:click="formatCell('color', '#e11d48')" @click="colorOpen = false" class="w-5 h-5 rounded bg-rose-600" title="Merah"></button>
-                    <button wire:click="formatCell('color', '#d97706')" @click="colorOpen = false" class="w-5 h-5 rounded bg-amber-600" title="Oranye / Kuning"></button>
+                    <button @click="formatCell('color', '#0f172a'); colorOpen = false" class="w-5 h-5 rounded bg-slate-900 border border-slate-300" title="Hitam Default"></button>
+                    <button @click="formatCell('color', '#0284c7'); colorOpen = false" class="w-5 h-5 rounded bg-sky-600" title="Biru"></button>
+                    <button @click="formatCell('color', '#059669'); colorOpen = false" class="w-5 h-5 rounded bg-emerald-600" title="Hijau"></button>
+                    <button @click="formatCell('color', '#e11d48'); colorOpen = false" class="w-5 h-5 rounded bg-rose-600" title="Merah"></button>
+                    <button @click="formatCell('color', '#d97706'); colorOpen = false" class="w-5 h-5 rounded bg-amber-600" title="Oranye / Kuning"></button>
                 </div>
             </div>
 
@@ -118,11 +138,11 @@
                 </button>
                 <div x-show="bgOpen" @click.away="bgOpen = false" 
                      class="absolute left-0 mt-1 p-2 bg-white rounded-lg shadow-xl border border-slate-200 z-50 grid grid-cols-5 gap-1.5 w-36" x-cloak>
-                    <button wire:click="formatCell('bg', '#ffffff')" @click="bgOpen = false" class="w-5 h-5 rounded bg-white border border-slate-300" title="Putih"></button>
-                    <button wire:click="formatCell('bg', '#fef9c3')" @click="bgOpen = false" class="w-5 h-5 rounded bg-yellow-100 border border-yellow-200" title="Kuning Muda"></button>
-                    <button wire:click="formatCell('bg', '#dcfce7')" @click="bgOpen = false" class="w-5 h-5 rounded bg-emerald-100 border border-emerald-200" title="Hijau Muda"></button>
-                    <button wire:click="formatCell('bg', '#e0f2fe')" @click="bgOpen = false" class="w-5 h-5 rounded bg-sky-100 border border-sky-200" title="Biru Muda"></button>
-                    <button wire:click="formatCell('bg', '#ffe4e6')" @click="bgOpen = false" class="w-5 h-5 rounded bg-rose-100 border border-rose-200" title="Merah Muda"></button>
+                    <button @click="formatCell('bg', '#ffffff'); bgOpen = false" class="w-5 h-5 rounded bg-white border border-slate-300" title="Putih"></button>
+                    <button @click="formatCell('bg', '#fef9c3'); bgOpen = false" class="w-5 h-5 rounded bg-yellow-100 border border-yellow-200" title="Kuning Muda"></button>
+                    <button @click="formatCell('bg', '#dcfce7'); bgOpen = false" class="w-5 h-5 rounded bg-emerald-100 border border-emerald-200" title="Hijau Muda"></button>
+                    <button @click="formatCell('bg', '#e0f2fe'); bgOpen = false" class="w-5 h-5 rounded bg-sky-100 border border-sky-200" title="Biru Muda"></button>
+                    <button @click="formatCell('bg', '#ffe4e6'); bgOpen = false" class="w-5 h-5 rounded bg-rose-100 border border-rose-200" title="Merah Muda"></button>
                 </div>
             </div>
 
@@ -186,19 +206,21 @@
         <!-- Synced Formula Bar Text Input -->
         <div class="flex-1 flex items-center">
             <input type="text" 
+                   x-ref="formulaBarInput"
                    x-model="activeFormula" 
-                   @focus="$wire.beginFormulaEdit()"
-                   @blur="$wire.finishFormulaEdit()"
-                   @input.debounce.300ms="$wire.updatedFormulaValue(activeFormula)"
+                   @focus="isFormulaBarFocused = true; originalFormulaValue = activeFormula;"
+                   @blur="isFormulaBarFocused = false"
+                   @keydown.enter.prevent="commitFormulaBar()"
+                   @keydown.escape.prevent="cancelFormulaBar()"
                    placeholder="Ketik nilai, formula (contoh: =SUM(A1:A5), =A1+B1), atau tempel data..."
-                   class="w-full h-7 px-2.5 text-xs text-slate-800 font-sans focus:outline-none focus:bg-sky-50/30 rounded border border-transparent focus:border-sky-300 transition-colors">
+                   class="formula-bar-input w-full h-7 px-2.5 text-xs text-slate-800 font-sans focus:outline-none focus:bg-sky-50/30 rounded border border-transparent focus:border-sky-300 transition-colors">
         </div>
 
         <!-- Auto-save Status Badge -->
         <div class="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200/60 shrink-0">
             <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span wire:loading wire:target="updateCell,finishCellEdit,updatedFormulaValue,pasteTsvData,formatCell">Menyimpan</span>
-            <span wire:loading.remove wire:target="updateCell,finishCellEdit,updatedFormulaValue,pasteTsvData,formatCell" x-text="$wire.saveStatus">Tersimpan</span>
+            <span wire:loading wire:target="updateCell,finishCellEdit,pasteTsvData,formatCell">Menyimpan</span>
+            <span wire:loading.remove wire:target="updateCell,finishCellEdit,pasteTsvData,formatCell" x-text="saveStatus">Tersimpan</span>
         </div>
     </div>
 
@@ -330,7 +352,7 @@
                                 ? ($frozenRowTopOffsets[$rIdx] ?? 0)
                                 : ($fixedTopRowOffsets[$rIdx] ?? 0);
                         @endphp
-                        <th style="{{ $isFixedRowHeader ? 'position:sticky;top:calc(36px + ' . $rowHeaderTopOffset . 'px);z-index:28;' : 'position:sticky;z-index:16;' }}left:0;"
+                        <th style="{{ $isFixedRowHeader ? 'position:sticky;top:calc(var(--spreadsheet-column-header-height, 36px) + ' . $rowHeaderTopOffset . 'px);z-index:28;' : 'position:sticky;z-index:16;' }}left:0;"
                             class="sticky left-0 w-12 min-w-[48px] bg-slate-100 border-r border-b border-slate-300 p-0 text-center font-mono text-[11px] text-slate-500 font-semibold select-none group/num">
                             <div class="flex items-center justify-center relative" style="height:{{ !empty($row['height']) ? (float) $row['height'] * 1.333333 : $defaultRowHeightPx }}px;">
                                 <span class="group-hover/row:hidden">{{ $row['sort_order'] }}</span>
@@ -383,9 +405,9 @@
 
                                 $stickyStyle = '';
                                 if ($isFixedTopRow && $isFrozenCol) {
-                                    $stickyStyle = 'position:sticky;top:calc(36px + ' . $fixedTopOffset . 'px);left:' . $frozenLeftOffset . 'px;z-index:26;';
+                                    $stickyStyle = 'position:sticky;top:calc(var(--spreadsheet-column-header-height, 36px) + ' . $fixedTopOffset . 'px);left:' . $frozenLeftOffset . 'px;z-index:26;';
                                 } elseif ($isFixedTopRow) {
-                                    $stickyStyle = 'position:sticky;top:calc(36px + ' . $fixedTopOffset . 'px);z-index:18;';
+                                    $stickyStyle = 'position:sticky;top:calc(var(--spreadsheet-column-header-height, 36px) + ' . $fixedTopOffset . 'px);z-index:18;';
                                 } elseif ($isFrozenCol) {
                                     $stickyStyle = 'position:sticky;left:' . $frozenLeftOffset . 'px;z-index:22;';
                                 }
@@ -394,27 +416,45 @@
                             @if(isset($mergedCoveredCells[$coord]))
                                 @continue
                             @endif
+                            @php
+                                $cellFormula = $cellsFormula[$cellKey] ?? null;
+                                $hasFormula = !empty($cellFormula);
+                            @endphp
                             <td @if(isset($mergedCells[$coord])) colspan="{{ $mergedCells[$coord]['colspan'] }}" rowspan="{{ $mergedCells[$coord]['rowspan'] }}" @endif
-                                data-grid-column="{{ $col['sort_order'] }}" wire:key="grid-cell-{{ $coord }}"
+                                id="td-{{ $coord }}"
+                                data-grid-column="{{ $col['sort_order'] }}" 
+                                data-coord="{{ $coord }}"
+                                wire:key="grid-cell-{{ $coord }}"
                                 style="height:{{ !empty($row['height']) ? (float) $row['height'] * 1.333333 : $defaultRowHeightPx }}px; {{ $bgColor ? "background-color: {$bgColor}; " : '' }}{{ $cellsStyleCss[$cellKey] ?? '' }}{{ $stickyStyle }}" 
-                                class="p-0 relative transition-colors focus-within:ring-2 focus-within:ring-sky-500 focus-within:z-30 bg-white overflow-hidden">
+                                class="grid-cell-td p-0 relative bg-white select-none outline-none border-b border-r border-slate-200/60 {{ $coord === ($activeCellCoord ?? 'A1') ? 'is-selected' : '' }}"
+                                @click="selectCell({{ \Illuminate\Support\Js::from($coord) }}, {{ $row['id'] ?? 'null' }}, {{ $col['id'] ?? 'null' }}, {{ $rIdx }}, {{ $cIdx }}, {{ $row['sort_order'] }}, {{ $col['sort_order'] }}, {{ \Illuminate\Support\Js::from((string) $formula) }}, {{ \Illuminate\Support\Js::from((string) $val) }}, {{ \Illuminate\Support\Js::from((string) ($cellsDisplay[$cellKey] ?? $val)) }}); if ({{ $rIdx }} >= {{ count($gridRows) - 5 }}) $wire.extendGrid('row'); if ({{ $cIdx }} >= {{ count($gridColumns) - 3 }}) $wire.extendGrid('column');"
+                                @dblclick="startEditCell({{ \Illuminate\Support\Js::from($coord) }}, {{ $row['id'] ?? 'null' }}, {{ $col['id'] ?? 'null' }}, {{ $row['sort_order'] }}, {{ $col['sort_order'] }}, {{ \Illuminate\Support\Js::from((string) ($formula ?: $val)) }})"
+                                @paste="if ({{ !empty($row['id']) && !empty($col['id']) ? 'true' : 'false' }}) handlePaste($event, {{ $row['id'] ?? 0 }}, {{ $col['id'] ?? 0 }})"
+                                title="{{ $hasFormula ? 'Formula: ' . $cellFormula : (!empty($format['external_reference']) ? 'Formula merujuk workbook eksternal; nilai tersimpan tidak dapat dihitung ulang tanpa sumber eksternal.' : '') }}">
                                 
-                                <input id="cell-{{ $coord }}" 
-                                       type="text" 
+                                @if($hasFormula)
+                                    <div class="formula-marker absolute top-0 right-0 w-1.5 h-1.5 border-t-2 border-r-2 border-sky-500/70 pointer-events-none z-10" title="Formula: {{ $cellFormula }}"></div>
+                                @endif
+
+                                {{-- Keep a real input in every cell. This preserves the table grid even
+                                     before Alpine initializes, while readonly prevents single-click edits. --}}
+                                <input id="cell-{{ $coord }}"
+                                       type="text"
                                        value="{{ $cellsDisplay[$cellKey] ?? $val }}"
-                                       title="{{ !empty($format['external_reference']) ? 'Formula merujuk workbook eksternal; nilai tersimpan tidak dapat dihitung ulang tanpa sumber eksternal.' : '' }}"
-                                       @focus="originalCellValue = $el.value; focusCell({{ $rIdx }}, {{ $cIdx }}, '{{ $coord }}', {{ $row['id'] ?? 'null' }}, {{ $col['id'] ?? 'null' }}, {{ $row['sort_order'] }}, {{ $col['sort_order'] }}); if ({{ $rIdx }} >= {{ count($gridRows) - 5 }}) $wire.extendGrid('row'); if ({{ $cIdx }} >= {{ count($gridColumns) - 3 }}) $wire.extendGrid('column');"
-                                       @blur="if ({{ !empty($row['id']) && !empty($col['id']) ? 'true' : 'false' }}) $wire.finishCellEdit({{ $row['id'] ?? 0 }}, {{ $col['id'] ?? 0 }}, $el.value, originalCellValue)"
-                                       @keydown="onKeyDown($event, {{ $rIdx }}, {{ $cIdx }}, {{ count($gridRows) }}, {{ count($gridColumns) }}, {{ $row['id'] ?? 0 }}, {{ $col['id'] ?? 0 }}, {{ $cellsVersions[$cellKey] ?? 0 }})"
-                                       @paste="if ({{ !empty($row['id']) && !empty($col['id']) ? 'true' : 'false' }}) handlePaste($event, {{ $row['id'] ?? 0 }}, {{ $col['id'] ?? 0 }})"
+                                       data-coord="{{ $coord }}"
+                                       data-val="{{ $val }}"
+                                       data-formula="{{ $formula }}"
+                                       data-version="{{ $cellsVersions[$cellKey] ?? 0 }}"
+                                       data-row-id="{{ $row['id'] ?? '' }}"
+                                       data-col-id="{{ $col['id'] ?? '' }}"
+                                       readonly
+                                       @input="handleCellInput($event, {{ \Illuminate\Support\Js::from($coord) }})"
+                                       @keydown.enter.prevent="commitCellEdit({{ \Illuminate\Support\Js::from($coord) }}, {{ $row['id'] ?? 'null' }}, {{ $col['id'] ?? 'null' }}, {{ $row['sort_order'] }}, {{ $col['sort_order'] }}, true)"
+                                       @keydown.escape.prevent="cancelCellEdit({{ \Illuminate\Support\Js::from($coord) }})"
+                                       @keydown.tab.prevent="commitCellEdit({{ \Illuminate\Support\Js::from($coord) }}, {{ $row['id'] ?? 'null' }}, {{ $col['id'] ?? 'null' }}, {{ $row['sort_order'] }}, {{ $col['sort_order'] }}, false, $event.shiftKey ? 'left' : 'right')"
+                                       @blur="commitCellEdit({{ \Illuminate\Support\Js::from($coord) }}, {{ $row['id'] ?? 'null' }}, {{ $col['id'] ?? 'null' }}, {{ $row['sort_order'] }}, {{ $col['sort_order'] }}, false)"
                                        style="{{ $textColor ? "color: {$textColor};" : '' }} text-align: {{ $textAlign }}; height:{{ !empty($row['height']) ? (float) $row['height'] * 1.333333 : $defaultRowHeightPx }}px;"
-                                       :class="{
-                                           'bg-amber-100/60': searchQuery && ('{{ addslashes($val) }}'.toLowerCase().includes(searchQuery.toLowerCase())),
-                                           'font-bold': {{ $isBold ? 'true' : 'false' }},
-                                           'italic': {{ $isItalic ? 'true' : 'false' }},
-                                           'underline': {{ $isUnderline ? 'true' : 'false' }},
-                                       }"
-                                       class="grid-cell-input {{ $isWrapped ? 'is-wrapped' : '' }} w-full h-full min-h-8 px-2 py-1 text-xs border-none focus:outline-none bg-transparent">
+                                       class="grid-cell-input {{ $isWrapped ? 'is-wrapped' : '' }} w-full h-full min-h-8 px-2 py-1 text-xs border-none focus:outline-none bg-transparent {{ $isBold ? 'font-bold' : '' }} {{ $isItalic ? 'italic' : '' }} {{ $isUnderline ? 'underline' : '' }}">
                             </td>
                         @endforeach
                     </tr>
@@ -424,25 +464,39 @@
     </div>
 
     <!-- 4. TAB LEMBAR KERJA DI BAGIAN BAWAH (GOOGLE SHEETS STYLE) -->
-    <div class="h-10 bg-slate-100 border-t border-slate-200 px-4 flex items-center justify-between text-xs bottom-tabs shrink-0 select-none">
+    <div class="relative z-[60] h-10 bg-slate-100 border-t border-slate-200 px-4 flex items-center justify-between text-xs bottom-tabs shrink-0 select-none">
         
-        <div class="flex items-center space-x-1 overflow-x-auto py-1">
+        <div class="flex items-center gap-1 min-w-0 flex-1">
             @if($sheet && $sheet->group)
+                @php
+                    $memberRole = $sheet->group->getMemberRole(Auth::id());
+                    $isLeader = $memberRole === 'leader';
+                @endphp
+                <div class="flex items-center space-x-1 overflow-x-auto py-1 min-w-0 flex-1">
                 @foreach($sheet->group->sheets as $sh)
                     @php
                         $isCurrent = $sh->id === $sheetId;
+                        $shRestricted = $sh->isRestrictedForRole($memberRole);
+                        $tabPalette = $sh->identityColor();
+                        $tabStyle = $isCurrent
+                            ? "background-color: {$tabPalette['active']}; color: #ffffff; border-color: {$tabPalette['active']};"
+                            : ($shRestricted
+                                ? 'background-color: #e2e8f0; color: #94a3b8; border-color: #cbd5e1;'
+                                : "background-color: {$tabPalette['idle']}; color: {$tabPalette['text']}; border-color: {$tabPalette['active']};");
                     @endphp
                     <div class="relative group/tab flex items-center">
-                        <a wire:navigate href="{{ route('group.workspace', [$sheet->group_id, $sh->id]) }}" @if($sheet->group->hasPassword() && $sh->id !== $sheetId) @click.prevent="$dispatch('sheet-switch', { sheetId: {{ $sh->id }} })" @endif
-                           class="px-3 py-1 rounded-t-lg font-medium transition-all flex items-center gap-1.5 {{
-                               $isCurrent 
-                               ? 'bg-white text-sky-800 border-t-2 border-sky-600 shadow-2xs font-bold' 
-                               : 'bg-slate-200/80 text-slate-600 hover:bg-slate-200'
-                           }}">
+                        <a wire:navigate href="{{ route('group.workspace', [$sheet->group_id, $sh->id]) }}"
+                           @if(($memberRole === 'admin' || (!$isLeader && $sheet->group->hasPassword())) && $sh->id !== $sheetId && !$shRestricted) @click.prevent="$dispatch('sheet-switch', { sheetId: {{ $sh->id }} })" @endif
+                           style="{{ $tabStyle }}"
+                           class="px-3 py-1 rounded-t-lg border font-medium transition-all flex items-center gap-1.5 {{ $isCurrent ? 'shadow-2xs font-bold' : '' }}">
                             <span>{{ $sh->name }}</span>
+                            @if($shRestricted)
+                                <svg class="w-3 h-3 text-slate-400" fill="currentColor" viewBox="0 0 20 20" title="Akses Dibatasi (Leader Only)"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" /></svg>
+                            @endif
                         </a>
 
-                        <!-- Dropdown actions for tab -->
+                        {{--
+                        <!-- Dropdown actions moved outside the horizontally scrolling tab strip. -->
                         @if($isCurrent)
                             <div class="relative" x-data="{ tabMenuOpen: false }">
                                 <button @click="tabMenuOpen = !tabMenuOpen" 
@@ -479,8 +533,44 @@
                                 </div>
                             </div>
                         @endif
+                        --}}
                     </div>
                 @endforeach
+                </div>
+
+                <div class="relative shrink-0" x-data="{ tabMenuOpen: false }">
+                    <button @click="tabMenuOpen = !tabMenuOpen"
+                            class="p-1 hover:bg-slate-200 text-slate-500 rounded"
+                            title="Opsi lembar aktif">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </button>
+                    <div x-show="tabMenuOpen" @click.away="tabMenuOpen = false"
+                         class="absolute bottom-full left-0 mb-1 w-40 bg-white rounded-lg shadow-xl border border-slate-200 py-1.5 z-50 text-xs" x-cloak>
+                        <button @click="$dispatch('open-rename-modal', { id: {{ $sheet->id }}, name: '{{ addslashes($sheet->name) }}' }); tabMenuOpen = false;"
+                                class="w-full px-3 py-1.5 hover:bg-slate-100 text-left flex items-center gap-2 text-slate-700">
+                            <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                            <span>Ganti Nama</span>
+                        </button>
+                        <form action="{{ route('sheets.duplicate', $sheet->id) }}" method="POST">
+                            @csrf
+                            <button type="submit" class="w-full px-3 py-1.5 hover:bg-slate-100 text-left flex items-center gap-2 text-slate-700">
+                                <svg class="w-3.5 h-3.5 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                                <span>Duplikasi</span>
+                            </button>
+                        </form>
+                        @if($sheet->group->sheets->count() > 1)
+                            <div class="my-1 border-t border-slate-100"></div>
+                            <form action="{{ route('sheets.delete', $sheet->id) }}" method="POST" onsubmit="return confirm('Hapus lembar kerja ini? Data di dalamnya akan hilang.')">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="w-full px-3 py-1.5 hover:bg-rose-50 text-left flex items-center gap-2 text-rose-600">
+                                    <svg class="w-3.5 h-3.5 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                    <span>Hapus Lembar</span>
+                                </button>
+                            </form>
+                        @endif
+                    </div>
+                </div>
             @endif
 
             <button type="button" @click="$dispatch('open-add-sheet-modal')" 
@@ -556,7 +646,8 @@
     </div>
 
     <!-- 6. MODAL CARI & GANTI (FIND AND REPLACE) -->
-    <div x-show="$wire.showFindReplaceModal" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
+    <template x-teleport="body">
+    <div x-show="$wire.showFindReplaceModal" class="fixed inset-0 z-[1000] overflow-y-auto" x-cloak>
         <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
             <div class="fixed inset-0 bg-slate-900/70 backdrop-blur-xs transition-opacity" @click="$wire.set('showFindReplaceModal', false)"></div>
             <div class="relative bg-white rounded-2xl max-w-md w-full p-6 text-left shadow-2xl border border-slate-100 my-8">
@@ -601,7 +692,7 @@
     </div>
 
     <!-- 7. MODAL KONFIRMASI HAPUS KOLOM BERISI DATA -->
-    <div x-show="$wire.showDeleteColumnModal" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
+    <div x-show="$wire.showDeleteColumnModal" class="fixed inset-0 z-[1000] overflow-y-auto" x-cloak>
         <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
             <div class="fixed inset-0 bg-slate-900/80 backdrop-blur-xs transition-opacity" wire:click="cancelDeleteColumn"></div>
 
@@ -635,4 +726,6 @@
                 </div>
             </div>
         </div>
+    </div>
+    </template>
 </div>

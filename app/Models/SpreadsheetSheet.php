@@ -23,6 +23,59 @@ class SpreadsheetSheet extends Model
         'metadata' => 'array',
     ];
 
+    public static function identityColorPalette(): array
+    {
+        return config('spreadsheet.sheet_identity_palette', []);
+    }
+
+    public static function identityColorKeyForName(string $name): ?string
+    {
+        $name = mb_strtolower($name);
+        foreach (array_keys(self::identityColorPalette()) as $identity) {
+            if (str_contains($name, $identity)
+                || ($identity === 'analisa' && str_contains($name, 'analysis'))
+                || ($identity === 'pendukung' && str_contains($name, 'supporting'))) {
+                return $identity;
+            }
+        }
+
+        return null;
+    }
+
+    public static function cyclicIdentityColorKey(int $sheetCount): string
+    {
+        $keys = array_keys(self::identityColorPalette());
+        if ($keys === []) {
+            throw new \LogicException('Sheet identity color palette must not be empty.');
+        }
+
+        return $keys[$sheetCount % count($keys)];
+    }
+
+    public function identityColorKey(): string
+    {
+        $palette = self::identityColorPalette();
+        $stored = $this->metadata['identity_color'] ?? null;
+        if (is_string($stored) && array_key_exists($stored, $palette)) {
+            return $stored;
+        }
+
+        return self::identityColorKeyForName($this->name)
+            ?? self::cyclicIdentityColorKey(max(0, (int) $this->getKey() - 1));
+    }
+
+    public function identityColor(): array
+    {
+        return self::identityColorPalette()[$this->identityColorKey()];
+    }
+
+    public function isCostWorksheet(): bool
+    {
+        return ($this->metadata['template_identity'] ?? null) === 'cost'
+            || (($this->category ?? null) === 'okt-analisa' && $this->identityColorKey() === 'cost')
+            || str_contains(mb_strtolower($this->name), 'cost');
+    }
+
     /**
      * Group relationship.
      */
@@ -93,5 +146,22 @@ class SpreadsheetSheet extends Model
         }
 
         return $letter;
+    }
+
+    /**
+     * Check if this sheet is restricted based on user role.
+     * Margin, Pendukung, and Rank are restricted to Leader only.
+     */
+    public function isRestrictedForRole(?string $role): bool
+    {
+        if ($role === 'leader') {
+            return false;
+        }
+
+        $haystack = strtolower($this->name . ' ' . ($this->category ?? ''));
+        return str_contains($haystack, 'margin')
+            || str_contains($haystack, 'pendukung')
+            || str_contains($haystack, 'supporting')
+            || str_contains($haystack, 'rank');
     }
 }

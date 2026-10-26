@@ -203,6 +203,10 @@ class SpreadsheetController extends Controller
             abort(422, 'Formula harus diawali dengan tanda sama dengan (=).');
         }
 
+        if ($formula !== null && ($syntaxError = SpreadsheetFormulaEngine::validateFormulaSyntax($formula)) !== null) {
+            abort(422, $syntaxError);
+        }
+
         $updateData = [
             'value' => $value,
             'formula' => $formula,
@@ -219,13 +223,19 @@ class SpreadsheetController extends Controller
                 ->first();
             $currentVersion = (int) ($currentCell?->version ?? 0);
             $expectedVersion = $validated['expected_version'] ?? $currentVersion;
-            $conflict = $currentVersion !== $expectedVersion;
+            // Version 0 means this is a newly materialized/unversioned cell;
+            // only a positive version participates in optimistic locking.
+            $conflict = $expectedVersion > 0 && $currentVersion !== $expectedVersion;
             $unchanged = $currentCell
                 && $currentCell->value === $updateData['value']
                 && $currentCell->formula === $updateData['formula']
                 && (!array_key_exists('format', $updateData) || $currentCell->format === $updateData['format']);
             if ($unchanged) {
                 return [$currentCell, false];
+            }
+            if ($conflict) {
+                // Do not let a delayed API request overwrite a newer edit.
+                return [$currentCell, true];
             }
             $cell = SpreadsheetCell::updateOrCreate(
                 [
@@ -239,6 +249,15 @@ class SpreadsheetController extends Controller
 
             return [$cell, $conflict];
         });
+        if ($conflict) {
+            return response()->json([
+                'status' => 'conflict',
+                'message' => 'Sel sudah diubah pengguna lain. Muat ulang nilai terbaru sebelum menyimpan kembali.',
+                'cell' => $cell,
+                'conflict' => true,
+            ], 409);
+        }
+
         app(\App\Services\SpreadsheetWorkbookCalculator::class)->recalculate($row->sheet->group);
         $cell->refresh();
 
@@ -383,7 +402,17 @@ class SpreadsheetController extends Controller
         if (!$group->isMember($user->id)) {
             abort(403, 'Akses ditolak: Anda tidak memiliki wewenang untuk membaca atau mengubah lembar kerja ini.');
         }
-        if ($group->hasPassword() && !request()->session()->get('sheet_unlocked_' . $sheet->id, false)) {
+
+        $userRole = $group->getMemberRole($user->id);
+        if ($sheet->isRestrictedForRole($userRole)) {
+            abort(403, 'Akses dibatasi: Hanya Leader yang memiliki izin untuk mengakses lembar kerja ' . $sheet->name . '.');
+        }
+
+        if ($userRole === 'admin' && !$group->isAdminSheetVerifiedForSession($user->id, $sheet->id)) {
+            abort(403, 'Lembar kerja ini memerlukan verifikasi password akun admin.');
+        }
+
+        if ($userRole !== 'admin' && !$group->isUnlockedForSession()) {
             abort(403, 'Lembar kerja ini belum diotorisasi.');
         }
     }

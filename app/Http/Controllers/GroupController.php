@@ -6,6 +6,11 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Database\QueryException;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use App\Models\FisheriesGroup;
 use App\Models\GroupMember;
@@ -17,6 +22,7 @@ use App\Models\User;
 use App\Models\Notification;
 use App\Services\SpreadsheetFormulaReferenceRewriter;
 use App\Services\SpreadsheetWorkbookCalculator;
+use App\Services\SpreadsheetActivityRecorder;
 
 class GroupController extends Controller
 {
@@ -59,11 +65,29 @@ class GroupController extends Controller
         }
 
         if (!$activeSheet) {
-            $activeSheet = $sheets->first();
+            $activeSheet = $sheets->firstWhere(fn ($s) => !$s->isRestrictedForRole($userRole)) ?? $sheets->first();
         }
 
-        $requiresPasswordUnlock = $group->hasPassword()
-            && !$request->session()->get('sheet_unlocked_' . $activeSheet->id, false);
+        $isSheetRestricted = $activeSheet ? $activeSheet->isRestrictedForRole($userRole) : false;
+
+        $requiresAdminAccountVerification = $userRole === 'admin'
+            && !$group->isAdminSheetVerifiedForSession($user->id, $activeSheet?->id ?? 0);
+        $requiresPasswordUnlock = $requiresAdminAccountVerification
+            || ($userRole !== 'admin' && $group->hasPassword() && !$group->isUnlockedForSession());
+
+        $canAccessWorkspace = ($userRole === 'admin' && !$requiresAdminAccountVerification)
+            || ($userRole === 'karyawan' && (!$group->hasPassword() || $group->isUnlockedForSession()));
+
+        if (in_array($userRole, ['admin', 'karyawan'], true) && $canAccessWorkspace && $activeSheet) {
+            $context = [
+                'user_id' => $user->id,
+                'group_id' => $group->id,
+                'sheet_id' => $activeSheet->id,
+                'role' => $userRole,
+            ];
+            $request->session()->put('admin_workspace_context', $context);
+            $request->session()->put('workspace_exit_context', $context);
+        }
 
         // 4. Load members from database with normalized roles
         $members = $group->members()->with('user')->orderBy('joined_at')->get();
@@ -79,7 +103,9 @@ class GroupController extends Controller
             'userRole',
             'userGroups',
             'requiresPasswordSetup',
-            'requiresPasswordUnlock'
+            'requiresPasswordUnlock',
+            'requiresAdminAccountVerification',
+            'isSheetRestricted'
         ));
     }
 
@@ -93,18 +119,165 @@ class GroupController extends Controller
             'sheet_id' => ['required', 'integer'],
         ]);
 
-        if (!$group->verifyPassword($validated['password'])) {
-            return back()->with('error', 'Password workspace salah.');
+        $sheet = $group->sheets()->findOrFail($validated['sheet_id']);
+        $user = Auth::user();
+        $role = $group->getMemberRole($user->id);
+
+        if ($role === 'admin') {
+            if (!Hash::check($validated['password'], $user->password)) {
+                if ($request->expectsJson()) {
+                    return response()->json(['message' => 'Password akun salah. Silakan coba lagi.'], 422);
+                }
+
+                return back()->with('error', 'Password akun salah. Silakan coba lagi.');
+            }
+
+            // One verified target only: returning to another sheet requires a
+            // fresh account-password check, while a normal refresh does not.
+            $group->markAdminSheetVerifiedForSession($user->id, $sheet->id);
+        } else {
+            if (!$group->verifyPassword($validated['password'])) {
+                if ($request->expectsJson()) {
+                    return response()->json(['message' => 'Password workspace salah.'], 422);
+                }
+
+                return back()->with('error', 'Password workspace salah.');
+            }
+            $request->session()->put('workspace_unlocked_' . $group->id, true);
+            $request->session()->put('sheet_unlocked_' . $sheet->id, true);
         }
 
-        $sheet = $group->sheets()->findOrFail($validated['sheet_id']);
-        $request->session()->put('sheet_unlocked_' . $sheet->id, true);
+        if (in_array($role, ['admin', 'karyawan'], true)) {
+            $context = [
+                'user_id' => $user->id,
+                'group_id' => $group->id,
+                'sheet_id' => $sheet->id,
+                'role' => $role,
+            ];
+            $request->session()->put('admin_workspace_context', $context);
+            $request->session()->put('workspace_exit_context', $context);
+        }
 
-        return redirect()->route('group.workspace', [$group->id, $sheet->id]);
+        $redirectUrl = route('group.workspace', [$group->id, $sheet->id]);
+        if ($request->expectsJson()) {
+            return response()->json(['redirect' => $redirectUrl]);
+        }
+
+        return redirect()->to($redirectUrl);
+    }
+
+    /** Verify the account password before leaving the active workspace. */
+    public function leaveWorkspace(Request $request, FisheriesGroup $group)
+    {
+        $context = $request->session()->get('admin_workspace_context') ?? $request->session()->get('workspace_exit_context');
+        $userRole = $group->getMemberRole(Auth::id());
+        abort_unless(
+            is_array($context)
+                && (int) ($context['user_id'] ?? 0) === (int) Auth::id()
+                && (int) ($context['group_id'] ?? 0) === $group->id
+                && in_array($userRole, ['admin', 'karyawan'], true),
+            403,
+            'Verifikasi keluar tidak berlaku untuk workspace ini.'
+        );
+
+        $validated = $request->validate([
+            'password' => ['required', 'string', 'max:100'],
+            'destination' => ['required', 'string', 'max:2048'],
+        ]);
+
+        $destination = $validated['destination'];
+        $isLogout = $destination === 'logout';
+        $parsedDestination = parse_url($destination);
+        $decodedPath = is_array($parsedDestination)
+            ? rawurldecode($parsedDestination['path'] ?? '')
+            : '';
+        abort_unless(
+            $isLogout || (
+                is_array($parsedDestination)
+                && !isset($parsedDestination['scheme'])
+                && !isset($parsedDestination['host'])
+                && str_starts_with($decodedPath, '/')
+                && !str_starts_with($decodedPath, '//')
+                && !str_contains($decodedPath, '\\')
+                && !preg_match('/[\x00-\x1F\x7F]/', $decodedPath)
+            ),
+            422,
+            'Tujuan navigasi tidak valid.'
+        );
+
+        $request->session()->flash('workspace_exit_target', $destination);
+        if (!Hash::check($validated['password'], Auth::user()->password)) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Password akun salah. Anda tetap berada di workspace.'], 422);
+            }
+
+            return back()->with('error', 'Password akun salah. Anda tetap berada di workspace.');
+        }
+
+        $request->session()->forget([
+            $group->adminVerificationSessionKey(Auth::id()),
+            'admin_workspace_context',
+            'workspace_exit_context',
+            'workspace_exit_target',
+            'workspace_unlocked_' . $group->id,
+        ]);
+        foreach ($group->sheets()->pluck('id') as $sheetId) {
+            $request->session()->forget('sheet_unlocked_' . $sheetId);
+        }
+
+        if ($isLogout) {
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            if ($request->expectsJson()) {
+                return response()->json(['redirect' => route('login')]);
+            }
+
+            return redirect()->route('login');
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json(['redirect' => $destination]);
+        }
+
+        return redirect()->to($destination);
+    }
+
+    /**
+     * Search registered users by name for adding members to the workspace.
+     */
+    public function searchUsers(Request $request, FisheriesGroup $group)
+    {
+        abort_unless($group->isMember(Auth::id()), 403);
+
+        $name = trim($request->query('name', ''));
+        if (mb_strlen($name) < 1) {
+            return response()->json(['users' => []]);
+        }
+
+        $activeMemberUserIds = $group->members()->where('status', 'Aktif')->pluck('user_id')->all();
+
+        $users = User::where('name', 'like', "%{$name}%")
+            ->take(12)
+            ->get(['id', 'name', 'role_title', 'avatar']);
+
+        $data = $users->map(function ($u) use ($activeMemberUserIds) {
+            return [
+                'id' => $u->id,
+                'name' => $u->name,
+                'role_title' => $u->role_title ?? 'Pengguna Terdaftar',
+                'avatar_url' => $u->avatar_url,
+                'is_member' => in_array($u->id, $activeMemberUserIds, true),
+            ];
+        });
+
+        return response()->json(['users' => $data]);
     }
 
     /**
      * Add member to the workspace via modal.
+     * Uses system registered user and role.
      * Leaders and Admins can invite members.
      */
     public function addMember(Request $request, FisheriesGroup $group)
@@ -113,10 +286,10 @@ class GroupController extends Controller
         Gate::authorize('addMember', $group);
 
         $validated = $request->validate([
-            'email_or_phone' => ['required', 'string'],
+            'user_id' => ['nullable', 'integer', 'exists:users,id'],
+            'email_or_phone' => ['nullable', 'string'],
             'role' => ['required', 'string', 'in:leader,admin,karyawan'],
         ], [
-            'email_or_phone.required' => 'Email atau nomor kontak pengguna wajib diisi.',
             'role.required' => 'Pilih peran anggota yang akan ditambahkan.',
             'role.in' => 'Peran yang dipilih tidak valid.',
         ]);
@@ -126,19 +299,36 @@ class GroupController extends Controller
             abort(403, 'Administrator tidak memiliki wewenang untuk menunjuk Leader.');
         }
 
-        $query = trim($validated['email_or_phone']);
-        $targetUser = User::where('email', $query)
-            ->orWhere('whatsapp', $query)
-            ->first();
+        $targetUser = null;
+        if (!empty($validated['user_id'])) {
+            $targetUser = User::find($validated['user_id']);
+        } elseif (!empty($validated['email_or_phone'])) {
+            $query = trim($validated['email_or_phone']);
+            $targetUser = User::where('name', $query)
+                ->orWhere('email', $query)
+                ->orWhere('whatsapp', $query)
+                ->first();
+        }
 
         if (!$targetUser) {
-            return back()->with('error', "Pengguna dengan kontak '{$query}' belum terdaftar di sistem Dadhen Mandiri.");
+            return back()->with('error', 'Pilih akun pengguna yang valid dari daftar pencarian.');
         }
 
         $existing = GroupMember::where('group_id', $group->id)->where('user_id', $targetUser->id)->first();
         if ($existing) {
+            if ($existing->status === 'Aktif') {
+                return back()->with('error', "Pengguna '{$targetUser->name}' sudah menjadi anggota di workspace ini.");
+            }
             $existing->update(['role' => $validated['role'], 'status' => 'Aktif']);
-            return back()->with('success', "Peran {$targetUser->name} berhasil diperbarui menjadi {$validated['role']}.");
+            app(SpreadsheetActivityRecorder::class)->recordWorkspace(
+                $user,
+                $group,
+                'member_added',
+                null,
+                $targetUser->name . ' (' . ucfirst($validated['role']) . ')',
+                ['user_name' => $targetUser->name, 'role' => $validated['role'], 'user_id' => $targetUser->id]
+            );
+            return back()->with('success', "Anggota {$targetUser->name} berhasil diaktifkan kembali dengan peran {$validated['role']}.");
         }
 
         GroupMember::create([
@@ -148,6 +338,15 @@ class GroupController extends Controller
             'status' => 'Aktif',
             'joined_at' => now(),
         ]);
+
+        app(SpreadsheetActivityRecorder::class)->recordWorkspace(
+            $user,
+            $group,
+            'member_added',
+            null,
+            $targetUser->name . ' (' . ucfirst($validated['role']) . ')',
+            ['user_name' => $targetUser->name, 'role' => $validated['role'], 'user_id' => $targetUser->id]
+        );
 
         Notification::create([
             'user_id' => $targetUser->id,
@@ -171,7 +370,17 @@ class GroupController extends Controller
 
         Gate::authorize('changeRole', [$group, $member, $validated['role']]);
 
+        $oldRole = $member->role;
         $member->update(['role' => $validated['role']]);
+
+        app(SpreadsheetActivityRecorder::class)->recordWorkspace(
+            Auth::user(),
+            $group,
+            'role_changed',
+            ucfirst($oldRole),
+            ucfirst($validated['role']),
+            ['target_user_name' => $member->user?->name, 'target_user_id' => $member->user_id, 'old_role' => $oldRole, 'new_role' => $validated['role']]
+        );
 
         return back()->with('success', "Peran anggota berhasil diperbarui menjadi {$validated['role']}.");
     }
@@ -184,7 +393,18 @@ class GroupController extends Controller
         Gate::authorize('removeMember', [$group, $member]);
 
         $name = $member->user ? $member->user->name : 'Anggota';
+        $oldRole = $member->role;
+        $memberUserId = $member->user_id;
         $member->delete();
+
+        app(SpreadsheetActivityRecorder::class)->recordWorkspace(
+            Auth::user(),
+            $group,
+            'member_removed',
+            $name . ' (' . ucfirst($oldRole) . ')',
+            null,
+            ['removed_user_name' => $name, 'removed_user_id' => $memberUserId, 'role' => $oldRole]
+        );
 
         return back()->with('success', "{$name} telah dikeluarkan dari workspace.");
     }
@@ -199,11 +419,24 @@ class GroupController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'password' => ['nullable', 'string', 'min:4', 'max:100'],
+            'avatar' => ['nullable', 'image', 'mimes:jpeg,png,jpg,webp', 'max:2048'],
         ]);
 
+        $oldName = $group->name;
         $updateData = [
             'name' => trim($validated['name']),
         ];
+
+        if ($request->hasFile('avatar')) {
+            $file = $request->file('avatar');
+            $filename = 'ws_' . $group->id . '_' . time() . '.' . $file->getClientOriginalExtension();
+            $destinationPath = public_path('uploads/workspaces');
+            if (!file_exists($destinationPath)) {
+                mkdir($destinationPath, 0755, true);
+            }
+            $file->move($destinationPath, $filename);
+            $updateData['avatar'] = 'uploads/workspaces/' . $filename;
+        }
 
         if (!empty($validated['password'])) {
             $request->validate(['current_password' => ['required', 'string']]);
@@ -218,6 +451,15 @@ class GroupController extends Controller
             $request->session()->forget('sheet_unlocked_' . $sheetId);
         }
 
+        app(SpreadsheetActivityRecorder::class)->recordWorkspace(
+            Auth::user(),
+            $group,
+            'workspace_updated',
+            $oldName,
+            $group->name,
+            ['name' => $group->name, 'has_avatar' => !empty($updateData['avatar'])]
+        );
+
         return back()->with('success', "Data workspace {$group->name} berhasil diperbarui.");
     }
 
@@ -228,10 +470,144 @@ class GroupController extends Controller
     {
         Gate::authorize('delete', $group);
 
-        $groupName = $group->name;
-        $group->delete();
+        $deletedWorkspace = DB::transaction(function () use ($group) {
+            $lockedGroup = FisheriesGroup::query()->lockForUpdate()->findOrFail($group->id);
+            Gate::authorize('delete', $lockedGroup);
+            $workspace = [
+                'name' => $lockedGroup->name,
+                'avatar_path' => $this->workspaceAvatarFilePath($lockedGroup),
+            ];
+            $lockedGroup->delete();
 
-        return redirect()->route('dashboard')->with('success', "Workspace '{$groupName}' dan seluruh dokumennya telah berhasil dihapus.");
+            return $workspace;
+        });
+        $avatarCleanupFailed = !$this->deleteWorkspaceAvatarFile($deletedWorkspace['avatar_path']);
+
+        $message = "Workspace '{$deletedWorkspace['name']}' dan seluruh dokumennya telah berhasil dihapus.";
+        if ($avatarCleanupFailed) {
+            $message .= ' File avatar workspace gagal dibersihkan.';
+        }
+
+        return redirect()->route('dashboard')->with('success', $message);
+    }
+
+    /** Delete selected workspaces only when every requested workspace is manageable. */
+    public function bulkDestroy(Request $request)
+    {
+        $validated = $request->validate([
+            'groups' => ['required', 'array', 'min:1', 'max:100'],
+            'groups.*' => ['required', 'integer', 'min:1', 'distinct'],
+        ]);
+
+        $groups = FisheriesGroup::query()->whereIn('id', $validated['groups'])->get()->keyBy('id');
+
+        foreach ($groups as $group) {
+            Gate::authorize('delete', $group);
+        }
+
+        $deleted = [];
+        $failed = [];
+        $cleanupWarnings = [];
+
+        foreach ($validated['groups'] as $groupId) {
+            $selectedGroup = $groups->get($groupId);
+            if (!$selectedGroup) {
+                $failed[] = "Workspace #{$groupId} (sudah tidak tersedia)";
+                continue;
+            }
+
+            try {
+                $workspace = DB::transaction(function () use ($groupId) {
+                    $group = FisheriesGroup::query()->lockForUpdate()->findOrFail($groupId);
+                    Gate::authorize('delete', $group);
+                    $workspace = [
+                        'name' => $group->name,
+                        'avatar_path' => $this->workspaceAvatarFilePath($group),
+                    ];
+                    $group->delete();
+
+                    return $workspace;
+                });
+                $deleted[] = $workspace['name'];
+                if (!$this->deleteWorkspaceAvatarFile($workspace['avatar_path'])) {
+                    $cleanupWarnings[] = $workspace['name'];
+                }
+            } catch (AuthorizationException) {
+                $failed[] = $selectedGroup->name . ' (izin berubah sebelum penghapusan)';
+            } catch (ModelNotFoundException) {
+                $failed[] = $selectedGroup->name . ' (workspace sudah tidak tersedia)';
+            } catch (QueryException $exception) {
+                Log::warning('Workspace deletion failed due to a database constraint.', [
+                    'workspace_id' => $groupId,
+                    'user_id' => Auth::id(),
+                    'exception' => $exception->getMessage(),
+                ]);
+                $failed[] = $selectedGroup->name . ' (data terkait tidak dapat dihapus dengan aman)';
+            }
+        }
+
+        $message = count($deleted) . ' workspace berhasil dihapus';
+        if ($deleted) {
+            $message .= ': ' . implode(', ', $deleted) . '.';
+        } else {
+            $message = 'Tidak ada workspace yang berhasil dihapus.';
+        }
+        if ($failed) {
+            $message .= ' Gagal menghapus: ' . implode(', ', $failed) . '.';
+        }
+        if ($cleanupWarnings) {
+            $message .= ' Workspace terhapus, tetapi file avatar gagal dibersihkan: ' . implode(', ', $cleanupWarnings) . '.';
+        }
+
+        return redirect()->route('dashboard')
+            ->with($failed ? 'error' : 'success', $message);
+    }
+
+    private function workspaceAvatarFilePath(FisheriesGroup $group): ?string
+    {
+        $avatar = str_replace('\\', '/', (string) $group->avatar);
+        $prefix = 'uploads/workspaces/';
+        if (!str_starts_with($avatar, $prefix)) {
+            return null;
+        }
+
+        $filename = substr($avatar, strlen($prefix));
+        $directory = realpath(public_path('uploads/workspaces'));
+        $path = realpath(public_path($prefix . $filename));
+        $publicDirectory = realpath(public_path());
+        if (
+            $filename === ''
+            || basename($filename) !== $filename
+            || !$directory
+            || !$path
+            || !$publicDirectory
+            || !str_starts_with($directory, $publicDirectory . DIRECTORY_SEPARATOR)
+            || is_link(public_path($prefix . $filename))
+            || dirname($path) !== $directory
+            || !is_file($path)
+            || FisheriesGroup::query()->where('avatar', $group->avatar)->where('id', '!=', $group->id)->exists()
+        ) {
+            return null;
+        }
+
+        return $path;
+    }
+
+    private function deleteWorkspaceAvatarFile(?string $path): bool
+    {
+        if (!$path || !is_file($path)) {
+            return true;
+        }
+
+        if (unlink($path)) {
+            return true;
+        }
+
+        Log::warning('Workspace was deleted but its avatar file could not be removed.', [
+            'path' => $path,
+        ]);
+
+        return false;
     }
 
     /**
@@ -257,11 +633,27 @@ class GroupController extends Controller
         ]);
 
         $sheet = DB::transaction(function () use ($group, $validated) {
+            $metadata = [
+                'identity_color' => SpreadsheetSheet::cyclicIdentityColorKey($group->sheets()->count()),
+            ];
             $sheet = $group->sheets()->create([
                 'name' => $validated['name'],
                 'category' => 'custom',
+                'metadata' => $metadata,
             ]);
             $sheet->initializeBlankGrid();
+            app(SpreadsheetActivityRecorder::class)->recordWorkspace(
+                Auth::user(),
+                $group,
+                'sheet_added',
+                null,
+                $sheet->name,
+                [
+                    'sheet_id' => $sheet->id,
+                    'sheet_name' => $sheet->name,
+                    'identity_color' => $metadata['identity_color'],
+                ]
+            );
 
             return $sheet;
         });
@@ -297,7 +689,9 @@ class GroupController extends Controller
         $oldName = $sheet->name;
         $group = $sheet->group;
         DB::transaction(function () use ($sheet, $group, $oldName, $validated) {
-            $sheet->update(['name' => $validated['name']]);
+            $metadata = $sheet->metadata ?? [];
+            $metadata['identity_color'] ??= $sheet->identityColorKey();
+            $sheet->update(['name' => $validated['name'], 'metadata' => $metadata]);
             $sheetIds = $group->sheets()->pluck('id');
             $rewriter = app(SpreadsheetFormulaReferenceRewriter::class);
 
@@ -317,6 +711,14 @@ class GroupController extends Controller
                 });
         });
         app(SpreadsheetWorkbookCalculator::class)->recalculate($group);
+        app(SpreadsheetActivityRecorder::class)->recordWorkspace(
+            Auth::user(),
+            $group,
+            'sheet_renamed',
+            $oldName,
+            $sheet->name,
+            ['sheet_id' => $sheet->id, 'sheet_name' => $sheet->name]
+        );
 
         return back()->with('success', "Nama lembar kerja berhasil diubah menjadi '{$sheet->name}'.");
     }
@@ -372,6 +774,15 @@ class GroupController extends Controller
                 }
             }
 
+            app(SpreadsheetActivityRecorder::class)->recordWorkspace(
+                Auth::user(),
+                $sheet->group,
+                'sheet_duplicated',
+                $sheet->name,
+                $duplicated->name,
+                ['sheet_id' => $duplicated->id, 'sheet_name' => $duplicated->name]
+            );
+
             return $duplicated;
         });
 
@@ -392,6 +803,14 @@ class GroupController extends Controller
         }
 
         $sheetName = $sheet->name;
+        app(SpreadsheetActivityRecorder::class)->recordWorkspace(
+            Auth::user(),
+            $group,
+            'sheet_deleted',
+            $sheetName,
+            null,
+            ['sheet_id' => $sheet->id, 'sheet_name' => $sheetName]
+        );
         $sheet->delete();
 
         $nextSheet = $group->sheets()->first();

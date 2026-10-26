@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\FisheriesGroup;
 use App\Models\SpreadsheetCell;
+use App\Models\SpreadsheetSheet;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
@@ -64,6 +65,9 @@ class OktAnalisaTemplateImporter
             'name' => $sheetName,
             'category' => 'okt-analisa',
             'metadata' => [
+                'identity_color' => SpreadsheetSheet::identityColorKeyForName($sheetName)
+                    ?? SpreadsheetSheet::cyclicIdentityColorKey($group->sheets()->count()),
+                'template_identity' => SpreadsheetSheet::identityColorKeyForName($sheetName),
                 'merged_cells' => array_values($worksheet->getMergeCells()),
                 'freeze_pane' => $worksheet->getFreezePane(),
                 'show_gridlines' => $worksheet->getShowGridlines(),
@@ -101,9 +105,25 @@ class OktAnalisaTemplateImporter
             $formula = $cell->isFormula()
                 ? $this->formulaReferenceRewriter->rewrite($cell->getValue(), $sheetNameMap)
                 : null;
-            $value = $formula !== null ? $cell->getOldCalculatedValue() : $cell->getValue();
+            // This importer is only used for a newly created template
+            // workspace. Keep all workbook formulas/styles, but discard
+            // imported numeric sample transactions so no user receives the
+            // source workbook's balances, quantities, or prices as their own.
+            $value = $formula !== null
+                ? $cell->getOldCalculatedValue()
+                : $this->templateValue($cell->getValue(), $cell->getDataType());
             $style = $worksheet->getStyle($coordinate)->exportArray();
             $format = $style === [] ? [] : ['xlsx' => $style];
+
+            // Formulae made solely of hard-coded source values are sample
+            // transactions, not live calculations. Keep their original
+            // formula for auditability/template fidelity, but give them a
+            // neutral cached value so a new workspace never displays a
+            // carried-over price or balance.
+            if ($formula !== null && !$this->formulaReferencesCell($formula)) {
+                $format['template_static_formula'] = true;
+                $value = '';
+            }
 
             if ($formula !== null && str_contains($formula, '[')) {
                 $format['external_reference'] = true;
@@ -137,6 +157,27 @@ class OktAnalisaTemplateImporter
         $usedNames[] = $candidate;
 
         return $candidate;
+    }
+
+    private function templateValue(mixed $value, string $dataType): mixed
+    {
+        if ($value === null || $value === '') {
+            return $value;
+        }
+
+        // Numeric and date serial cells are transaction inputs in this
+        // workbook. Text is intentionally retained because it contains the
+        // labels, units, and instructions that define the template structure.
+        if (is_numeric($value) || $dataType === \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_NUMERIC) {
+            return '';
+        }
+
+        return $value;
+    }
+
+    private function formulaReferencesCell(string $formula): bool
+    {
+        return preg_match('/\$?[A-Z]{1,3}\$?[1-9][0-9]*/i', $formula) === 1;
     }
 
     public static function calculateReadableWidth(string $sheetName, int $index, float $excelWidth, float $defaultColumnWidth): int
