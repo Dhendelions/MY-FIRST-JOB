@@ -343,6 +343,7 @@ window.spreadsheetWorksheet = function($wire) {
         lastSheetSwitchRequest: null,
         sheetScrollPositions: {},
         isSheetSwitching: false,
+        gridExtensionPending: { row: false, column: false },
 
         init() {
             this.listenerController = new AbortController();
@@ -1020,6 +1021,23 @@ window.spreadsheetWorksheet = function($wire) {
             });
 
             this.requestSheetSwitch(request.sheetId, request.url, request.historyMode);
+        },
+
+        extendGrid(axis) {
+            const limit = axis === 'row' ? 10000 : 702;
+            const property = axis === 'row' ? 'gridRowLimit' : 'gridColumnLimit';
+            if (this.gridExtensionPending[axis] || Number($wire[property]) >= limit) return;
+
+            this.gridExtensionPending[axis] = true;
+            $wire.extendGrid(axis).finally(() => {
+                this.gridExtensionPending[axis] = false;
+            });
+        },
+
+        maybeExtendGrid(event) {
+            const scrollArea = event.currentTarget;
+            if (!scrollArea || scrollArea.scrollHeight - scrollArea.scrollTop - scrollArea.clientHeight > 160) return;
+            this.extendGrid('row');
         },
 
         startSheetTransition(direction) {

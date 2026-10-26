@@ -10,7 +10,6 @@ use App\Models\SpreadsheetColumn;
 use App\Models\SpreadsheetRow;
 use App\Models\SpreadsheetCell;
 use App\Models\GroupMember;
-use App\Models\SpreadsheetActivity;
 use App\Services\SpreadsheetActivityRecorder;
 use App\Services\SpreadsheetFormulaEngine;
 use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
@@ -27,7 +26,7 @@ class SpreadsheetWorksheet extends Component
     public array $gridColumns = [];
     public array $gridRows = [];
     public int $gridColumnLimit = 26;
-    public int $gridRowLimit = 100;
+    public int $gridRowLimit = 30;
     public array $cellsData = []; // key: "{rowId}_{colId}" => raw value or calculated
     public array $cellsDisplay = [];
     public array $cellsFormula = []; // key: "{rowId}_{colId}" => formula string
@@ -76,7 +75,6 @@ class SpreadsheetWorksheet extends Component
     // Undo / Redo history stacks
     public array $undoStack = [];
     public array $redoStack = [];
-    public array $recentActivities = [];
 
     protected $listeners = [
         'cellUpdated' => 'updateCell',
@@ -89,7 +87,6 @@ class SpreadsheetWorksheet extends Component
     {
         $this->sheetId = $sheet->id;
         $this->sheet = $sheet;
-        $this->authorizeAccess();
         $this->loadSheetData();
     }
 
@@ -111,11 +108,11 @@ class SpreadsheetWorksheet extends Component
             abort(404, 'Lembar kerja tidak ditemukan.');
         }
 
-        if (!$this->sheet->group->isMember($user->id)) {
+        $userRole = $this->sheet->group->getMemberRole($user->id);
+        if (!$userRole) {
             abort(403, 'Akses ditolak: Anda tidak memiliki wewenang pada workspace ini.');
         }
 
-        $userRole = $this->sheet->group->getMemberRole($user->id);
         if ($this->sheet->isRestrictedForRole($userRole)) {
             abort(403, 'Akses dibatasi: Hanya Leader yang memiliki izin untuk mengakses lembar kerja ' . $this->sheet->name . '.');
         }
@@ -135,7 +132,11 @@ class SpreadsheetWorksheet extends Component
     public function loadSheetData()
     {
         $this->authorizeAccess();
+        $this->hydrateSheetData();
+    }
 
+    private function hydrateSheetData(): void
+    {
         $this->sheet = SpreadsheetSheet::with([
             'columns' => fn($q) => $q->orderBy('sort_order'),
             'rows' => fn($q) => $q->orderBy('sort_order'),
@@ -165,7 +166,8 @@ class SpreadsheetWorksheet extends Component
 
         // Fetch all cells in one query
         $rowIds = array_column($this->rows, 'id');
-        $cells = SpreadsheetCell::whereIn('row_id', $rowIds)->get();
+        $cells = SpreadsheetCell::whereIn('row_id', $rowIds)
+            ->get(['row_id', 'column_id', 'value', 'formula', 'format', 'version']);
 
         $this->cellsData = [];
         $this->cellsDisplay = [];
@@ -202,7 +204,6 @@ class SpreadsheetWorksheet extends Component
         }
 
         $this->recalculateSummary();
-        $this->loadRecentActivities();
     }
 
     public function switchSheet(int $sheetId): void
@@ -228,10 +229,10 @@ class SpreadsheetWorksheet extends Component
         $this->columnPendingDeleteLetter = '';
         $this->columnPendingDeleteCount = 0;
         $this->gridColumnLimit = 26;
-        $this->gridRowLimit = 100;
+        $this->gridRowLimit = 30;
 
         $this->authorizeAccess();
-        $this->loadSheetData();
+        $this->hydrateSheetData();
 
         $this->dispatch(
             'worksheet-sheet-switched',
@@ -257,7 +258,7 @@ class SpreadsheetWorksheet extends Component
         $maxColumn = max(1, (int) (collect($this->columns)->max('sort_order') ?? 0));
         $maxRow = max(1, (int) (collect($this->rows)->max('sort_order') ?? 0));
         $this->gridColumnLimit = max(26, $this->gridColumnLimit, $maxColumn);
-        $this->gridRowLimit = max(100, $this->gridRowLimit, $maxRow);
+        $this->gridRowLimit = max(30, $this->gridRowLimit, $maxRow);
         $this->gridColumns = [];
         $this->gridRows = [];
 
@@ -591,7 +592,6 @@ class SpreadsheetWorksheet extends Component
 
         $this->evaluateAllFormulas();
         $this->recalculateSummary();
-        $this->loadRecentActivities();
         $this->dispatch('refreshActivityHistory');
 
         $changedCells = [];
@@ -694,22 +694,7 @@ class SpreadsheetWorksheet extends Component
         }
 
         $this->recalculateSummary();
-        $this->loadRecentActivities();
         $this->saveStatus = 'Tersinkron ' . date('H:i:s');
-    }
-
-    private function loadRecentActivities(): void
-    {
-        $this->recentActivities = SpreadsheetActivity::with(['user:id,name', 'sheet:id,name'])
-            ->where('group_id', $this->sheet->group_id)->latest('committed_at')->limit(20)->get()
-            ->map(fn ($activity) => [
-                'id' => $activity->id,
-                'actor' => $activity->user?->name ?? 'Pengguna',
-                'action' => $activity->action,
-                'sheet' => $activity->sheet?->name ?? '-',
-                'range' => $activity->cell_range,
-                'at' => $activity->committed_at->timezone('Asia/Jakarta')->format('d M H:i:s'),
-            ])->all();
     }
 
     /**

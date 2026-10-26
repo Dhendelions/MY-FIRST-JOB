@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Livewire\SpreadsheetWorksheet;
 use App\Services\SpreadsheetFormulaEngine;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -112,6 +113,49 @@ class SpreadsheetPerformanceOptimizationTest extends TestCase
             ->test(SpreadsheetWorksheet::class, ['sheet' => $this->sheet])
             ->call('switchSheet', $restrictedSheet->id)
             ->assertForbidden();
+    }
+
+    public function test_sheet_switch_skips_activity_queries_and_redundant_membership_checks(): void
+    {
+        $staff = User::create([
+            'name' => 'Sheet Switch Tester',
+            'email' => 'sheet-switch@example.test',
+            'password' => 'password',
+        ]);
+        GroupMember::create([
+            'group_id' => $this->group->id,
+            'user_id' => $staff->id,
+            'role' => 'karyawan',
+            'status' => 'Aktif',
+        ]);
+
+        $targetSheet = $this->group->sheets()->orderBy('id')->skip(1)->firstOrFail();
+        $component = Livewire::actingAs($staff)
+            ->test(SpreadsheetWorksheet::class, ['sheet' => $this->sheet]);
+
+        $queries = [];
+        DB::listen(function ($query) use (&$queries): void {
+            $queries[] = strtolower($query->sql);
+        });
+
+        $component->call('switchSheet', $targetSheet->id)
+            ->assertSet('sheetId', $targetSheet->id);
+
+        $membershipQueries = array_filter(
+            $queries,
+            fn (string $sql): bool => str_contains($sql, 'group_members')
+        );
+        $activityQueries = array_filter(
+            $queries,
+            fn (string $sql): bool => str_contains($sql, 'spreadsheet_activities')
+        );
+
+        $this->assertLessThanOrEqual(
+            3,
+            count($membershipQueries),
+            'A sheet switch should check membership once for the current sheet and once for the target, plus view rendering.'
+        );
+        $this->assertCount(0, $activityQueries, 'Switching sheets must not reload workspace activity history.');
     }
 
     /**

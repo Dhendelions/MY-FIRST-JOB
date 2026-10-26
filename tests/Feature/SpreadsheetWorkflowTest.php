@@ -176,10 +176,14 @@ class SpreadsheetWorkflowTest extends TestCase
     {
         [$group, $sheet] = $this->createSheet();
 
-        Livewire::actingAs($group->creator)
+        $component = Livewire::actingAs($group->creator)
             ->test(SpreadsheetWorksheet::class, ['sheet' => $sheet])
             ->assertSet('gridColumnLimit', 26)
-            ->assertSet('gridRowLimit', 100)
+            ->assertSet('gridRowLimit', 30);
+
+        $this->assertSame(780, substr_count($component->html(), 'class="grid-cell-td'));
+        $component->call('extendGrid', 'row')
+            ->assertSet('gridRowLimit', 55)
             ->call('ensureGridCell', 100, 26);
 
         $row = $sheet->rows()->where('sort_order', 100)->firstOrFail();

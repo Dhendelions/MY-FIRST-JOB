@@ -86,7 +86,9 @@
     </div>
 
     <!-- GRID TABEL SPREADSHEET (MICROSOFT EXCEL LOOK & FEEL) -->
-    <div class="flex-1 overflow-auto min-h-0 min-w-0 bg-slate-200 select-text relative spreadsheet-scroll" aria-label="Area kerja spreadsheet">
+    <div class="flex-1 overflow-auto min-h-0 min-w-0 bg-slate-200 select-text relative spreadsheet-scroll"
+         aria-label="Area kerja spreadsheet"
+         @scroll.passive="maybeExtendGrid($event)">
         <table class="spreadsheet-table bg-white w-max table-fixed text-xs border-separate border-spacing-0">
             <colgroup>
                 <col style="width: 48px; min-width: 48px; max-width: 48px;">
@@ -288,7 +290,7 @@
                                 wire:key="grid-cell-{{ $coord }}"
                                 style="height:{{ !empty($row['height']) ? (float) $row['height'] * 1.333333 : $defaultRowHeightPx }}px; {{ $bgColor ? "background-color: {$bgColor}; " : '' }}{{ $cellsStyleCss[$cellKey] ?? '' }}{{ $stickyStyle }}" 
                                 class="grid-cell-td p-0 relative bg-white select-none outline-none border-b border-r border-slate-200/60 {{ $coord === ($activeCellCoord ?? 'A1') ? 'is-selected' : '' }}"
-                                @click="selectCell({{ \Illuminate\Support\Js::from($coord) }}, {{ $row['id'] ?? 'null' }}, {{ $col['id'] ?? 'null' }}, {{ $rIdx }}, {{ $cIdx }}, {{ $row['sort_order'] }}, {{ $col['sort_order'] }}, {{ \Illuminate\Support\Js::from((string) $formula) }}, {{ \Illuminate\Support\Js::from((string) $val) }}, {{ \Illuminate\Support\Js::from((string) ($cellsDisplay[$cellKey] ?? $val)) }}); if ({{ $rIdx }} >= {{ count($gridRows) - 5 }}) $wire.extendGrid('row'); if ({{ $cIdx }} >= {{ count($gridColumns) - 3 }}) $wire.extendGrid('column');"
+                                @click="selectCell({{ \Illuminate\Support\Js::from($coord) }}, {{ $row['id'] ?? 'null' }}, {{ $col['id'] ?? 'null' }}, {{ $rIdx }}, {{ $cIdx }}, {{ $row['sort_order'] }}, {{ $col['sort_order'] }}, {{ \Illuminate\Support\Js::from((string) $formula) }}, {{ \Illuminate\Support\Js::from((string) $val) }}, {{ \Illuminate\Support\Js::from((string) ($cellsDisplay[$cellKey] ?? $val)) }}); if ({{ $rIdx }} >= {{ count($gridRows) - 5 }}) extendGrid('row'); if ({{ $cIdx }} >= {{ count($gridColumns) - 3 }}) extendGrid('column');"
                                 @dblclick="startEditCell({{ \Illuminate\Support\Js::from($coord) }}, {{ $row['id'] ?? 'null' }}, {{ $col['id'] ?? 'null' }}, {{ $row['sort_order'] }}, {{ $col['sort_order'] }}, {{ \Illuminate\Support\Js::from((string) ($formula ?: $val)) }})"
                                 @paste="if ({{ !empty($row['id']) && !empty($col['id']) ? 'true' : 'false' }}) handlePaste($event, {{ $row['id'] ?? 0 }}, {{ $col['id'] ?? 0 }})"
                                 title="{{ $hasFormula ? 'Formula: ' . $cellFormula : (!empty($format['external_reference']) ? 'Formula merujuk workbook eksternal; nilai tersimpan tidak dapat dihitung ulang tanpa sumber eksternal.' : '') }}">
