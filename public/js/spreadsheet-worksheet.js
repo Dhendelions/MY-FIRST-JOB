@@ -502,10 +502,21 @@ window.spreadsheetWorksheet = function($wire) {
             }, { signal: this.listenerController.signal });
 
             // Listen for Livewire morph updates to refresh cellsMap after structural changes (addRow, etc.)
+            // We only reinitialize on *structural* DOM changes (rows/columns added or removed).
+            // Simple cell value morphs handled via cell-updated-confirmed event should NOT
+            // trigger a full DOM scan, which is expensive on large sheets.
             if (typeof Livewire !== 'undefined') {
+                let _prevRowCount = document.querySelectorAll('.grid-data-row').length;
+                let _prevColCount = document.querySelectorAll('col[data-col-index]').length;
                 Livewire.hook('morph.updated', () => {
                     this.$nextTick(() => {
-                        this.initCellsMap();
+                        const newRowCount = document.querySelectorAll('.grid-data-row').length;
+                        const newColCount = document.querySelectorAll('col[data-col-index]').length;
+                        if (newRowCount !== _prevRowCount || newColCount !== _prevColCount) {
+                            _prevRowCount = newRowCount;
+                            _prevColCount = newColCount;
+                            this.initCellsMap();
+                        }
                         const activeTd = document.getElementById('td-' + this.selectedCell);
                         if (activeTd) activeTd.classList.add('is-selected');
                     });
@@ -1184,6 +1195,7 @@ window.spreadsheetWorksheet = function($wire) {
         },
 
         navigateCell(r, c) {
+            // Use cached references when possible to avoid repeated DOM scans.
             const rows = document.querySelectorAll('.grid-data-row');
             if (rows && rows[r]) {
                 const cells = rows[r].querySelectorAll('td[data-coord]');

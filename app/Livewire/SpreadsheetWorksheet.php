@@ -76,6 +76,13 @@ class SpreadsheetWorksheet extends Component
     public array $undoStack = [];
     public array $redoStack = [];
 
+    /**
+     * Per-request cache: stores the resolved member role to avoid repeated
+     * DB lookups inside a single Livewire action (e.g. authorizeAccess() was
+     * previously called twice in switchSheet()).
+     */
+    private ?string $_cachedMemberRole = null;
+
     protected $listeners = [
         'cellUpdated' => 'updateCell',
         'tsvPasted' => 'pasteTsvData',
@@ -92,6 +99,10 @@ class SpreadsheetWorksheet extends Component
 
     /**
      * Verify user authorization before performing any read or write operation.
+     *
+     * The resolved role is cached for the lifetime of this request so that
+     * multiple calls within the same Livewire action (e.g. switchSheet)
+     * do not repeat the member-lookup query.
      */
     protected function authorizeAccess(): void
     {
@@ -108,7 +119,13 @@ class SpreadsheetWorksheet extends Component
             abort(404, 'Lembar kerja tidak ditemukan.');
         }
 
-        $userRole = $this->sheet->group->getMemberRole($user->id);
+        // Cache the role resolution so repeated calls (e.g. in switchSheet)
+        // only hit the DB once per request.
+        if ($this->_cachedMemberRole === null) {
+            $this->_cachedMemberRole = $this->sheet->group->getMemberRole($user->id);
+        }
+        $userRole = $this->_cachedMemberRole;
+
         if (!$userRole) {
             abort(403, 'Akses ditolak: Anda tidak memiliki wewenang pada workspace ini.');
         }
@@ -231,6 +248,8 @@ class SpreadsheetWorksheet extends Component
         $this->gridColumnLimit = 26;
         $this->gridRowLimit = 30;
 
+        // Reset cached role so the new sheet's authorization is evaluated fresh.
+        $this->_cachedMemberRole = null;
         $this->authorizeAccess();
         $this->hydrateSheetData();
 
@@ -375,26 +394,42 @@ class SpreadsheetWorksheet extends Component
         );
     }
 
-    public function evaluateAllFormulas()
+    public function evaluateAllFormulas(): void
     {
         $this->authorizeAccess();
-        app(\App\Services\SpreadsheetWorkbookCalculator::class)->recalculate($this->sheet->group);
 
+        // Skip the expensive PhpSpreadsheet workbook instantiation when there
+        // are no server-side formulas on this sheet. The JS engine already
+        // handles client-side formula display; this path only updates persisted
+        // values for cross-sheet references and XLSX-level calculations.
         $rowIds = array_column($this->rows, 'id');
-        foreach (SpreadsheetCell::whereIn('row_id', $rowIds)->get() as $cell) {
-            $key = $cell->row_id . '_' . $cell->column_id;
-            $this->cellsData[$key] = $cell->value ?? '';
-            $this->cellsFormula[$key] = $cell->formula ?? '';
-            $this->cellsVersions[$key] = (int) ($cell->version ?? 1);
-            // Prefer in-memory format (may include recent formatCell changes not yet fetched);
-            // fall back to DB format if key was never populated in memory.
-            if (!isset($this->cellsFormat[$key])) {
-                $this->cellsFormat[$key] = $cell->format ?? [];
-            }
-            $this->updateCellPresentation($key, $cell->value ?? '', $this->cellsFormat[$key]);
-            if ($this->activeRowId === $cell->row_id && $this->activeColumnId === $cell->column_id) {
-                $this->activeCellVersion = (int) ($cell->version ?? 1);
-                $this->formulaValue = $cell->formula ?: ($cell->value ?? '');
+        $hasFormulasOnSheet = !empty($rowIds)
+            && SpreadsheetCell::whereIn('row_id', $rowIds)
+                ->whereNotNull('formula')
+                ->where('formula', '!=', '')
+                ->exists();
+
+        if ($hasFormulasOnSheet) {
+            app(\App\Services\SpreadsheetWorkbookCalculator::class)->recalculate($this->sheet->group);
+        }
+
+        // Refresh in-memory cell state from DB (picks up any updated formula results).
+        if (!empty($rowIds)) {
+            foreach (SpreadsheetCell::whereIn('row_id', $rowIds)
+                ->get(['row_id', 'column_id', 'value', 'formula', 'format', 'version']) as $cell) {
+                $key = $cell->row_id . '_' . $cell->column_id;
+                $this->cellsData[$key] = $cell->value ?? '';
+                $this->cellsFormula[$key] = $cell->formula ?? '';
+                $this->cellsVersions[$key] = (int) ($cell->version ?? 1);
+                // Prefer in-memory format (may include recent formatCell changes not yet fetched).
+                if (!isset($this->cellsFormat[$key])) {
+                    $this->cellsFormat[$key] = $cell->format ?? [];
+                }
+                $this->updateCellPresentation($key, $cell->value ?? '', $this->cellsFormat[$key]);
+                if ($this->activeRowId === $cell->row_id && $this->activeColumnId === $cell->column_id) {
+                    $this->activeCellVersion = (int) ($cell->version ?? 1);
+                    $this->formulaValue = $cell->formula ?: ($cell->value ?? '');
+                }
             }
         }
     }
@@ -994,6 +1029,9 @@ class SpreadsheetWorksheet extends Component
 
     /**
      * Change column width (110, 160, 230, 320 px).
+     *
+     * Only the in-memory columns array and gridColumns are refreshed; a full
+     * loadSheetData() reload is avoided because cell data has not changed.
      */
     public function setColumnWidth(int $colId, int $width)
     {
@@ -1006,7 +1044,16 @@ class SpreadsheetWorksheet extends Component
             ->where('id', $colId)
             ->update(['width' => $width]);
 
-        $this->loadSheetData();
+        // Patch the in-memory array instead of reloading all cells.
+        foreach ($this->columns as &$col) {
+            if ($col['id'] === $colId) {
+                $col['width'] = $width;
+                break;
+            }
+        }
+        unset($col);
+        $this->buildRenderedGrid();
+        $this->loadFreezePaneOffsets();
     }
 
     /** Persist a user-resized row without changing its contents. */
@@ -1014,25 +1061,46 @@ class SpreadsheetWorksheet extends Component
     {
         $this->authorizeAccess();
 
+        $storedHeight = max(15, min(300, $height / 1.333333));
         SpreadsheetRow::where('sheet_id', $this->sheetId)
             ->where('id', $rowId)
-            ->update(['height' => max(15, min(300, $height / 1.333333))]);
+            ->update(['height' => $storedHeight]);
 
-        $this->loadSheetData();
+        // Patch the in-memory arrays instead of reloading all cells.
+        foreach ($this->rows as &$row) {
+            if ($row['id'] === $rowId) {
+                $row['height'] = $storedHeight;
+                break;
+            }
+        }
+        unset($row);
+        $this->buildRenderedGrid();
+        $this->loadFreezePaneOffsets();
+        $this->loadAnalisaFixedRows();
     }
 
     /**
      * Inline update column title.
+     *
+     * Patches only the columns/gridColumns arrays to avoid a full cell reload.
      */
     public function updateColumnTitle(int $colId, string $title)
     {
         $this->authorizeAccess();
 
+        $trimmed = trim($title);
         SpreadsheetColumn::where('sheet_id', $this->sheetId)
             ->where('id', $colId)
-            ->update(['title' => trim($title)]);
+            ->update(['title' => $trimmed]);
 
-        $this->loadSheetData();
+        foreach ($this->columns as &$col) {
+            if ($col['id'] === $colId) {
+                $col['title'] = $trimmed;
+                break;
+            }
+        }
+        unset($col);
+        $this->buildRenderedGrid();
         $this->dispatch('toast', message: 'Judul kolom disimpan ke database', type: 'success');
     }
 
@@ -1097,7 +1165,9 @@ class SpreadsheetWorksheet extends Component
             return $newRow;
         });
 
-        $this->loadSheetData();
+        // evaluateAllFormulas() already reloads cell data from DB; calling
+        // loadSheetData() first would duplicate all cell queries.
+        $this->hydrateSheetData();
         $this->evaluateAllFormulas();
         app(SpreadsheetActivityRecorder::class)->record(Auth::user(), $this->sheet, 'row_added', 'A' . $newRow->sort_order);
         $this->dispatch('toast', message: "Baris {$newRow->sort_order} ditambahkan", type: 'info');
@@ -1260,12 +1330,18 @@ class SpreadsheetWorksheet extends Component
 
     private function assertCellBelongsToSheet(int $rowId, int $columnId): void
     {
-        abort_unless(
-            SpreadsheetRow::where('sheet_id', $this->sheetId)->whereKey($rowId)->exists()
-            && SpreadsheetColumn::where('sheet_id', $this->sheetId)->whereKey($columnId)->exists(),
-            404,
-            'Sel tidak ditemukan di lembar kerja ini.'
-        );
+        // First check the already-loaded in-memory arrays (zero extra queries).
+        $rowOk = collect($this->rows)->contains('id', $rowId);
+        $colOk = collect($this->columns)->contains('id', $columnId);
+
+        if (!$rowOk || !$colOk) {
+            // Fall back to a single combined DB query when in-memory cache misses
+            // (e.g., newly materialised rows/columns not yet reflected in state).
+            $rowOk = $rowOk || SpreadsheetRow::where('sheet_id', $this->sheetId)->whereKey($rowId)->exists();
+            $colOk = $colOk || SpreadsheetColumn::where('sheet_id', $this->sheetId)->whereKey($columnId)->exists();
+        }
+
+        abort_unless($rowOk && $colOk, 404, 'Sel tidak ditemukan di lembar kerja ini.');
     }
 
     private function persistCellWithVersion(int $rowId, int $columnId, array $attributes): int

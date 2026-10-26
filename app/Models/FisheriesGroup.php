@@ -60,6 +60,9 @@ class FisheriesGroup extends Model
 
     /**
      * Determine if this workspace is unlocked for the current session.
+     *
+     * Optimized: the workspace-level flag is checked first; only when absent
+     * do we fall back to iterating sheet-level flags, which requires a DB query.
      */
     public function isUnlockedForSession(): bool
     {
@@ -72,12 +75,18 @@ class FisheriesGroup extends Model
             return false;
         }
 
+        // Fast path: workspace-level flag set (e.g. after entering the password once).
         if ($session->get('workspace_unlocked_' . $this->id, false)) {
             return true;
         }
 
-        // Check if any sheet in this workspace was unlocked
-        foreach ($this->sheets()->pluck('id') as $sheetId) {
+        // Slow path: check individual sheet unlock flags (requires fetching sheet IDs).
+        // Use the already-loaded relationship when available to avoid an extra query.
+        $sheetIds = $this->relationLoaded('sheets')
+            ? $this->sheets->pluck('id')
+            : $this->sheets()->pluck('id');
+
+        foreach ($sheetIds as $sheetId) {
             if ($session->get('sheet_unlocked_' . $sheetId, false)) {
                 return true;
             }
