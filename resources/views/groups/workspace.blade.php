@@ -1,7 +1,7 @@
 @extends('layouts.app', ['title' => $group->name . ' — Ruang Kerja Spreadsheet Dadhen Mandiri'])
 
 @section('content')
-<div class="flex-1 flex flex-col min-h-0 bg-slate-100" 
+<div class="flex-1 flex flex-col min-h-0 min-w-0 bg-slate-100" 
      x-data="{ 
         workspaceModal: {{ $isSheetRestricted ? "'modal-access-restricted'" : 'null' }},
         editSheetModal: false,
@@ -18,7 +18,7 @@
 
     @persist('workspace-header-' . $group->id)
     <!-- 1. HEADER IDENTITAS WORKSPACE -->
-    <div class="sticky top-0 z-30 bg-white border-b border-slate-200 px-4 sm:px-6 py-4 shadow-2xs">
+    <div class="sticky top-0 z-30 bg-white border-b border-slate-200 px-4 sm:px-6 py-4 shadow-2xs shrink-0">
         <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             
             <!-- Left: Avatar & Nama -->
@@ -98,7 +98,7 @@
     <!-- Sheet tabs are now only at the bottom via the Livewire component -->
 
     <!-- 3. LEMBAR KERJA SPREADSHEET (LIVEWIRE COMPONENT / RESTRICTION) -->
-    <div class="flex-1 flex flex-col min-h-0 overflow-hidden">
+    <div class="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
         @if($isSheetRestricted)
             <div class="flex-1 flex flex-col items-center justify-center p-8 text-center bg-slate-50">
                 <div class="w-16 h-16 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center mb-4 shadow-sm">

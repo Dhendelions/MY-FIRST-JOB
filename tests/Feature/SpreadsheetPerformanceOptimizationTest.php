@@ -51,6 +51,69 @@ class SpreadsheetPerformanceOptimizationTest extends TestCase
         $this->sheet = $this->group->sheets()->firstOrFail();
     }
 
+    public function test_switching_sheets_reuses_the_worksheet_and_loads_only_the_selected_sheet(): void
+    {
+        $sheets = $this->group->sheets()->orderBy('id')->get();
+        $sheetNames = ['Analisa', 'Cost', 'Margin', 'Pendukung', 'Rank'];
+
+        foreach ($sheets as $index => $sheet) {
+            $sheet->update(['name' => $sheetNames[$index]]);
+            SpreadsheetCell::create([
+                'row_id' => $sheet->rows()->firstOrFail()->id,
+                'column_id' => $sheet->columns()->firstOrFail()->id,
+                'value' => $sheetNames[$index] . ' data',
+            ]);
+        }
+        $this->sheet = $sheets->first()->fresh();
+
+        $component = Livewire::actingAs($this->user)
+            ->test(SpreadsheetWorksheet::class, ['sheet' => $this->sheet]);
+
+        $switchDuration = null;
+        foreach ($sheets->skip(1) as $targetSheet) {
+            $targetRow = $targetSheet->rows()->firstOrFail();
+            $targetColumn = $targetSheet->columns()->firstOrFail();
+
+            $startedAt = microtime(true);
+            $component->call('switchSheet', $targetSheet->id)
+                ->assertSet('sheetId', $targetSheet->id);
+            $duration = microtime(true) - $startedAt;
+            $switchDuration ??= $duration;
+
+            $this->assertSame(
+                [$targetRow->id . '_' . $targetColumn->id => $targetSheet->name . ' data'],
+                $component->get('cellsData')
+            );
+        }
+
+        $this->assertLessThan(3.0, $switchDuration, 'An in-place sheet switch should complete within 3 seconds.');
+    }
+
+    public function test_in_place_sheet_switch_preserves_restricted_sheet_access(): void
+    {
+        $staff = User::create([
+            'name' => 'Restricted Sheet Tester',
+            'email' => 'restricted-perf@example.test',
+            'password' => 'password',
+        ]);
+        GroupMember::create([
+            'group_id' => $this->group->id,
+            'user_id' => $staff->id,
+            'role' => 'karyawan',
+            'status' => 'Aktif',
+        ]);
+        $restrictedSheet = SpreadsheetSheet::create([
+            'group_id' => $this->group->id,
+            'name' => 'Rank',
+            'category' => 'rank',
+        ]);
+
+        Livewire::actingAs($staff)
+            ->test(SpreadsheetWorksheet::class, ['sheet' => $this->sheet])
+            ->call('switchSheet', $restrictedSheet->id)
+            ->assertForbidden();
+    }
+
     /**
      * Test 1: Repeated rapid typing & cell editing performance.
      * Verifies that consecutive cell edits update smoothly and maintain consistency.

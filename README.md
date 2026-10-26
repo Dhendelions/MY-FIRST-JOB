@@ -31,6 +31,7 @@
    - **Penataan Konten Otomatis**: Angka atau format mata uang (`Rp`) otomatis rata kanan dengan font monospace `tabular-nums`; teks biasa rata kiri.
    - **Dukungan Paste Multi-Sel**: Mampu menerima teks TSV (Tab-Separated) hasil copy dari MS Excel atau Google Sheets dan langsung mengisi petak sel lintas baris dan kolom.
    - **Bilah Ringkasan Finansial Bawah**: Menghitung secara otomatis **Total (SUM)** dan **Rata-rata (AVERAGE)** dari sel numerik/rupiah, dengan indikator status *Tersimpan Otomatis*.
+   - **Navigasi Sheet In-Place**: Sheet yang dapat diakses berpindah di dalam komponen Livewire yang sama. Perubahan sel yang masih tersimpan dituntaskan sebelum berpindah, posisi scroll dipulihkan per sheet, dan nilai formula tersimpan digunakan saat sheet dimuat. Kalkulasi workbook tetap berjalan pada perubahan data dan impor.
 
 4. **Katalog & Kode Undangan Kelompok**:
    - Setiap kelompok memiliki kode unik (contoh: `LELE-MKMR-88`, `NILA-BRKH-42`).

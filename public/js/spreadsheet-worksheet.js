@@ -333,11 +333,20 @@ window.spreadsheetWorksheet = function($wire) {
         // value replaces a queued older value, preventing late responses from
         // writing over the user's most recent edit.
         cellSaveQueues: {},
+        failedCellSaves: {},
         listenerController: null,
         headerResizeObserver: null,
+        currentSheetId: null,
+        latestSheetSwitch: null,
+        sheetSwitchPromise: null,
+        sheetSwitchError: '',
+        lastSheetSwitchRequest: null,
+        sheetScrollPositions: {},
+        isSheetSwitching: false,
 
         init() {
             this.listenerController = new AbortController();
+            this.currentSheetId = Number(this.$el.dataset.sheetId);
             // Populate in-memory cells map from rendered DOM inputs
             this.initCellsMap();
 
@@ -345,6 +354,7 @@ window.spreadsheetWorksheet = function($wire) {
             this.selectedCell = initialCoord;
             this.activeCoord = initialCoord;
             this.activeFormula = $wire.formulaValue !== null && $wire.formulaValue !== undefined ? String($wire.formulaValue) : '';
+            this.originalFormulaValue = this.activeFormula;
 
             // Apply initial selection highlight
             this.$nextTick(() => {
@@ -467,6 +477,29 @@ window.spreadsheetWorksheet = function($wire) {
                 }
             }, { signal: this.listenerController.signal });
 
+            window.addEventListener('worksheet-sheet-switched', (e) => {
+                const detail = e.detail || {};
+                this.currentSheetId = Number(detail.sheetId);
+                this.selectedCell = detail.coord || 'A1';
+                this.activeCoord = this.selectedCell;
+                this.selectedRowId = detail.rowId || null;
+                this.selectedColId = detail.colId || null;
+                this.selectedRowOrder = detail.rowOrder || 1;
+                this.selectedColOrder = detail.colOrder || 1;
+                this.selectedR = 0;
+                this.selectedC = 0;
+                this.editingCell = null;
+                this.activeFormula = detail.formula || '';
+                this.originalFormulaValue = this.activeFormula;
+                this.isFormulaBarFocused = false;
+                this.cellsMap = {};
+                this.$nextTick(() => {
+                    this.initCellsMap();
+                    const selected = document.getElementById('td-' + this.selectedCell);
+                    if (selected) selected.classList.add('is-selected');
+                });
+            }, { signal: this.listenerController.signal });
+
             // Listen for Livewire morph updates to refresh cellsMap after structural changes (addRow, etc.)
             if (typeof Livewire !== 'undefined') {
                 Livewire.hook('morph.updated', () => {
@@ -480,6 +513,8 @@ window.spreadsheetWorksheet = function($wire) {
 
             // Global Keyboard Shortcuts
             window.addEventListener('keydown', (e) => {
+                if (this.isSheetSwitching) return;
+
                 const isGridCell = e.target && e.target.classList && e.target.classList.contains('grid-cell-input');
                 const isFormulaBar = e.target && e.target.classList && e.target.classList.contains('formula-bar-input');
                 const isStandardInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName);
@@ -822,7 +857,8 @@ window.spreadsheetWorksheet = function($wire) {
 
         saveCellToServer(coord, rowId, colId, rowOrder, colOrder, newValue) {
             this.saveStatus = 'Menyimpan...';
-            const queue = this.cellSaveQueues[coord] || { running: false, pending: null };
+            delete this.failedCellSaves[coord];
+            const queue = this.cellSaveQueues[coord] || { running: false, pending: null, waiters: [] };
             // Coalesce rapid commits to the same cell. This mirrors normal
             // spreadsheet behavior: the final committed value is authoritative.
             queue.pending = { rowId, colId, rowOrder, colOrder, newValue };
@@ -862,19 +898,135 @@ window.spreadsheetWorksheet = function($wire) {
             Promise.resolve(save)
                 .then(() => {
                     this.saveStatus = 'Tersimpan ' + this.formatCurrentTime();
+                    delete this.failedCellSaves[coord];
                 })
                 .catch((err) => {
                     console.error('Save error', err);
                     this.saveStatus = 'Gagal menyimpan';
+                    this.failedCellSaves[coord] = request;
                 })
                 .finally(() => {
                     queue.running = false;
                     if (queue.pending) {
                         this.drainCellSaveQueue(coord);
                     } else {
+                        const waiters = queue.waiters.splice(0);
                         delete this.cellSaveQueues[coord];
+                        waiters.forEach(resolve => resolve());
                     }
                 });
+        },
+
+        async waitForPendingCellSaves() {
+            const pendingSaves = Object.entries(this.cellSaveQueues).map(([, queue]) => new Promise(resolve => {
+                queue.waiters.push(resolve);
+            }));
+
+            await Promise.all(pendingSaves);
+
+            if (Object.keys(this.failedCellSaves).length > 0) {
+                throw new Error('Ada perubahan yang belum berhasil disimpan.');
+            }
+        },
+
+        requestSheetSwitch(sheetId, url, historyMode = 'push') {
+            if (this.activeFormula !== this.originalFormulaValue && !this.commitFormulaBar()) {
+                return Promise.resolve(false);
+            }
+
+            if (!this.sheetSwitchPromise && Number(sheetId) === this.currentSheetId) {
+                return Promise.resolve(true);
+            }
+
+            const request = { sheetId: Number(sheetId), url, historyMode };
+            this.latestSheetSwitch = request;
+            this.sheetSwitchError = '';
+            this.lastSheetSwitchRequest = request;
+
+            if (this.sheetSwitchPromise) return this.sheetSwitchPromise;
+
+            this.isSheetSwitching = true;
+            this.sheetSwitchPromise = (async () => {
+                while (this.latestSheetSwitch) {
+                    const next = this.latestSheetSwitch;
+                    this.latestSheetSwitch = null;
+
+                    if (next.sheetId === this.currentSheetId) continue;
+
+                    try {
+                        await this.waitForPendingCellSaves();
+
+                        const scrollArea = this.$el.querySelector('.spreadsheet-scroll');
+                        if (scrollArea) {
+                            this.sheetScrollPositions[this.currentSheetId] = {
+                                top: scrollArea.scrollTop,
+                                left: scrollArea.scrollLeft,
+                            };
+                            scrollArea.classList.remove('sheet-transition-enter');
+                            scrollArea.classList.add('sheet-transition-exit');
+                        }
+
+                        await $wire.switchSheet(next.sheetId);
+
+                        if (this.latestSheetSwitch) continue;
+
+                        if (next.historyMode === 'push') {
+                            history.pushState(
+                                { ...(history.state || {}), worksheetSheetId: next.sheetId },
+                                '',
+                                next.url
+                            );
+                        }
+
+                        this.currentSheetId = next.sheetId;
+                        this.lastSheetSwitchRequest = null;
+                        this.sheetSwitchError = '';
+
+                        if (scrollArea) {
+                            scrollArea.classList.remove('sheet-transition-exit');
+                            scrollArea.classList.add('sheet-transition-enter');
+                            const position = this.sheetScrollPositions[next.sheetId] || { top: 0, left: 0 };
+                            scrollArea.scrollTop = position.top;
+                            scrollArea.scrollLeft = position.left;
+                        }
+                    } catch (error) {
+                        const scrollArea = this.$el.querySelector('.spreadsheet-scroll');
+                        if (scrollArea) scrollArea.classList.remove('sheet-transition-exit');
+
+                        if (this.latestSheetSwitch) continue;
+
+                        this.sheetSwitchError = Object.keys(this.failedCellSaves).length > 0
+                            ? 'Perubahan belum tersimpan. Coba simpan lagi sebelum berpindah lembar.'
+                            : 'Lembar tidak dapat dimuat. Silakan coba lagi.';
+                        this.lastSheetSwitchRequest = next;
+                        console.error('Sheet switch error', error);
+                    }
+                }
+            })().finally(() => {
+                this.isSheetSwitching = false;
+                this.sheetSwitchPromise = null;
+            });
+
+            return this.sheetSwitchPromise;
+        },
+
+        retrySheetSwitch() {
+            const request = this.lastSheetSwitchRequest;
+            if (!request) return;
+
+            Object.entries(this.failedCellSaves).forEach(([coord, save]) => {
+                delete this.failedCellSaves[coord];
+                this.saveCellToServer(coord, save.rowId, save.colId, save.rowOrder, save.colOrder, save.newValue);
+            });
+
+            this.requestSheetSwitch(request.sheetId, request.url, request.historyMode);
+        },
+
+        startSheetTransition(direction) {
+            const scrollArea = this.$el.querySelector('.spreadsheet-scroll');
+            if (!scrollArea) return;
+            scrollArea.classList.remove('sheet-transition-enter', 'sheet-transition-exit');
+            scrollArea.classList.add('sheet-transition-' + direction);
         },
 
         /**
@@ -904,20 +1056,21 @@ window.spreadsheetWorksheet = function($wire) {
             const changed = raw !== this.originalFormulaValue;
 
             if (!changed) {
-                return;
+                return true;
             }
 
             if (raw.startsWith('=')) {
                 const syntaxErr = this.checkFormulaSyntax(raw);
                 if (syntaxErr) {
                     this.notifyError(syntaxErr);
-                    return;
+                    return false;
                 }
             }
 
             this.updateCellLocally(this.selectedCell, raw, this.selectedRowId, this.selectedColId);
             this.saveCellToServer(this.selectedCell, this.selectedRowId, this.selectedColId, this.selectedRowOrder, this.selectedColOrder, raw);
             this.originalFormulaValue = raw;
+            return true;
         },
 
         /**

@@ -508,10 +508,10 @@
     </aside>
 
     <!-- CONTENT WRAPPER -->
-    <div class="flex-1 flex flex-col min-w-0 overflow-hidden bg-slate-50 page-transition">
+    <div class="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden bg-slate-50 page-transition">
         
         <!-- TOPBAR -->
-        <header class="h-16 bg-white border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between shadow-xs sticky top-0 z-[100]">
+        <header class="h-16 bg-white border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between shadow-xs sticky top-0 z-[100] shrink-0">
             <div class="flex items-center gap-3">
                 <!-- Mobile sidebar toggle -->
                 <button @click="mobileSidebarOpen = !mobileSidebarOpen" class="lg:hidden p-2 rounded-md text-slate-600 hover:bg-slate-100">
@@ -608,7 +608,7 @@
         </header>
 
         <!-- MAIN VIEW AREA -->
-        <main class="flex-1 overflow-y-auto flex flex-col">
+        <main class="flex-1 min-h-0 min-w-0 overflow-y-auto flex flex-col">
             <?php echo e($slot ?? ''); ?>
 
             <?php echo $__env->yieldContent('content'); ?>

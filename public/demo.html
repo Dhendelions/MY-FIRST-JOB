@@ -532,62 +532,10 @@
                 </div>
 
                 <!-- 3. LEMBAR KERJA SPREADSHEET EXCEL -->
-                <div class="flex-1 flex flex-col min-h-0 bg-white overflow-hidden">
+                <div class="flex-1 flex flex-col min-h-0 min-w-0 bg-white overflow-hidden">
                     
-                    <!-- Toolbar Atas -->
-                    <div class="h-13 bg-slate-50 border-b border-slate-200 px-4 flex items-center justify-between gap-3 text-xs toolbar-area shrink-0">
-                        <div class="flex items-center gap-1.5 overflow-x-auto py-1">
-                            <button @click="addRow()" 
-                                    type="button" 
-                                    class="px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-100 border border-slate-300 font-semibold text-slate-700 flex items-center gap-1.5 shadow-2xs">
-                                <svg class="w-3.5 h-3.5 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                                <span>+ Tambah Baris</span>
-                            </button>
-
-                            <button @click="addColumn()" 
-                                    type="button" 
-                                    class="px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-100 border border-slate-300 font-semibold text-slate-700 flex items-center gap-1.5 shadow-2xs">
-                                <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                                <span>+ Tambah Kolom</span>
-                            </button>
-
-                            <span class="w-px h-5 bg-slate-300 mx-1"></span>
-
-                            <button @click="exportCSV()" 
-                                    class="px-2.5 py-1.5 rounded-lg bg-white hover:bg-emerald-50 border border-slate-300 font-semibold text-emerald-700 flex items-center gap-1.5 shadow-2xs">
-                                <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                                <span>Ekspor CSV</span>
-                            </button>
-
-                            <button type="button" @click="window.print()" 
-                                    class="px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-100 border border-slate-300 font-semibold text-slate-700 flex items-center gap-1.5 shadow-2xs">
-                                <svg class="w-3.5 h-3.5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
-                                <span>Cetak</span>
-                            </button>
-                        </div>
-
-                        <!-- Search & Stats -->
-                        <div class="flex items-center gap-3">
-                            <div class="relative w-44 sm:w-56">
-                                <span class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400">
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                                </span>
-                                <input type="text" 
-                                       x-model="searchQuery" 
-                                       placeholder="Cari data di sel..." 
-                                       class="w-full pl-8 pr-3 py-1 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-sky-500">
-                            </div>
-
-                            <div class="hidden md:flex items-center gap-2 text-[11px] text-slate-500 font-medium">
-                                <span class="bg-slate-200/60 px-2 py-0.5 rounded font-mono" x-text="activeColumns.length + ' Kolom'"></span>
-                                <span class="bg-slate-200/60 px-2 py-0.5 rounded font-mono" x-text="activeRows.length + ' Baris'"></span>
-                                <span class="bg-sky-100 text-sky-800 px-2 py-0.5 rounded font-mono font-semibold" x-text="filledCellsCount + ' Sel Terisi'"></span>
-                            </div>
-                        </div>
-                    </div>
-
                     <!-- Formula Bar -->
-                    <div class="h-10 bg-white border-b border-slate-200 px-3 flex items-center gap-2 text-xs shrink-0 shadow-2xs">
+                    <div class="h-10 bg-white border-b border-slate-200 px-3 flex items-center gap-2 text-xs shrink-0 shadow-2xs" style="border-top: 2px solid #0284c7;">
                         <div class="w-16 h-7 bg-slate-100 border border-slate-300 rounded flex items-center justify-center font-mono font-bold text-slate-800 shadow-inner">
                             <span x-text="activeCoord">A1</span>
                         </div>
@@ -754,31 +702,6 @@
                         </div>
                     </div>
 
-                    <!-- Financial Footer Bar -->
-                    <div class="h-11 bg-slate-900 text-white px-4 flex items-center justify-between text-xs shrink-0 border-t border-slate-800 financial-bar">
-                        <div class="flex items-center gap-6">
-                            <div class="flex items-center gap-2">
-                                <span class="text-slate-400 text-[10px] uppercase font-bold tracking-wider">TOTAL (SUM):</span>
-                                <span class="font-mono font-bold text-emerald-400 text-sm" x-text="formatCurrency(sumTotal)"></span>
-                            </div>
-
-                            <div class="hidden sm:flex items-center gap-2 border-l border-slate-700 pl-6">
-                                <span class="text-slate-400 text-[10px] uppercase font-bold tracking-wider">RATA-RATA (AVERAGE):</span>
-                                <span class="font-mono font-bold text-sky-400 text-sm" x-text="formatCurrency(averageTotal)"></span>
-                            </div>
-
-                            <div class="hidden md:flex items-center gap-2 border-l border-slate-700 pl-6">
-                                <span class="text-slate-400 text-[10px] uppercase font-bold tracking-wider">DATA NUMERIK:</span>
-                                <span class="font-mono font-bold text-slate-300" x-text="numericCellsCount + ' Sel'"></span>
-                            </div>
-                        </div>
-
-                        <div class="flex items-center gap-2">
-                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-950/80 border border-emerald-500/40 text-emerald-300">
-                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                                Tersimpan Otomatis
-                            </span>
-                        </div>
                     </div>
 
                 </div>

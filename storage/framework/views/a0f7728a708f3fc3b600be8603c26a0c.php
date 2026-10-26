@@ -1,9 +1,37 @@
 
-<div class="flex-1 flex flex-col min-h-0 bg-white"
+<div class="relative flex-1 flex flex-col min-h-0 min-w-0 bg-white"
      x-data="spreadsheetWorksheet($wire)"
+     data-sheet-id="<?php echo e($sheetId); ?>"
      style="--sheet-accent: <?php echo e($sheet->identityColor()['active']); ?>;">
 
     <style>
+        @keyframes worksheet-sheet-enter {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes worksheet-sheet-exit {
+            from { opacity: 1; transform: translateY(0); }
+            to { opacity: 0; transform: translateY(-3px); }
+        }
+        .sheet-transition-enter {
+            animation: worksheet-sheet-enter 180ms ease-out both;
+        }
+        .sheet-transition-exit {
+            animation: worksheet-sheet-exit 150ms ease-in both;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .sheet-transition-enter,
+            .sheet-transition-exit {
+                animation: none;
+                transform: none;
+                opacity: 1;
+            }
+            .sheet-switch-overlay,
+            .sheet-switch-spinner {
+                transition: none !important;
+                animation: none !important;
+            }
+        }
         .grid-cell-td.is-selected {
             box-shadow: inset 0 0 0 2px var(--sheet-accent) !important;
             z-index: 25;
@@ -16,180 +44,13 @@
         .grid-cell-td.is-search-match {
             background-color: rgba(254, 240, 138, 0.6) !important;
         }
-        .toolbar-area {
+        .formula-bar-container {
             border-top: 2px solid var(--sheet-accent);
         }
     </style>
 
-    <!-- 1. TOOLBAR UTAMA SPREADSHEET (MODERN EXCEL & GOOGLE SHEETS STYLE) -->
-    <div class="relative z-[60] bg-slate-50 border-b border-slate-200 px-3 py-1.5 flex flex-wrap items-center justify-between gap-2 text-xs toolbar-area shrink-0">
-        
-        <!-- Left: Undo / Redo & Cell Formatting Controls -->
-        <div class="flex items-center flex-wrap gap-1">
-            
-            <!-- Undo / Redo -->
-            <button wire:click="undo" type="button" title="Undo (Ctrl+Z)"
-                    class="p-1.5 rounded hover:bg-slate-200 text-slate-700 transition-colors <?php echo e(empty($undoStack) ? 'opacity-40 cursor-not-allowed' : ''); ?>">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a5 5 0 015 5v2M3 10l6-6M3 10l6 6"></path></svg>
-            </button>
-            <button wire:click="redo" type="button" title="Redo (Ctrl+Y)"
-                    class="p-1.5 rounded hover:bg-slate-200 text-slate-700 transition-colors <?php echo e(empty($redoStack) ? 'opacity-40 cursor-not-allowed' : ''); ?>">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 10H11a5 5 0 00-5 5v2m15-7l-6-6m6 6l-6 6"></path></svg>
-            </button>
-
-            <span class="w-px h-5 bg-slate-300 mx-1"></span>
-
-            <!-- Bold, Italic, Underline -->
-            <button @click="formatCell('bold')" type="button" title="Tebal (Bold)"
-                    class="p-1.5 rounded hover:bg-slate-200 font-bold text-slate-800 transition-colors">
-                <span class="w-4 h-4 flex items-center justify-center font-serif text-sm">B</span>
-            </button>
-            <button @click="formatCell('italic')" type="button" title="Miring (Italic)"
-                    class="p-1.5 rounded hover:bg-slate-200 italic font-serif text-slate-800 transition-colors">
-                <span class="w-4 h-4 flex items-center justify-center text-sm">I</span>
-            </button>
-            <button @click="formatCell('underline')" type="button" title="Garis Bawah (Underline)"
-                    class="p-1.5 rounded hover:bg-slate-200 underline text-slate-800 transition-colors">
-                <span class="w-4 h-4 flex items-center justify-center text-sm">U</span>
-            </button>
-
-            <span class="w-px h-5 bg-slate-300 mx-1"></span>
-
-            <!-- Text Alignment Dropdown -->
-            <div class="relative" x-data="{ alignOpen: false }">
-                <button @click="alignOpen = !alignOpen" type="button" title="Perataan Teks"
-                        class="p-1.5 rounded hover:bg-slate-200 text-slate-700 flex items-center gap-1 transition-colors">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h10M4 18h16"></path></svg>
-                    <svg class="w-2.5 h-2.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                </button>
-                <div x-show="alignOpen" @click.away="alignOpen = false" 
-                     class="absolute left-0 mt-1 w-32 bg-white rounded-lg shadow-xl border border-slate-200 py-1 z-50 text-xs" x-cloak>
-                    <button @click="formatCell('align', 'left'); alignOpen = false" 
-                            class="w-full px-3 py-1.5 hover:bg-slate-100 flex items-center gap-2 text-slate-700">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h10M4 18h16"></path></svg>
-                        <span>Kiri</span>
-                    </button>
-                    <button @click="formatCell('align', 'center'); alignOpen = false" 
-                            class="w-full px-3 py-1.5 hover:bg-slate-100 flex items-center gap-2 text-slate-700">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M7 12h10M4 18h16"></path></svg>
-                        <span>Tengah</span>
-                    </button>
-                    <button @click="formatCell('align', 'right'); alignOpen = false" 
-                            class="w-full px-3 py-1.5 hover:bg-slate-100 flex items-center gap-2 text-slate-700">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M10 12h10M4 18h16"></path></svg>
-                        <span>Kanan</span>
-                    </button>
-                </div>
-            </div>
-
-            <!-- Number Formatting Dropdown -->
-            <div class="relative" x-data="{ numFormatOpen: false }">
-                <button @click="numFormatOpen = !numFormatOpen" type="button" title="Format Nilai Sel"
-                        class="px-2 py-1 rounded hover:bg-slate-200 text-slate-700 font-mono text-xs flex items-center gap-1 transition-colors border border-slate-300 bg-white">
-                    <span>123</span>
-                    <svg class="w-2.5 h-2.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                </button>
-                <div x-show="numFormatOpen" @click.away="numFormatOpen = false" 
-                     class="absolute left-0 mt-1 w-44 bg-white rounded-lg shadow-xl border border-slate-200 py-1.5 z-50 text-xs" x-cloak>
-                    <div class="px-3 py-1 text-[10px] uppercase font-bold text-slate-400">Format Angka</div>
-                    <button @click="formatCell('numFormat', 'general'); numFormatOpen = false" 
-                            class="w-full px-3 py-1.5 hover:bg-slate-100 text-left text-slate-700">
-                        Umum (Teks Otomatis)
-                    </button>
-                    <button @click="formatCell('numFormat', 'currency'); numFormatOpen = false" 
-                            class="w-full px-3 py-1.5 hover:bg-slate-100 text-left text-slate-700 flex justify-between">
-                        <span>Mata Uang (Rp)</span> <span class="text-slate-400 font-mono">Rp 1.000</span>
-                    </button>
-                    <button @click="formatCell('numFormat', 'number'); numFormatOpen = false" 
-                            class="w-full px-3 py-1.5 hover:bg-slate-100 text-left text-slate-700 flex justify-between">
-                        <span>Angka Desimal</span> <span class="text-slate-400 font-mono">1.000,00</span>
-                    </button>
-                    <button @click="formatCell('numFormat', 'percent'); numFormatOpen = false" 
-                            class="w-full px-3 py-1.5 hover:bg-slate-100 text-left text-slate-700 flex justify-between">
-                        <span>Persentase (%)</span> <span class="text-slate-400 font-mono">100%</span>
-                    </button>
-                </div>
-            </div>
-
-            <!-- Text Color Picker Dropdown -->
-            <div class="relative" x-data="{ colorOpen: false }">
-                <button @click="colorOpen = !colorOpen" type="button" title="Warna Teks"
-                        class="p-1.5 rounded hover:bg-slate-200 text-slate-700 flex items-center gap-0.5 transition-colors">
-                    <span class="w-4 h-4 font-bold border-b-2 border-sky-600 flex items-center justify-center">A</span>
-                    <svg class="w-2.5 h-2.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                </button>
-                <div x-show="colorOpen" @click.away="colorOpen = false" 
-                     class="absolute left-0 mt-1 p-2 bg-white rounded-lg shadow-xl border border-slate-200 z-50 grid grid-cols-5 gap-1.5 w-36" x-cloak>
-                    <button @click="formatCell('color', '#0f172a'); colorOpen = false" class="w-5 h-5 rounded bg-slate-900 border border-slate-300" title="Hitam Default"></button>
-                    <button @click="formatCell('color', '#0284c7'); colorOpen = false" class="w-5 h-5 rounded bg-sky-600" title="Biru"></button>
-                    <button @click="formatCell('color', '#059669'); colorOpen = false" class="w-5 h-5 rounded bg-emerald-600" title="Hijau"></button>
-                    <button @click="formatCell('color', '#e11d48'); colorOpen = false" class="w-5 h-5 rounded bg-rose-600" title="Merah"></button>
-                    <button @click="formatCell('color', '#d97706'); colorOpen = false" class="w-5 h-5 rounded bg-amber-600" title="Oranye / Kuning"></button>
-                </div>
-            </div>
-
-            <!-- Background Color Picker Dropdown -->
-            <div class="relative" x-data="{ bgOpen: false }">
-                <button @click="bgOpen = !bgOpen" type="button" title="Warna Latar Sel (Fill)"
-                        class="p-1.5 rounded hover:bg-slate-200 text-slate-700 flex items-center gap-0.5 transition-colors">
-                    <svg class="w-4 h-4 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4 4.5 4.5 0 013.9-4.48 3.5 3.5 0 016.2 0A4.5 4.5 0 0117 17a4 4 0 01-4 4H7z"></path></svg>
-                    <svg class="w-2.5 h-2.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                </button>
-                <div x-show="bgOpen" @click.away="bgOpen = false" 
-                     class="absolute left-0 mt-1 p-2 bg-white rounded-lg shadow-xl border border-slate-200 z-50 grid grid-cols-5 gap-1.5 w-36" x-cloak>
-                    <button @click="formatCell('bg', '#ffffff'); bgOpen = false" class="w-5 h-5 rounded bg-white border border-slate-300" title="Putih"></button>
-                    <button @click="formatCell('bg', '#fef9c3'); bgOpen = false" class="w-5 h-5 rounded bg-yellow-100 border border-yellow-200" title="Kuning Muda"></button>
-                    <button @click="formatCell('bg', '#dcfce7'); bgOpen = false" class="w-5 h-5 rounded bg-emerald-100 border border-emerald-200" title="Hijau Muda"></button>
-                    <button @click="formatCell('bg', '#e0f2fe'); bgOpen = false" class="w-5 h-5 rounded bg-sky-100 border border-sky-200" title="Biru Muda"></button>
-                    <button @click="formatCell('bg', '#ffe4e6'); bgOpen = false" class="w-5 h-5 rounded bg-rose-100 border border-rose-200" title="Merah Muda"></button>
-                </div>
-            </div>
-
-            <span class="w-px h-5 bg-slate-300 mx-1"></span>
-
-            <!-- Core Operations: Row/Col addition -->
-            <button wire:click="addRow" type="button" 
-                    class="px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-100 border border-slate-300 font-semibold text-slate-700 flex items-center gap-1.5 shadow-2xs hover:border-slate-400 transition-colors">
-                <svg class="w-3.5 h-3.5 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                <span class="hidden sm:inline">+ Baris</span>
-            </button>
-
-            <button wire:click="addColumn" type="button" 
-                    class="px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-100 border border-slate-300 font-semibold text-slate-700 flex items-center gap-1.5 shadow-2xs hover:border-slate-400 transition-colors">
-                <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                <span class="hidden sm:inline">+ Kolom</span>
-            </button>
-
-            <!-- Find & Replace Trigger -->
-            <button @click="$wire.set('showFindReplaceModal', true)" type="button" title="Cari & Ganti (Ctrl+F)"
-                    class="p-1.5 rounded hover:bg-slate-200 text-slate-700 transition-colors">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16l2.879-2.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242zM21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-            </button>
-        </div>
-
-        <!-- Right: Export CSV & Search -->
-        <div class="flex items-center gap-2">
-            <a href="<?php echo e(route('spreadsheet.export', $sheetId)); ?>" 
-               class="px-2.5 py-1.5 rounded-lg bg-white hover:bg-emerald-50 border border-slate-300 font-semibold text-emerald-700 flex items-center gap-1.5 shadow-2xs hover:border-emerald-400 transition-colors">
-                <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                <span class="hidden sm:inline">Ekspor CSV</span>
-            </a>
-
-            <!-- Quick Search Input -->
-            <div class="relative w-36 sm:w-48">
-                <span class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                </span>
-                <input type="text" 
-                       x-model="searchQuery" 
-                       placeholder="Cari di sel..." 
-                       class="w-full pl-8 pr-2.5 py-1 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-sky-500">
-            </div>
-        </div>
-    </div>
-
-    <!-- 2. FORMULA BAR (COORDINATE + FX INPUT) -->
-    <div class="h-10 bg-white border-b border-slate-200 px-3 flex items-center gap-2 text-xs shrink-0 shadow-2xs">
+    <!-- FORMULA BAR (COORDINATE + FX INPUT) -->
+    <div class="h-10 bg-white border-b border-slate-200 px-3 flex items-center gap-2 text-xs shrink-0 shadow-2xs formula-bar-container">
         <!-- Coordinate Box (e.g. A1, B4) -->
         <div class="w-16 h-7 bg-slate-100 border border-slate-300 rounded flex items-center justify-center font-mono font-bold text-slate-800 shadow-inner">
             <span x-text="activeCoord">A1</span>
@@ -203,7 +64,7 @@
         <span class="w-px h-5 bg-slate-200"></span>
 
         <!-- Synced Formula Bar Text Input -->
-        <div class="flex-1 flex items-center">
+        <div class="flex-1 flex items-center min-w-0">
             <input type="text" 
                    x-ref="formulaBarInput"
                    x-model="activeFormula" 
@@ -223,8 +84,8 @@
         </div>
     </div>
 
-    <!-- 3. GRID TABEL SPREADSHEET (MICROSOFT EXCEL LOOK & FEEL) -->
-    <div class="flex-1 overflow-auto bg-slate-200 select-text relative spreadsheet-scroll" aria-label="Area kerja spreadsheet">
+    <!-- GRID TABEL SPREADSHEET (MICROSOFT EXCEL LOOK & FEEL) -->
+    <div class="flex-1 overflow-auto min-h-0 min-w-0 bg-slate-200 select-text relative spreadsheet-scroll" aria-label="Area kerja spreadsheet">
         <table class="spreadsheet-table bg-white w-max table-fixed text-xs border-separate border-spacing-0">
             <colgroup>
                 <col style="width: 48px; min-width: 48px; max-width: 48px;">
@@ -463,6 +324,29 @@
         </table>
     </div>
 
+    <div x-show="isSheetSwitching || sheetSwitchError"
+         x-cloak
+         class="sheet-switch-overlay absolute inset-x-0 top-0 bottom-10 z-50 flex items-center justify-center bg-white/85 backdrop-blur-[1px]"
+         x-transition:enter="transition-opacity ease-out duration-100 delay-150"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition-opacity ease-in duration-75"
+         role="status"
+         aria-live="polite">
+        <div class="flex max-w-sm items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-600 shadow-lg">
+            <template x-if="isSheetSwitching">
+                <span class="sheet-switch-spinner h-4 w-4 shrink-0 rounded-full border-2 border-sky-200 border-t-sky-600 animate-spin" aria-hidden="true"></span>
+            </template>
+            <span x-text="sheetSwitchError || 'Memuat lembar kerja…'"></span>
+            <button x-show="sheetSwitchError"
+                    type="button"
+                    @click="retrySheetSwitch()"
+                    class="shrink-0 rounded-lg bg-sky-600 px-2.5 py-1.5 font-semibold text-white hover:bg-sky-500">
+                Coba lagi
+            </button>
+        </div>
+    </div>
+
     <!-- 4. TAB LEMBAR KERJA DI BAGIAN BAWAH (GOOGLE SHEETS STYLE) -->
     <div class="relative z-[60] h-10 bg-slate-100 border-t border-slate-200 px-4 flex items-center justify-between text-xs bottom-tabs shrink-0 select-none">
         
@@ -486,7 +370,11 @@
                     ?>
                     <div class="relative group/tab flex items-center">
                         <a wire:navigate href="<?php echo e(route('group.workspace', [$sheet->group_id, $sh->id])); ?>"
-                           <?php if(($memberRole === 'admin' || (!$isLeader && $sheet->group->hasPassword())) && $sh->id !== $sheetId && !$shRestricted): ?> @click.prevent="$dispatch('sheet-switch', { sheetId: <?php echo e($sh->id); ?> })" <?php endif; ?>
+                           <?php if(($memberRole === 'admin' || (!$isLeader && $sheet->group->hasPassword())) && $sh->id !== $sheetId && !$shRestricted): ?>
+                               @click.prevent="$dispatch('sheet-switch', { sheetId: <?php echo e($sh->id); ?> })"
+                           <?php elseif(!$shRestricted): ?>
+                               @click.prevent="requestSheetSwitch(<?php echo e($sh->id); ?>, $el.href)"
+                           <?php endif; ?>
                            style="<?php echo e($tabStyle); ?>"
                            class="px-3 py-1 rounded-t-lg border font-medium transition-all flex items-center gap-1.5 <?php echo e($isCurrent ? 'shadow-2xs font-bold' : ''); ?>">
                             <span><?php echo e($sh->name); ?></span>
@@ -544,69 +432,6 @@
 
         <div class="text-[11px] text-slate-400 hidden sm:block">
             Navigasi: <kbd class="px-1 py-0.5 bg-slate-200 rounded text-slate-700 font-mono">Tab</kbd> / <kbd class="px-1 py-0.5 bg-slate-200 rounded text-slate-700 font-mono">Enter</kbd> / <kbd class="px-1 py-0.5 bg-slate-200 rounded text-slate-700 font-mono">&uarr;&darr;&larr;&rarr;</kbd>
-        </div>
-    </div>
-
-    <!-- 5. BILAH RINGKASAN BAWAH (SUM, AVERAGE, STATUS) -->
-    <div class="h-11 bg-slate-900 text-white px-4 flex items-center justify-between text-xs shrink-0 border-t border-slate-800">
-        
-        <!-- Left: Summary Calculations (SUM, AVERAGE, COUNT) -->
-        <div class="flex items-center gap-6">
-            <div class="flex items-center gap-2">
-                <span class="text-slate-400 text-[10px] uppercase font-bold tracking-wider">TOTAL (SUM):</span>
-                <span class="font-mono font-bold text-emerald-400 text-sm">
-                    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($numericCellsCount > 0): ?>
-                        <?php echo e(number_format($sumTotal, 2, ',', '.')); ?>
-
-                    <?php else: ?>
-                        0
-                    <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
-                </span>
-            </div>
-
-            <div class="hidden sm:flex items-center gap-2 border-l border-slate-700 pl-6">
-                <span class="text-slate-400 text-[10px] uppercase font-bold tracking-wider">RATA-RATA (AVERAGE):</span>
-                <span class="font-mono font-bold text-sky-400 text-sm">
-                    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($numericCellsCount > 0): ?>
-                        <?php echo e(number_format($averageTotal, 2, ',', '.')); ?>
-
-                    <?php else: ?>
-                        —
-                    <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
-                </span>
-            </div>
-
-            <div class="hidden md:flex items-center gap-2 border-l border-slate-700 pl-6">
-                <span class="text-slate-400 text-[10px] uppercase font-bold tracking-wider">SEL TERISI:</span>
-                <span class="font-mono font-bold text-slate-300">
-                    <?php echo e($filledCellsCount); ?>
-
-                </span>
-            </div>
-        </div>
-
-        <!-- Right: Status Badge -->
-        <div class="flex items-center gap-2">
-            <div x-data="{ open: false }" class="relative">
-                <button type="button" @click="open = !open" class="px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-100 border border-slate-300 font-semibold text-slate-700">Aktivitas</button>
-                <aside x-show="open" @click.away="open = false" x-cloak class="absolute right-0 bottom-full mb-2 w-80 max-h-80 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-xl p-3 z-40" aria-label="Riwayat aktivitas spreadsheet">
-                    <h3 class="text-xs font-bold text-slate-800 mb-2">Riwayat Aktivitas</h3>
-                    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php $__empty_1 = true; $__currentLoopData = $recentActivities; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $activity): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
-                        <div class="py-2 border-b border-slate-100 last:border-0 text-[11px]">
-                            <span class="font-semibold text-slate-800"><?php echo e($activity['actor']); ?></span>
-                            <span class="text-slate-600"><?php echo e(str_replace('_', ' ', $activity['action'])); ?></span>
-                            <span class="text-sky-700"><?php echo e($activity['sheet']); ?><?php echo e($activity['range'] ? ' · ' . $activity['range'] : ''); ?></span>
-                            <time class="block text-slate-400 mt-0.5"><?php echo e($activity['at']); ?></time>
-                        </div>
-                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
-                        <p class="py-5 text-center text-xs text-slate-400">Belum ada aktivitas tersimpan.</p>
-                    <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
-                </aside>
-            </div>
-            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-950/80 border border-emerald-500/40 text-emerald-300">
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                Tersimpan Otomatis
-            </span>
         </div>
     </div>
 

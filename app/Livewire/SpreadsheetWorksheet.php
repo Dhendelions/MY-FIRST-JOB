@@ -201,9 +201,49 @@ class SpreadsheetWorksheet extends Component
             }
         }
 
-        $this->evaluateAllFormulas();
         $this->recalculateSummary();
         $this->loadRecentActivities();
+    }
+
+    public function switchSheet(int $sheetId): void
+    {
+        $this->authorizeAccess();
+
+        $targetSheet = SpreadsheetSheet::with('group')
+            ->where('group_id', $this->sheet->group_id)
+            ->findOrFail($sheetId);
+
+        $this->sheet = $targetSheet;
+        $this->sheetId = $targetSheet->id;
+        $this->activeCellCoord = 'A1';
+        $this->activeRowId = null;
+        $this->activeColumnId = null;
+        $this->activeCellVersion = 0;
+        $this->formulaValue = '';
+        $this->isEditingCell = false;
+        $this->undoStack = [];
+        $this->redoStack = [];
+        $this->showDeleteColumnModal = false;
+        $this->columnPendingDeleteId = null;
+        $this->columnPendingDeleteLetter = '';
+        $this->columnPendingDeleteCount = 0;
+        $this->gridColumnLimit = 26;
+        $this->gridRowLimit = 100;
+
+        $this->authorizeAccess();
+        $this->loadSheetData();
+
+        $this->dispatch(
+            'worksheet-sheet-switched',
+            sheetId: $this->sheetId,
+            coord: $this->activeCellCoord,
+            rowId: $this->activeRowId,
+            colId: $this->activeColumnId,
+            rowOrder: $this->rows[0]['sort_order'] ?? 1,
+            colOrder: $this->columns[0]['sort_order'] ?? 1,
+            formula: $this->formulaValue,
+            url: route('group.workspace', [$this->sheet->group_id, $this->sheetId]),
+        );
     }
 
     /**

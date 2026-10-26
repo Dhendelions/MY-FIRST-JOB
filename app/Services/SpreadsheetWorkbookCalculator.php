@@ -13,6 +13,16 @@ class SpreadsheetWorkbookCalculator
 {
     public function recalculate(FisheriesGroup $group): void
     {
+        $hasFormulas = SpreadsheetCell::query()
+            ->whereNotNull('formula')
+            ->where('formula', '!=', '')
+            ->whereHas('row.sheet', fn ($query) => $query->where('group_id', $group->id))
+            ->exists();
+
+        if (!$hasFormulas) {
+            return;
+        }
+
         $sheets = $group->sheets()->with(['columns', 'rows.cells.column'])->orderBy('id')->get();
         if ($sheets->isEmpty()) {
             return;
