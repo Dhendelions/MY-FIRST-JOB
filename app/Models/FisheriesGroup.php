@@ -266,11 +266,23 @@ class FisheriesGroup extends Model
     }
 
     /**
-     * Get normalized role for a user in this workspace (leader, admin, karyawan).
+     * Check if a user is the original creator (founder) of this workspace.
+     */
+    public function isFounder(int $userId): bool
+    {
+        return (int) $this->created_by === (int) $userId;
+    }
+
+    /**
+     * Get normalized role for a user in this workspace (leader, admin).
+     *
+     * Only two active roles exist: 'leader' and 'admin'.
+     * The founder (created_by) is permanently a leader.
      */
     public function getMemberRole(int $userId): ?string
     {
-        if ($this->created_by === $userId) {
+        // Founder is permanently protected and recognized as leader
+        if ($this->isFounder($userId)) {
             return 'leader';
         }
 
@@ -284,13 +296,39 @@ class FisheriesGroup extends Model
         }
 
         $role = strtolower(trim($member->role));
-        if (in_array($role, ['leader', 'ketua tambak', 'pemilik/pengelola tambak', 'owner'])) {
+
+        if ($role === 'leader') {
             return 'leader';
         }
-        if (in_array($role, ['admin', 'administrator', 'teknisi kolam', 'staff keuangan', 'manager'])) {
-            return 'admin';
+
+        // Legacy aliases for leader
+        if (in_array($role, ['ketua tambak', 'pemilik/pengelola tambak', 'owner', 'ketua'], true)) {
+            return 'leader';
         }
-        return 'karyawan';
+
+        return 'admin';
+    }
+
+    /**
+     * Return the first active leader GroupMember record for this workspace.
+     */
+    public function getActiveLeaderMember(): ?\App\Models\GroupMember
+    {
+        return $this->members()
+            ->where('role', 'leader')
+            ->where('status', 'Aktif')
+            ->first();
+    }
+
+    /**
+     * Count active leader members. Workspaces can have multiple leaders.
+     */
+    public function countActiveLeaders(): int
+    {
+        return $this->members()
+            ->where('role', 'leader')
+            ->where('status', 'Aktif')
+            ->count();
     }
 
     public function isLeader(int $userId): bool

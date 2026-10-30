@@ -79,6 +79,16 @@
                         <svg class="w-4 h-4 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                         <span class="hidden sm:inline">Riwayat Aktivitas</span>
                     </button>
+
+                    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(in_array($userRole, ['leader', 'admin'])): ?>
+                    <!-- Tombol Backup Seluruh Spreadsheet -->
+                    <button @click="workspaceModal = 'modal-backup-workspace'" 
+                            class="p-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold text-xs flex items-center gap-1.5 transition-colors"
+                            title="Backup Seluruh Spreadsheet (.xlsx)">
+                        <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        <span class="hidden sm:inline">Backup Spreadsheet</span>
+                    </button>
+                    <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
                 </div>
 
                 <!-- Settings Button (Leader & Admin) -->
@@ -309,10 +319,9 @@ if (isset($__slots)) unset($__slots);
                     <div>
                         <label class="block text-xs font-semibold text-slate-700 mb-1">Peran dalam Workspace <span class="text-rose-500">*</span></label>
                         <select name="role" required class="w-full text-xs sm:text-sm px-3.5 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:outline-none bg-white">
-                            <option value="karyawan">Karyawan (Akses & Edit Lembar Kerja)</option>
                             <option value="admin">Admin (Kelola Anggota & Dokumen)</option>
                             <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($userRole === 'leader'): ?>
-                                <option value="leader">Leader (Pemilik / Pemimpin Tim)</option>
+                                <option value="leader">Leader (Pemimpin Tim & Pengelola Anggota)</option>
                             <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
                         </select>
                     </div>
@@ -333,75 +342,192 @@ if (isset($__slots)) unset($__slots);
         </div>
     </div>
 
-    <!-- MODAL 2: Kelola Anggota & Peran (Leader & Admin) -->
-    <div x-show="workspaceModal === 'modal-manage-members'" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
+    <!-- MODAL 2: Kelola Anggota & Peran (Leader Only) -->
+    <div x-show="workspaceModal === 'modal-manage-members'"
+         x-data="workspaceMembersManager({
+            members: <?php echo \Illuminate\Support\Js::from($managedMembers)->toHtml() ?>,
+            currentUserId: <?php echo e((int) Auth::id()); ?>,
+            currentUserRole: <?php echo \Illuminate\Support\Js::from($userRole)->toHtml() ?>,
+            groupId: <?php echo e((int) $group->id); ?>
+
+         })"
+         class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
         <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
             <div class="fixed inset-0 bg-slate-900/70 backdrop-blur-xs transition-opacity" @click="workspaceModal = null"></div>
-            <div class="relative bg-white rounded-2xl max-w-2xl w-full p-6 text-left shadow-2xl border border-slate-100 my-8">
-                <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div class="relative bg-white rounded-2xl max-w-2xl w-full text-left shadow-2xl border border-slate-100 my-8 overflow-hidden flex flex-col">
+
+                <!-- Header -->
+                <div class="p-6 pb-4 border-b border-slate-100 flex items-center justify-between shrink-0">
                     <div class="flex items-center gap-2.5">
-                        <div class="w-9 h-9 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center font-bold">
+                        <div class="w-9 h-9 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
                         </div>
                         <div>
-                            <h3 class="text-base font-bold text-slate-800">Daftar Anggota Workspace</h3>
-                            <p class="text-xs text-slate-500">Kelola izin dan peran anggota tim</p>
+                            <h3 class="text-base font-bold text-slate-800">Kelola Anggota & Peran</h3>
+                            <p class="text-xs text-slate-500">
+                                <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($userRole === 'leader'): ?>
+                                    Anda dapat mengubah peran semua anggota
+                                <?php else: ?>
+                                    Hanya Leader yang dapat mengubah peran
+                                <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+                            </p>
                         </div>
                     </div>
-                    <button @click="workspaceModal = null" class="text-slate-400 hover:text-slate-600">
+                    <button @click="workspaceModal = null" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                     </button>
                 </div>
 
-                <div class="mt-4 max-h-80 overflow-y-auto divide-y divide-slate-100">
-                    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php $__currentLoopData = $members; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $mem): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                        <?php
-                            $normalizedRole = strtolower(trim($mem->role));
-                            if ($normalizedRole === 'ketua tambak') $normalizedRole = 'leader';
-                            elseif (in_array($normalizedRole, ['teknisi kolam', 'staff keuangan'])) $normalizedRole = 'admin';
-                            elseif ($normalizedRole === 'anggota') $normalizedRole = 'karyawan';
-                        ?>
+                <!-- Toast notification -->
+                <div x-show="toast.show"
+                     x-transition:enter="transition ease-out duration-200"
+                     x-transition:enter-start="opacity-0 -translate-y-2"
+                     x-transition:enter-end="opacity-100 translate-y-0"
+                     x-transition:leave="transition ease-in duration-150"
+                     x-transition:leave-start="opacity-100"
+                     x-transition:leave-end="opacity-0"
+                     :class="toast.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-800'"
+                     class="mx-6 mt-4 p-3 rounded-xl border text-xs font-medium flex items-center gap-2" x-cloak>
+                    <svg x-show="toast.type === 'success'" class="w-4 h-4 shrink-0 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                    <svg x-show="toast.type === 'error'" class="w-4 h-4 shrink-0 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01M5.07 19h13.86c1.54 0 2.5-1.67 1.73-3L13.73 4c-.77-1.33-2.69-1.33-3.46 0L3.34 16c-.77 1.33.19 3 1.73 3z"></path></svg>
+                    <span x-text="toast.message"></span>
+                    <button @click="toast.show = false" class="ml-auto text-current opacity-60 hover:opacity-100">✕</button>
+                </div>
+
+                <!-- Processing overlay -->
+                <div x-show="isProcessing" class="absolute inset-0 bg-white/70 z-10 flex items-center justify-center rounded-2xl" x-cloak>
+                    <div class="flex items-center gap-2 text-sky-700 text-sm font-semibold">
+                        <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                        Memproses...
+                    </div>
+                </div>
+
+                <!-- Member list -->
+                <div class="overflow-y-auto divide-y divide-slate-100 max-h-96 px-6 py-2">
+                    <template x-if="members.length === 0">
+                        <p class="py-8 text-center text-xs text-slate-400">Tidak ada anggota aktif dalam workspace ini.</p>
+                    </template>
+
+                    <template x-for="mem in members" :key="mem.id">
                         <div class="py-3 flex items-center justify-between gap-3">
-                            <div class="flex items-center gap-3 cursor-pointer hover:opacity-85 transition-opacity" 
-                                 @click="openUserProfile(<?php echo e($mem->user->id); ?>)" 
-                                 title="Klik untuk membuka profil">
-                                <img class="w-9 h-9 rounded-full object-cover ring-1 ring-slate-200" src="<?php echo e($mem->user->avatar_url); ?>" alt="<?php echo e($mem->user->name); ?>">
-                                <div>
-                                    <p class="text-xs font-bold text-slate-800 hover:text-sky-600 underline decoration-slate-300"><?php echo e($mem->user->name); ?></p>
-                                    <p class="text-[11px] text-slate-500"><?php echo e($mem->user->role_title ?? 'Anggota Tim'); ?></p>
+                            <!-- Avatar & Info -->
+                            <div class="flex items-center gap-3 min-w-0 flex-1 cursor-pointer hover:opacity-80 transition-opacity"
+                                 @click="openUserProfile(mem.user_id)" :title="'Lihat profil ' + mem.user_name">
+                                <div class="relative shrink-0">
+                                    <img class="w-9 h-9 rounded-full object-cover ring-2 ring-white shadow-sm"
+                                         :src="mem.user_avatar" :alt="mem.user_name">
+                                    <!-- Role indicator dot -->
+                                    <span class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white text-[8px] flex items-center justify-center"
+                                          :class="mem.role === 'leader' ? 'bg-amber-400' : 'bg-sky-400'"></span>
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="flex items-center gap-1.5 flex-wrap">
+                                        <p class="text-xs font-bold text-slate-800 truncate hover:text-sky-600 underline decoration-slate-200" x-text="mem.user_name"></p>
+                                        <template x-if="mem.is_founder">
+                                            <span class="inline-flex items-center gap-0.5 text-[9px] font-extrabold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300 shadow-xs">👑 Founder</span>
+                                        </template>
+                                    </div>
+                                    <p class="text-[10px] text-slate-400 truncate" x-text="mem.user_title"></p>
                                 </div>
                             </div>
 
-                            <div class="flex items-center gap-2">
-                                <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(in_array($userRole, ['leader', 'admin']) && $mem->user_id !== Auth::id()): ?>
-                                    <form action="<?php echo e(route('groups.members.update', [$group->id, $mem->id])); ?>" method="POST" class="flex items-center gap-1">
-                                        <?php echo csrf_field(); ?>
-                                        <?php echo method_field('PUT'); ?>
-                                        <select name="role" onchange="this.form.submit()" class="text-xs border border-slate-200 rounded-lg px-2 py-1 bg-white text-slate-700">
-                                            <option value="karyawan" <?php echo e($normalizedRole === 'karyawan' ? 'selected' : ''); ?>>Karyawan</option>
-                                            <option value="admin" <?php echo e($normalizedRole === 'admin' ? 'selected' : ''); ?>>Admin</option>
-                                            <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($userRole === 'leader'): ?>
-                                                <option value="leader" <?php echo e($normalizedRole === 'leader' ? 'selected' : ''); ?>>Leader</option>
-                                            <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
-                                        </select>
-                                    </form>
+                            <!-- Actions -->
+                            <div class="flex items-center gap-2 shrink-0">
+                                <!-- 1. Founder: permanently Leader, no role change dropdown, no remove button -->
+                                <template x-if="mem.is_founder">
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide bg-amber-100 text-amber-800 border border-amber-200">👑 LEADER</span>
+                                        <template x-if="mem.user_id === currentUserId">
+                                            <span class="text-[10px] text-slate-400 font-medium bg-slate-50 px-2 py-0.5 rounded border border-slate-200">Anda</span>
+                                        </template>
+                                    </div>
+                                </template>
 
-                                    <form action="<?php echo e(route('groups.members.remove', [$group->id, $mem->id])); ?>" method="POST" onsubmit="return confirm('Keluarkan anggota ini dari workspace?')">
-                                        <?php echo csrf_field(); ?>
-                                        <?php echo method_field('DELETE'); ?>
-                                        <button type="submit" class="p-1 rounded text-rose-500 hover:bg-rose-50" title="Keluarkan Anggota">
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                <!-- 2. Non-founder member (view-only for non-leaders or when looking at oneself) -->
+                                <template x-if="!mem.is_founder && (currentUserRole !== 'leader' || mem.user_id === currentUserId)">
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide"
+                                              :class="getRoleBadgeClass(mem.role)"
+                                              x-text="mem.role"></span>
+                                        <template x-if="mem.user_id === currentUserId">
+                                            <span class="text-[10px] text-slate-400 font-medium bg-slate-50 px-2 py-0.5 rounded border border-slate-200">Anda</span>
+                                        </template>
+                                    </div>
+                                </template>
+
+                                <!-- 3. Non-founder member when current user IS leader and target is NOT oneself -->
+                                <template x-if="!mem.is_founder && currentUserRole === 'leader' && mem.user_id !== currentUserId">
+                                    <div class="flex items-center gap-1.5">
+                                        <div class="relative">
+                                            <select :value="mem.pending_role"
+                                                    @change="onRoleSelectChange(mem.id, $event.target.value); $event.target.value = mem.pending_role"
+                                                    :disabled="isProcessing"
+                                                    class="text-xs border border-slate-200 rounded-lg pl-2.5 pr-7 py-1.5 bg-white text-slate-700 font-medium appearance-none cursor-pointer hover:border-sky-400 focus:ring-2 focus:ring-sky-400 focus:border-sky-400 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                    :class="mem.role === 'leader' ? 'border-amber-300 bg-amber-50' : 'border-sky-300 bg-sky-50'">
+                                                <option value="admin" :selected="mem.role === 'admin'">🛡️ Admin</option>
+                                                <option value="leader" :selected="mem.role === 'leader'">👑 Leader</option>
+                                            </select>
+                                            <svg class="w-3 h-3 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                                        </div>
+
+                                        <!-- Remove member button (non-founder) -->
+                                        <button @click="onRemoveMember(mem.id)"
+                                                :disabled="isProcessing"
+                                                title="Keluarkan Anggota"
+                                                class="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition-colors disabled:opacity-40">
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                                         </button>
-                                    </form>
-                                <?php else: ?>
-                                    <span class="text-[11px] font-mono font-bold px-2 py-0.5 rounded uppercase bg-slate-100 text-slate-700">
-                                        <?php echo e($normalizedRole); ?>
-
-                                    </span>
-                                <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+                                    </div>
+                                </template>
                             </div>
                         </div>
-                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+                    </template>
+                </div>
+
+                <!-- Footer info -->
+                <div class="px-6 py-3 border-t border-slate-100 bg-slate-50/70 flex items-center justify-between shrink-0">
+                    <p class="text-[10px] text-slate-400">
+                        <template x-if="currentUserRole === 'leader'">
+                            <span>💡 Klik dropdown untuk ubah peran · Ikon 🗑️ keluarkan anggota</span>
+                        </template>
+                        <template x-if="currentUserRole !== 'leader'">
+                            <span>Hanya Leader yang dapat mengubah peran anggota.</span>
+                        </template>
+                    </p>
+                    <span class="text-[10px] font-semibold text-slate-500" x-text="members.length + ' anggota aktif'"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Inline Confirm Modal -->
+        <div x-show="confirmModal.show"
+             x-transition:enter="transition ease-out duration-150"
+             x-transition:enter-start="opacity-0"
+             x-transition:enter-end="opacity-100"
+             class="fixed inset-0 z-[60] flex items-center justify-center px-4" x-cloak>
+            <div class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm" @click="closeConfirm()"></div>
+            <div x-transition:enter="transition ease-out duration-150"
+                 x-transition:enter-start="opacity-0 scale-95"
+                 x-transition:enter-end="opacity-100 scale-100"
+                 class="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden ring-1 ring-black/5">
+                <div class="h-1" :class="confirmModal.isDanger ? 'bg-gradient-to-r from-rose-500 to-orange-400' : 'bg-gradient-to-r from-sky-500 to-cyan-400'"></div>
+                <div class="p-5">
+                    <h4 class="text-sm font-bold text-slate-900" x-text="confirmModal.title"></h4>
+                    <p class="mt-2 text-xs leading-5 text-slate-600" x-html="confirmModal.body"></p>
+
+                    <div class="mt-5 flex items-center justify-end gap-2">
+                        <button @click="closeConfirm()"
+                                class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors">
+                            Batal
+                        </button>
+                        <button @click="runConfirmedAction()"
+                                :class="confirmModal.isDanger
+                                    ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-600/30'
+                                    : 'bg-sky-600 hover:bg-sky-500 shadow-sky-600/20'"
+                                class="px-5 py-2 rounded-xl text-xs font-semibold text-white shadow-md transition-all">
+                            Ya, Lanjutkan
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -465,6 +591,21 @@ if (isset($__slots)) unset($__slots);
                                class="w-full mt-2 text-xs sm:text-sm px-3.5 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:outline-none">
                         <p class="text-[11px] text-slate-400 mt-1">Status saat ini: <strong class="text-emerald-600"><?php echo e($group->hasPassword() ? 'Password Terpasang ✓' : 'Password Belum Diatur'); ?></strong></p>
                         <p class="text-[11px] text-slate-400">Hanya leader yang dapat melihat dan mengubah password.</p>
+                    </div>
+                    <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+
+                    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(in_array($userRole, ['leader', 'admin'])): ?>
+                    <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700">Backup Data Spreadsheet</label>
+                            <p class="text-[11px] text-slate-400">Unduh seluruh lembar kerja dalam format file Excel (.xlsx)</p>
+                        </div>
+                        <button type="button" 
+                                @click="workspaceModal = 'modal-backup-workspace'"
+                                class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-colors flex items-center gap-1.5 shadow-2xs">
+                            <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                            Backup Seluruh Spreadsheet
+                        </button>
                     </div>
                     <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
 
@@ -736,10 +877,262 @@ if (isset($__slots)) unset($__slots);
                 </div>
             </div>
         </div>
+    </div>
+
+    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(in_array($userRole, ['leader', 'admin'])): ?>
+    <!-- MODAL 8: Backup Seluruh Spreadsheet ke XLSX -->
+    <div x-show="workspaceModal === 'modal-backup-workspace'" 
+         x-data="{
+            isExporting: false,
+            startBackup() {
+                this.isExporting = true;
+                const link = document.createElement('a');
+                link.href = '<?php echo e(route('groups.backup', $group->id)); ?>';
+                link.download = '';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                setTimeout(() => {
+                    this.isExporting = false;
+                    workspaceModal = null;
+                }, 2000);
+            }
+         }"
+         x-transition.opacity 
+         class="fixed inset-0 z-[60] overflow-y-auto" 
+         x-cloak 
+         role="dialog" 
+         aria-modal="true"
+         aria-labelledby="backup-workspace-title"
+         @keydown.escape.window="!isExporting && (workspaceModal = null)">
+        <div class="flex items-center justify-center min-h-screen px-4 py-8">
+            <div class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm" @click="!isExporting && (workspaceModal = null)"></div>
+            <div x-transition.scale.origin.center class="relative bg-white rounded-2xl max-w-md w-full p-6 text-left shadow-2xl border border-slate-100">
+                <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        </div>
+                        <div>
+                            <h3 id="backup-workspace-title" class="text-base font-bold text-slate-800">Backup Seluruh Spreadsheet</h3>
+                            <p class="text-xs text-slate-500">Ekspor workbook lengkap ke file Microsoft Excel (.xlsx)</p>
+                        </div>
+                    </div>
+                    <button @click="!isExporting && (workspaceModal = null)" :disabled="isExporting" class="text-slate-400 hover:text-slate-600 disabled:opacity-40">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+
+                <div class="mt-4 space-y-3.5 text-xs text-slate-600">
+                    <div class="p-3.5 bg-slate-50 rounded-xl border border-slate-100 space-y-2">
+                        <div class="flex justify-between items-center">
+                            <span class="text-slate-500">Nama Workspace:</span>
+                            <strong class="text-slate-900 font-semibold"><?php echo e($group->name); ?></strong>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-slate-500">Jumlah Worksheet:</span>
+                            <span class="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                <?php echo e($sheets->count()); ?> Lembar Kerja
+                            </span>
+                        </div>
+                        <div class="flex justify-between items-start gap-2">
+                            <span class="text-slate-500 shrink-0">Daftar Lembar:</span>
+                            <span class="text-right text-slate-700 font-medium truncate" title="<?php echo e($sheets->pluck('name')->join(', ')); ?>">
+                                <?php echo e($sheets->pluck('name')->join(', ')); ?>
+
+                            </span>
+                        </div>
+                    </div>
+
+                    <p class="text-[11px] text-slate-500 leading-relaxed">
+                        File backup akan berisi <strong>seluruh worksheet</strong> dalam satu workbook Excel (.xlsx) dengan struktur tabel, formula, warna header/sel, dan format data yang tetap dipertahankan.
+                    </p>
+                </div>
+
+                <div class="mt-6 pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                    <button type="button" @click="workspaceModal = null" :disabled="isExporting" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-40 transition-colors">
+                        Batal
+                    </button>
+                    <button type="button" 
+                            @click="startBackup()" 
+                            :disabled="isExporting"
+                            class="px-5 py-2.5 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/20 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                        <template x-if="!isExporting">
+                            <span class="flex items-center gap-1.5">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                                Unduh Backup (.xlsx)
+                            </span>
+                        </template>
+                        <template x-if="isExporting">
+                            <span class="flex items-center gap-1.5">
+                                <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                                Menyiapkan File...
+                            </span>
+                        </template>
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
-    </template>
+    <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+
     </div>
+    </template>
+</div>
+
+<script>
+function workspaceMembersManager(config) {
+    return {
+        members: config.members || [],
+        currentUserId: config.currentUserId,
+        currentUserRole: config.currentUserRole,
+        groupId: config.groupId,
+        isProcessing: false,
+        toast: { show: false, message: '', type: 'success' },
+        confirmModal: { show: false, title: '', body: '', action: null, isDestructive: false, isDanger: false },
+
+        showToast(message, type = 'success') {
+            this.toast = { show: true, message, type };
+            setTimeout(() => { this.toast.show = false; }, 5000);
+        },
+
+        openConfirm(title, body, action, isDestructive = false) {
+            this.confirmModal = { show: true, title, body, action, isDestructive, isDanger: isDestructive };
+        },
+
+        closeConfirm() {
+            this.confirmModal = { show: false, title: '', body: '', action: null, isDestructive: false, isDanger: false };
+        },
+
+        runConfirmedAction() {
+            if (this.confirmModal.action) this.confirmModal.action();
+            this.closeConfirm();
+        },
+
+        getMemberById(memberId) {
+            return this.members.find(m => m.id === memberId);
+        },
+
+        getRoleBadgeClass(role) {
+            if (role === 'leader') return 'bg-amber-100 text-amber-800 border border-amber-200';
+            return 'bg-sky-100 text-sky-800 border border-sky-200';
+        },
+
+        getRoleLabel(role) {
+            if (role === 'leader') return '👑 Leader';
+            return '🛡️ Admin';
+        },
+
+        onRoleSelectChange(memberId, newRole) {
+            const member = this.getMemberById(memberId);
+            if (!member || member.role === newRole) return;
+
+            const memberName = member.user_name;
+            const oldRoleLabel = this.getRoleLabel(member.role);
+            const newRoleLabel = this.getRoleLabel(newRole);
+            const isPromotion  = newRole === 'leader';
+
+            let title = isPromotion ? '👑 Angkat Menjadi Leader' : '🛡️ Ubah Menjadi Admin';
+            let body  = isPromotion
+                ? `Angkat <strong>${memberName}</strong> menjadi <strong>Leader</strong>?<br><br>` +
+                  `Anggota akan memiliki hak pengelolaan anggota workspace dan hak administratif penuh.`
+                : `Ubah peran <strong>${memberName}</strong> dari <strong>${oldRoleLabel}</strong> menjadi <strong>${newRoleLabel}</strong>?<br><br>` +
+                  `Anggota tidak akan lagi dapat mengelola peran anggota workspace.`;
+
+            this.openConfirm(title, body, () => {
+                this.submitRoleChange(memberId, newRole);
+            }, false);
+        },
+
+        async submitRoleChange(memberId, newRole) {
+            const member = this.getMemberById(memberId);
+            if (!member) return;
+            this.isProcessing = true;
+
+            try {
+                const url    = `/groups/${this.groupId}/members/${memberId}`;
+                const csrfEl = document.querySelector('meta[name="csrf-token"]');
+                const csrf   = csrfEl ? csrfEl.content : '';
+
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept':       'application/json',
+                        'X-CSRF-TOKEN': csrf,
+                        'X-HTTP-Method-Override': 'PUT',
+                    },
+                    body: JSON.stringify({ role: newRole }),
+                });
+
+                const data = await res.json();
+
+                if (res.ok) {
+                    member.role = newRole;
+                    member.pending_role = newRole;
+                    this.showToast(data.message || 'Peran berhasil diperbarui.', 'success');
+                } else {
+                    member.pending_role = member.role;
+                    this.showToast(data.message || 'Gagal mengubah peran.', 'error');
+                }
+            } catch (err) {
+                member.pending_role = member.role;
+                this.showToast('Terjadi kesalahan koneksi. Coba lagi.', 'error');
+            } finally {
+                this.isProcessing = false;
+            }
+        },
+
+        onRemoveMember(memberId) {
+            const member = this.getMemberById(memberId);
+            if (!member) return;
+
+            this.openConfirm(
+                '⛔ Keluarkan Anggota',
+                `Keluarkan <strong>${member.user_name}</strong> dari workspace ini secara permanen?`,
+                () => { this.submitRemoveMember(memberId); },
+                true
+            );
+        },
+
+        async submitRemoveMember(memberId) {
+            const member = this.getMemberById(memberId);
+            if (!member) return;
+            this.isProcessing = true;
+
+            try {
+                const url    = `/groups/${this.groupId}/members/${memberId}`;
+                const csrfEl = document.querySelector('meta[name="csrf-token"]');
+                const csrf   = csrfEl ? csrfEl.content : '';
+
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept':       'application/json',
+                        'X-CSRF-TOKEN': csrf,
+                        'X-HTTP-Method-Override': 'DELETE',
+                    },
+                    body: JSON.stringify({}),
+                });
+
+                const data = await res.json();
+
+                if (res.ok) {
+                    this.members = this.members.filter(m => m.id !== memberId);
+                    this.showToast(data.message || 'Anggota berhasil dikeluarkan.', 'success');
+                } else {
+                    this.showToast(data.message || 'Gagal mengeluarkan anggota.', 'error');
+                }
+            } catch (err) {
+                this.showToast('Terjadi kesalahan koneksi. Coba lagi.', 'error');
+            } finally {
+                this.isProcessing = false;
+            }
+        }
+    };
+}
+</script>
 <?php $__env->stopSection(); ?>
 
 <?php echo $__env->make('layouts.app', ['title' => $group->name . ' — Ruang Kerja Spreadsheet Dadhen Mandiri'], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH C:\Users\Crissencio Dheni S\Documents\JOB 1\resources\views/groups/workspace.blade.php ENDPATH**/ ?>

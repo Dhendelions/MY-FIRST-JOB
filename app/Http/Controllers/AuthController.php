@@ -33,7 +33,7 @@ class AuthController extends Controller
             'email' => ['required', 'string', 'email:rfc,filter', 'max:255', 'unique:users,email'],
             'whatsapp' => ['nullable', 'string', 'max:50'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
-            'role_title' => ['required', 'string', 'in:leader,admin,karyawan'],
+            'role_title' => ['required', 'string', 'in:leader,admin'],
         ], [
             'name.required' => 'Nama lengkap wajib diisi.',
             'email.required' => 'Alamat email wajib diisi.',

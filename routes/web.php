@@ -61,6 +61,7 @@ Route::middleware(['auth', EnsureWorkspaceAdminReauthentication::class])->group(
     Route::delete('/groups/{group}/members/{member}', [GroupController::class, 'removeMember'])->name('groups.members.remove');
     Route::put('/groups/{group}', [GroupController::class, 'update'])->name('groups.update');
     Route::delete('/groups/{group}', [GroupController::class, 'destroy'])->name('groups.destroy');
+    Route::get('/groups/{group}/backup-xlsx', [GroupController::class, 'backupXlsx'])->name('groups.backup');
 
     // Sheet operations
     Route::post('/groups/{group}/sheets', [GroupController::class, 'addSheet'])->name('groups.sheets.add');

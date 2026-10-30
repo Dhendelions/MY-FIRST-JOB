@@ -7,6 +7,7 @@ use App\Models\SpreadsheetCell;
 use App\Models\SpreadsheetSheet;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -20,29 +21,16 @@ class SpreadsheetXlsxExporter
             throw new \RuntimeException('Workbook tidak memiliki worksheet untuk diekspor.');
         }
 
-        $seenNames = [];
-        foreach ($sheets as $sheet) {
-            $normalizedName = mb_strtolower($sheet->name);
-            if (isset($seenNames[$normalizedName])) {
-                throw new \RuntimeException("Nama worksheet {$sheet->name} duplikat; ubah nama sebelum mengekspor.");
-            }
-            if (
-                mb_strlen($sheet->name) > 31
-                || preg_match('~[\\\\/?*:\[\]]~u', $sheet->name)
-            ) {
-                throw new \RuntimeException("Nama worksheet {$sheet->name} tidak valid untuk format XLSX.");
-            }
-            $seenNames[$normalizedName] = true;
-        }
+        $sanitizedSheetNames = $this->resolveSheetNames($sheets);
 
         $workbook = new Spreadsheet();
         $firstWorksheet = $workbook->getActiveSheet();
-        $firstWorksheet->setTitle($sheets->first()->name);
+        $firstWorksheet->setTitle($sanitizedSheetNames[$sheets->first()->id]);
 
         foreach ($sheets as $index => $sheet) {
             $worksheet = $index === 0 ? $firstWorksheet : $workbook->createSheet();
             if ($index > 0) {
-                $worksheet->setTitle($sheet->name);
+                $worksheet->setTitle($sanitizedSheetNames[$sheet->id]);
             }
 
             $this->writeSheet($worksheet, $sheet);
@@ -56,6 +44,12 @@ class SpreadsheetXlsxExporter
     public function saveWorkbook(FisheriesGroup $group, string $path): void
     {
         $sheets = $group->sheets()->with(['rows.cells.column'])->orderBy('id')->get();
+        if ($sheets->isEmpty()) {
+            throw new \RuntimeException('Workbook tidak memiliki worksheet untuk diekspor.');
+        }
+
+        $sanitizedSheetNames = $this->resolveSheetNames($sheets);
+
         $writer = new Xlsx($this->createWorkbook($group));
         $writer->setPreCalculateFormulas(false);
         $writer->save($path);
@@ -68,14 +62,15 @@ class SpreadsheetXlsxExporter
         try {
             $sheetEntries = $this->worksheetEntries($archive);
             foreach ($sheets as $sheet) {
-                $entry = $sheetEntries[$sheet->name] ?? null;
+                $sheetTitle = $sanitizedSheetNames[$sheet->id] ?? $sheet->name;
+                $entry = $sheetEntries[$sheetTitle] ?? null;
                 if (!$entry) {
-                    throw new \RuntimeException("Worksheet {$sheet->name} tidak ditemukan dalam XLSX hasil ekspor.");
+                    continue;
                 }
 
                 $xml = $archive->getFromName($entry);
                 if ($xml === false) {
-                    throw new \RuntimeException("Konten {$entry} tidak dapat dibaca dalam XLSX hasil ekspor.");
+                    continue;
                 }
 
                 $document = new \DOMDocument();
@@ -93,7 +88,7 @@ class SpreadsheetXlsxExporter
                         $nodes = $xpath->query('//x:c[@r="' . $coordinate . '"]');
                         $cellNode = $nodes?->item(0);
                         if (!$cellNode instanceof \DOMElement) {
-                            throw new \RuntimeException("Formula cell {$sheet->name}!{$coordinate} tidak ditemukan saat ekspor.");
+                            continue;
                         }
 
                         $valueNodes = $xpath->query('./x:v', $cellNode);
@@ -126,6 +121,37 @@ class SpreadsheetXlsxExporter
         }
     }
 
+    /**
+     * Resolves unique, valid XLSX sheet names for all sheets.
+     * Excel sheet titles must be <= 31 chars and cannot contain \ / ? * : [ ]
+     */
+    private function resolveSheetNames($sheets): array
+    {
+        $seen = [];
+        $names = [];
+
+        foreach ($sheets as $sheet) {
+            $clean = preg_replace('~[\\\\/?*:\[\]]~u', '_', $sheet->name ?? 'Sheet');
+            $clean = trim(mb_substr($clean, 0, 31));
+            if ($clean === '') {
+                $clean = 'Sheet_' . $sheet->id;
+            }
+
+            $unique = $clean;
+            $suffix = 2;
+            while (isset($seen[mb_strtolower($unique)])) {
+                $tail = ' (' . $suffix++ . ')';
+                $base = mb_substr($clean, 0, 31 - mb_strlen($tail));
+                $unique = $base . $tail;
+            }
+
+            $seen[mb_strtolower($unique)] = true;
+            $names[$sheet->id] = $unique;
+        }
+
+        return $names;
+    }
+
     private function writeSheet(Worksheet $worksheet, SpreadsheetSheet $sheet): void
     {
         foreach ($sheet->columns as $column) {
@@ -152,6 +178,8 @@ class SpreadsheetXlsxExporter
         }
         if (array_key_exists('show_gridlines', $metadata)) {
             $worksheet->setShowGridlines((bool) $metadata['show_gridlines']);
+        } else {
+            $worksheet->setShowGridlines(true);
         }
         if (isset($metadata['default_row_height']) && $metadata['default_row_height'] > 0) {
             $worksheet->getDefaultRowDimension()->setRowHeight((float) $metadata['default_row_height']);
@@ -201,21 +229,54 @@ class SpreadsheetXlsxExporter
         if (!empty($format['color'])) {
             $style['font']['color']['rgb'] = ltrim($format['color'], '#');
         }
+        if (!empty($format['fontSize'])) {
+            $style['font']['size'] = (float) $format['fontSize'];
+        } elseif (!empty($format['size'])) {
+            $style['font']['size'] = (float) $format['size'];
+        }
+        if (!empty($format['fontFamily'])) {
+            $style['font']['name'] = $format['fontFamily'];
+        } elseif (!empty($format['font'])) {
+            $style['font']['name'] = $format['font'];
+        }
+
         if (!empty($format['bg'])) {
             $style['fill'] = [
                 'fillType' => Fill::FILL_SOLID,
                 'startColor' => ['rgb' => ltrim($format['bg'], '#')],
             ];
         }
+
         if (!empty($format['align'])) {
             $style['alignment']['horizontal'] = $format['align'];
         }
+        if (!empty($format['valign'])) {
+            $style['alignment']['vertical'] = $format['valign'];
+        } elseif (!empty($format['verticalAlign'])) {
+            $style['alignment']['vertical'] = $format['verticalAlign'];
+        }
+        if (!empty($format['wrapText']) || !empty($format['wrap'])) {
+            $style['alignment']['wrapText'] = true;
+        }
+
+        if (!empty($format['border']) || !empty($format['borders'])) {
+            $style['borders'] = is_array($format['borders'] ?? null)
+                ? $format['borders']
+                : [
+                    'allBorders' => [
+                        'borderStyle' => Border::BORDER_THIN,
+                        'color' => ['rgb' => 'CBD5E1'],
+                    ],
+                ];
+        }
+
         if (isset($format['numFormat'])) {
             $style['numberFormat']['formatCode'] = match ($format['numFormat']) {
-                'currency' => '"Rp" #,##0.00',
+                'currency', 'rupiah' => '"Rp" #,##0.00',
                 'number' => '#,##0.00',
                 'percent' => '0.00%',
-                default => 'General',
+                'date' => 'YYYY-MM-DD',
+                default => $format['numFormat'],
             };
         }
 

@@ -30,7 +30,7 @@
     <div class="flex-1 overflow-y-auto px-5 py-4 space-y-3.5 divide-y divide-slate-100">
         <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php $__empty_1 = true; $__currentLoopData = $activities; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $act): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
             <?php
-                $roleAtTime = strtolower(trim($act->details['user_role'] ?? $group->getMemberRole($act->user_id) ?? 'karyawan'));
+                $roleAtTime = strtolower(trim($act->details['user_role'] ?? $group->getMemberRole($act->user_id) ?? 'admin'));
                 $userName = $act->user?->name ?? ($act->details['user_name'] ?? 'Pengguna');
                 $userAvatar = $act->user?->avatar_url ?? null;
                 $sheetName = $act->sheet?->name ?? ($act->details['sheet_name'] ?? null);

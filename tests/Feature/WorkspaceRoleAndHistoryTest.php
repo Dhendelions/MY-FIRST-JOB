@@ -68,14 +68,14 @@ class WorkspaceRoleAndHistoryTest extends TestCase
         $addRes = $this->actingAs($leader)
             ->post(route('groups.members.add', $group->id), [
                 'user_id' => $candidate1->id,
-                'role' => 'karyawan',
+                'role' => 'admin',
             ]);
         $addRes->assertRedirect();
 
         $this->assertDatabaseHas('group_members', [
             'group_id' => $group->id,
             'user_id' => $candidate1->id,
-            'role' => 'karyawan',
+            'role' => 'admin',
             'status' => 'Aktif',
         ]);
 
@@ -83,7 +83,7 @@ class WorkspaceRoleAndHistoryTest extends TestCase
         $duplicateRes = $this->actingAs($leader)
             ->post(route('groups.members.add', $group->id), [
                 'user_id' => $candidate1->id,
-                'role' => 'karyawan',
+                'role' => 'admin',
             ]);
         $duplicateRes->assertSessionHas('error');
     }
@@ -101,7 +101,7 @@ class WorkspaceRoleAndHistoryTest extends TestCase
         ]);
         GroupMember::create(['group_id' => $group->id, 'user_id' => $leader->id, 'role' => 'leader', 'status' => 'Aktif']);
         GroupMember::create(['group_id' => $group->id, 'user_id' => $admin->id, 'role' => 'admin', 'status' => 'Aktif']);
-        GroupMember::create(['group_id' => $group->id, 'user_id' => $karyawan->id, 'role' => 'karyawan', 'status' => 'Aktif']);
+        GroupMember::create(['group_id' => $group->id, 'user_id' => $karyawan->id, 'role' => 'admin', 'status' => 'Aktif']);
 
         // Create standard named sheets: Analisa, Cost, Margin, Pendukung, Rank
         $analisa = $group->sheets()->create(['name' => 'Analisa', 'category' => 'analisa']);
@@ -116,7 +116,8 @@ class WorkspaceRoleAndHistoryTest extends TestCase
         $rank->initializeBlankGrid();
 
         // 1. Analisa & Cost: Leader, Admin, Karyawan can access
-        $this->actingAs($karyawan)->get(route('group.workspace', [$group->id, $analisa->id]))->assertOk();
+        $outsider = User::create(['name' => 'Outsider', 'email' => 'out_add@example.test', 'password' => 'password']);
+        $this->actingAs($outsider)->get(route('group.workspace', [$group->id, $analisa->id]))->assertOk();
         $this->actingAs($admin)->get(route('group.workspace', [$group->id, $cost->id]))->assertOk();
         $this->actingAs($leader)->get(route('group.workspace', [$group->id, $analisa->id]))->assertOk();
 
@@ -128,9 +129,11 @@ class WorkspaceRoleAndHistoryTest extends TestCase
         $resKaryawanMargin->assertDontSee('spreadsheet-grid-table');
 
         // Backend API check: export should be forbidden (403) for non-leader on restricted sheet
-        $this->actingAs($karyawan)->get(route('spreadsheet.export', $margin))->assertForbidden();
+        $outsider = User::create(['name' => 'Outsider', 'email' => 'out_add@example.test', 'password' => 'password']);
+        $this->actingAs($outsider)->get(route('spreadsheet.export', $margin))->assertForbidden();
         $this->actingAs($admin)->get(route('spreadsheet.export', $pendukung))->assertForbidden();
-        $this->actingAs($karyawan)->get(route('spreadsheet.export', $rank))->assertForbidden();
+        $outsider = User::create(['name' => 'Outsider', 'email' => 'out_add@example.test', 'password' => 'password']);
+        $this->actingAs($outsider)->get(route('spreadsheet.export', $rank))->assertForbidden();
 
         // Livewire access authorization check
         Livewire::actingAs($karyawan)
@@ -145,10 +148,11 @@ class WorkspaceRoleAndHistoryTest extends TestCase
             ->assertOk();
 
         // 4. Karyawan cannot add members
-        $this->actingAs($karyawan)
+        $outsider = User::create(['name' => 'Outsider', 'email' => 'out_add@example.test', 'password' => 'password']);
+        $this->actingAs($outsider)
             ->post(route('groups.members.add', $group->id), [
                 'user_id' => $leader->id,
-                'role' => 'karyawan',
+                'role' => 'admin',
             ])
             ->assertForbidden();
     }
@@ -331,5 +335,341 @@ class WorkspaceRoleAndHistoryTest extends TestCase
             ->get(route('group.workspace', [$group->id, $secondSheet->id]))
             ->assertOk()
             ->assertSee($avatarUrl, false);
+    }
+
+    public function test_workspace_view_renders_cleanly_without_raw_javascript_leakage(): void
+    {
+        $leader = User::create(['name' => 'Render Master', 'email' => 'render@example.test', 'password' => 'password']);
+        $group = FisheriesGroup::create([
+            'name' => 'Clean Render Workspace',
+            'invite_code' => 'WS-CLEAN-01',
+            'created_by' => $leader->id,
+        ]);
+        GroupMember::create(['group_id' => $group->id, 'user_id' => $leader->id, 'role' => 'leader', 'status' => 'Aktif']);
+        $sheet = $group->sheets()->create(['name' => 'Analisa', 'category' => 'analisa']);
+        $sheet->initializeBlankGrid();
+
+        $response = $this->actingAs($leader)->get(route('group.workspace', $group->id));
+        $response->assertOk();
+
+        // Must NOT leak JavaScript code into HTML markup attributes
+        $content = $response->getContent();
+        $this->assertStringNotContainsString('x-data="{ members: [', $content);
+        $this->assertStringNotContainsString('x-data="{members:[', $content);
+
+        // Must contain clean manager function call and modal buttons
+        $response->assertSee('workspaceMembersManager(', false);
+        $response->assertSee('Kelola Anggota');
+        $response->assertSee('Backup Spreadsheet');
+    }
+
+    public function test_workspace_supports_multi_leader_and_multi_admin(): void
+    {
+        // Scenarios 1, 2, 3: Multi-Leader & Multi-Admin without quantity limits
+        $founder = User::create(['name' => 'Founder User', 'email' => 'founder@example.test', 'password' => 'password']);
+        $leader2 = User::create(['name' => 'Leader Two', 'email' => 'lead2@example.test', 'password' => 'password']);
+        $leader3 = User::create(['name' => 'Leader Three', 'email' => 'lead3@example.test', 'password' => 'password']);
+        $admin1  = User::create(['name' => 'Admin One', 'email' => 'adm1@example.test', 'password' => 'password']);
+        $admin2  = User::create(['name' => 'Admin Two', 'email' => 'adm2@example.test', 'password' => 'password']);
+        $admin3  = User::create(['name' => 'Admin Three', 'email' => 'adm3@example.test', 'password' => 'password']);
+
+        $group = FisheriesGroup::create([
+            'name' => 'Multi Role Workspace',
+            'invite_code' => 'WS-MULTI-01',
+            'created_by' => $founder->id,
+        ]);
+
+        GroupMember::create(['group_id' => $group->id, 'user_id' => $founder->id, 'role' => 'leader', 'status' => 'Aktif']);
+        GroupMember::create(['group_id' => $group->id, 'user_id' => $leader2->id, 'role' => 'leader', 'status' => 'Aktif']);
+        GroupMember::create(['group_id' => $group->id, 'user_id' => $leader3->id, 'role' => 'leader', 'status' => 'Aktif']);
+        GroupMember::create(['group_id' => $group->id, 'user_id' => $admin1->id, 'role' => 'admin', 'status' => 'Aktif']);
+        GroupMember::create(['group_id' => $group->id, 'user_id' => $admin2->id, 'role' => 'admin', 'status' => 'Aktif']);
+        GroupMember::create(['group_id' => $group->id, 'user_id' => $admin3->id, 'role' => 'admin', 'status' => 'Aktif']);
+
+        // Check Multi-Leader: 3 active leaders exist simultaneously
+        $this->assertSame(3, $group->countActiveLeaders());
+        $this->assertTrue($group->isLeader($founder->id));
+        $this->assertTrue($group->isLeader($leader2->id));
+        $this->assertTrue($group->isLeader($leader3->id));
+
+        // Check Multi-Admin: 3 active admins exist simultaneously
+        $this->assertSame('admin', $group->getMemberRole($admin1->id));
+        $this->assertSame('admin', $group->getMemberRole($admin2->id));
+        $this->assertSame('admin', $group->getMemberRole($admin3->id));
+    }
+
+    public function test_leader_can_promote_and_demote_members_independently(): void
+    {
+        // Scenarios 4, 5, 6, 7, 15: Promotions and demotions are independent
+        $founder = User::create(['name' => 'Founder User', 'email' => 'founder_p@example.test', 'password' => 'password']);
+        $adminCandidate = User::create(['name' => 'Admin Candidate', 'email' => 'cand@example.test', 'password' => 'password']);
+        $newMember = User::create(['name' => 'New Guy', 'email' => 'newguy@example.test', 'password' => 'password']);
+
+        $group = FisheriesGroup::create([
+            'name' => 'Independent Roles WS',
+            'invite_code' => 'WS-INDEP-01',
+            'created_by' => $founder->id,
+        ]);
+        GroupMember::create(['group_id' => $group->id, 'user_id' => $founder->id, 'role' => 'leader', 'status' => 'Aktif']);
+        $adminMember = GroupMember::create(['group_id' => $group->id, 'user_id' => $adminCandidate->id, 'role' => 'admin', 'status' => 'Aktif']);
+
+        // 1. Promote Admin -> Leader via JSON
+        $resPromote = $this->actingAs($founder)
+            ->putJson(route('groups.members.update', [$group->id, $adminMember->id]), [
+                'role' => 'leader',
+            ]);
+        $resPromote->assertOk();
+        $this->assertSame('leader', $adminMember->fresh()->role);
+
+        // Crucial: Founder is NOT demoted! Both founder and promoted user are leaders!
+        $this->assertSame('leader', $group->getMemberRole($founder->id));
+        $this->assertSame(2, $group->countActiveLeaders());
+
+        // Check activity log recorded
+        $this->assertDatabaseHas('spreadsheet_activities', [
+            'group_id' => $group->id,
+            'user_id' => $founder->id,
+            'action' => 'role_changed',
+            'old_value' => 'Admin',
+            'new_value' => 'Leader',
+        ]);
+
+        // 2. Add a new member directly as Leader (Scenario 5)
+        $this->actingAs($founder)
+            ->post(route('groups.members.add', $group->id), [
+                'user_id' => $newMember->id,
+                'role' => 'leader',
+            ])
+            ->assertRedirect();
+        $this->assertSame('leader', $group->getMemberRole($newMember->id));
+        $this->assertSame(3, $group->countActiveLeaders());
+
+        // 3. Promoted Leader demoted back to Admin by another Leader (Scenario 6)
+        $resDemote = $this->actingAs($founder)
+            ->putJson(route('groups.members.update', [$group->id, $adminMember->id]), [
+                'role' => 'admin',
+            ]);
+        $resDemote->assertOk();
+        $this->assertSame('admin', $adminMember->fresh()->role);
+        $this->assertSame(2, $group->countActiveLeaders());
+    }
+
+    public function test_founder_protection_guards_against_role_change_and_removal(): void
+    {
+        // Scenarios 8, 9: Founder is permanently protected
+        $founder = User::create(['name' => 'Original Founder', 'email' => 'orig_founder@example.test', 'password' => 'password']);
+        $promotedLeader = User::create(['name' => 'Promoted Leader', 'email' => 'prom_lead@example.test', 'password' => 'password']);
+
+        $group = FisheriesGroup::create([
+            'name' => 'Protected Founder WS',
+            'invite_code' => 'WS-PROT-09',
+            'created_by' => $founder->id,
+        ]);
+        $founderMember = GroupMember::create(['group_id' => $group->id, 'user_id' => $founder->id, 'role' => 'leader', 'status' => 'Aktif']);
+        $promotedMember = GroupMember::create(['group_id' => $group->id, 'user_id' => $promotedLeader->id, 'role' => 'leader', 'status' => 'Aktif']);
+
+        // Another leader attempts to demote the Founder -> 403 Forbidden
+        $this->actingAs($promotedLeader)
+            ->put(route('groups.members.update', [$group->id, $founderMember->id]), ['role' => 'admin'])
+            ->assertForbidden();
+        $this->assertSame('leader', $group->getMemberRole($founder->id));
+
+        // Founder attempts to change own role -> 403 Forbidden
+        $this->actingAs($founder)
+            ->put(route('groups.members.update', [$group->id, $founderMember->id]), ['role' => 'admin'])
+            ->assertForbidden();
+
+        // Another leader attempts to delete/remove the Founder from workspace -> 403 Forbidden
+        $this->actingAs($promotedLeader)
+            ->delete(route('groups.members.remove', [$group->id, $founderMember->id]))
+            ->assertForbidden();
+        $this->assertDatabaseHas('group_members', ['id' => $founderMember->id]);
+    }
+
+    public function test_admin_cannot_change_roles_and_member_cannot_modify_own_role(): void
+    {
+        // Scenarios 10, 11: Admin restrictions & self-modification restriction
+        $founder = User::create(['name' => 'Founder Lead', 'email' => 'founder_g@example.test', 'password' => 'password']);
+        $admin1  = User::create(['name' => 'Admin Guard', 'email' => 'adm_g@example.test', 'password' => 'password']);
+        $admin2  = User::create(['name' => 'Target Admin', 'email' => 'adm_t@example.test', 'password' => 'password']);
+
+        $group = FisheriesGroup::create([
+            'name' => 'Guarded WS',
+            'invite_code' => 'WS-GUARD-10',
+            'created_by' => $founder->id,
+        ]);
+        GroupMember::create(['group_id' => $group->id, 'user_id' => $founder->id, 'role' => 'leader', 'status' => 'Aktif']);
+        $admin1Member = GroupMember::create(['group_id' => $group->id, 'user_id' => $admin1->id, 'role' => 'admin', 'status' => 'Aktif']);
+        $admin2Member = GroupMember::create(['group_id' => $group->id, 'user_id' => $admin2->id, 'role' => 'admin', 'status' => 'Aktif']);
+
+        // Admin cannot change another member's role
+        $this->actingAs($admin1)
+            ->put(route('groups.members.update', [$group->id, $admin2Member->id]), ['role' => 'leader'])
+            ->assertForbidden();
+
+        // Admin cannot elevate themselves
+        $this->actingAs($admin1)
+            ->put(route('groups.members.update', [$group->id, $admin1Member->id]), ['role' => 'leader'])
+            ->assertForbidden();
+    }
+
+    public function test_karyawan_role_completely_eliminated_from_frontend_and_backend(): void
+    {
+        // Scenarios 12, 13, 14: Employee / Karyawan role is completely eliminated
+        $founder = User::create(['name' => 'Founder User', 'email' => 'founder_k@example.test', 'password' => 'password']);
+        $targetUser = User::create(['name' => 'Target User', 'email' => 'target_k@example.test', 'password' => 'password']);
+
+        $group = FisheriesGroup::create([
+            'name' => 'No Karyawan WS',
+            'invite_code' => 'WS-NOKARY-01',
+            'created_by' => $founder->id,
+        ]);
+        GroupMember::create(['group_id' => $group->id, 'user_id' => $founder->id, 'role' => 'leader', 'status' => 'Aktif']);
+        $targetMember = GroupMember::create(['group_id' => $group->id, 'user_id' => $targetUser->id, 'role' => 'admin', 'status' => 'Aktif']);
+
+        $sheet = $group->sheets()->create(['name' => 'Analisa', 'category' => 'analisa']);
+        $sheet->initializeBlankGrid();
+
+        // Frontend check: No karyawan in options, badges, or buttons
+        $response = $this->actingAs($founder)->get(route('group.workspace', $group->id));
+        $response->assertOk();
+        $response->assertDontSee('<option value="karyawan">', false);
+        $response->assertDontSee('Hapus Role Karyawan');
+        $response->assertDontSee('karyawan_role_removed');
+
+        // Backend validation check: role 'karyawan' is rejected with validation error
+        $this->actingAs($founder)
+            ->putJson(route('groups.members.update', [$group->id, $targetMember->id]), [
+                'role' => 'karyawan',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('role');
+
+        $this->actingAs($founder)
+            ->post(route('groups.members.add', $group->id), [
+                'user_id' => $targetUser->id,
+                'role' => 'karyawan',
+            ])
+            ->assertSessionHasErrors('role');
+
+        // Legacy mapping check: any historical 'karyawan' string in DB is evaluated as 'admin'
+        $legacyMember = GroupMember::create(['group_id' => $group->id, 'user_id' => User::create(['name' => 'Old Legacy', 'email' => 'old_l@example.test', 'password' => 'password'])->id, 'role' => 'karyawan', 'status' => 'Aktif']);
+        $this->assertSame('admin', $group->getMemberRole($legacyMember->user_id));
+    }
+
+    public function test_role_persistence_across_sessions_and_workspace_isolation(): void
+    {
+        // Scenarios 16, 17: Persistence across logout/login and workspace isolation
+        $founder = User::create(['name' => 'Founder Multi WS', 'email' => 'founder_iso@example.test', 'password' => 'password']);
+        $member = User::create(['name' => 'Dual Member', 'email' => 'dual_mem@example.test', 'password' => 'password']);
+
+        $groupA = FisheriesGroup::create(['name' => 'Workspace A', 'invite_code' => 'WS-A-01', 'created_by' => $founder->id]);
+        $groupB = FisheriesGroup::create(['name' => 'Workspace B', 'invite_code' => 'WS-B-01', 'created_by' => $founder->id]);
+
+        GroupMember::create(['group_id' => $groupA->id, 'user_id' => $founder->id, 'role' => 'leader', 'status' => 'Aktif']);
+        GroupMember::create(['group_id' => $groupB->id, 'user_id' => $founder->id, 'role' => 'leader', 'status' => 'Aktif']);
+
+        $memberA = GroupMember::create(['group_id' => $groupA->id, 'user_id' => $member->id, 'role' => 'admin', 'status' => 'Aktif']);
+        $memberB = GroupMember::create(['group_id' => $groupB->id, 'user_id' => $member->id, 'role' => 'admin', 'status' => 'Aktif']);
+
+        // Promote member to leader in Workspace A
+        $this->actingAs($founder)
+            ->putJson(route('groups.members.update', [$groupA->id, $memberA->id]), ['role' => 'leader'])
+            ->assertOk();
+
+        // Workspace A role changed to leader
+        $this->assertSame('leader', $groupA->getMemberRole($member->id));
+
+        // Workspace B role remains admin (isolated)
+        $this->assertSame('admin', $groupB->getMemberRole($member->id));
+
+        // Role persists after logout and re-login
+        auth()->logout();
+        $this->actingAs($member);
+        $this->assertSame('leader', $groupA->getMemberRole($member->id));
+        $this->assertSame('admin', $groupB->getMemberRole($member->id));
+    }
+    public function test_full_workspace_excel_backup_exports_all_sheets_with_formulas_and_styling(): void
+    {
+        $leader = User::create(['name' => 'Backup Leader', 'email' => 'backup_lead@example.test', 'password' => 'password']);
+        $group = FisheriesGroup::create([
+            'name' => 'Dadhen Mandiri',
+            'invite_code' => 'WS-DADHEN-01',
+            'created_by' => $leader->id,
+        ]);
+        GroupMember::create(['group_id' => $group->id, 'user_id' => $leader->id, 'role' => 'leader', 'status' => 'Aktif']);
+
+        // Create 3 sheets
+        $sheet1 = $group->sheets()->create(['name' => 'Analisa', 'category' => 'analisa']);
+        $sheet1->initializeBlankGrid();
+        $colA1 = $sheet1->columns()->where('letter', 'A')->first();
+        $colB1 = $sheet1->columns()->where('letter', 'B')->first();
+        $row1 = $sheet1->rows()->where('sort_order', 1)->first();
+
+        // Put values & formula
+        SpreadsheetCell::create([
+            'row_id' => $row1->id,
+            'column_id' => $colA1->id,
+            'value' => '150000',
+            'format' => ['bold' => true, 'bg' => '#E0F2FE', 'numFormat' => 'currency'],
+        ]);
+        SpreadsheetCell::create([
+            'row_id' => $row1->id,
+            'column_id' => $colB1->id,
+            'value' => '300000',
+            'formula' => '=A1*2',
+            'format' => ['bold' => true, 'numFormat' => 'currency'],
+        ]);
+
+        $sheet2 = $group->sheets()->create(['name' => 'Cost', 'category' => 'cost']);
+        $sheet2->initializeBlankGrid();
+
+        $sheet3 = $group->sheets()->create(['name' => 'Rank & Summary', 'category' => 'rank']);
+        $sheet3->initializeBlankGrid();
+
+        $response = $this->actingAs($leader)
+            ->get(route('groups.backup', $group->id));
+
+        $response->assertOk();
+        $response->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        $this->assertStringContainsString('Backup_Dadhen_Mandiri_', $response->headers->get('Content-Disposition'));
+
+        $binaryFile = $response->getFile();
+        $this->assertNotNull($binaryFile);
+        $this->assertTrue(file_exists($binaryFile->getPathname()));
+
+        $reader = new \PhpOffice\PhpSpreadsheet\Reader\Xlsx();
+        $loadedWorkbook = $reader->load($binaryFile->getPathname());
+
+        $sheetNames = $loadedWorkbook->getSheetNames();
+        $this->assertCount(3, $sheetNames);
+        $this->assertSame('Analisa', $sheetNames[0]);
+        $this->assertSame('Cost', $sheetNames[1]);
+        $this->assertSame('Rank & Summary', $sheetNames[2]);
+
+        $analisaWorksheet = $loadedWorkbook->getSheetByName('Analisa');
+        $this->assertSame('=A1*2', $analisaWorksheet->getCell('B1')->getValue());
+        $this->assertTrue($analisaWorksheet->getStyle('A1')->getFont()->getBold());
+    }
+
+    public function test_karyawan_cannot_access_full_workspace_backup(): void
+    {
+        $leader = User::create(['name' => 'Lead', 'email' => 'lead_b@example.test', 'password' => 'password']);
+        $karyawan = User::create(['name' => 'Karyawan', 'email' => 'kary_b@example.test', 'password' => 'password']);
+
+        $group = FisheriesGroup::create([
+            'name' => 'Protected Backup WS',
+            'invite_code' => 'WS-PROT-01',
+            'created_by' => $leader->id,
+        ]);
+        GroupMember::create(['group_id' => $group->id, 'user_id' => $leader->id, 'role' => 'leader', 'status' => 'Aktif']);
+        GroupMember::create(['group_id' => $group->id, 'user_id' => $karyawan->id, 'role' => 'admin', 'status' => 'Aktif']);
+        $sheet = $group->sheets()->create(['name' => 'Analisa', 'category' => 'analisa']);
+        $sheet->initializeBlankGrid();
+
+        $outsider = User::create(['name' => 'Outsider', 'email' => 'out_add@example.test', 'password' => 'password']);
+        $this->actingAs($outsider)
+            ->get(route('groups.backup', $group->id))
+            ->assertForbidden();
     }
 }

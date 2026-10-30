@@ -188,7 +188,7 @@
     activeModal: <?php echo \Illuminate\Support\Js::from(session('workspace_exit_target') ? 'modal-exit-verification' : (request()->query('open') === 'friends' ? 'modal-friend' : null))->toHtml() ?>,
     workspaceExitGroupId: <?php echo \Illuminate\Support\Js::from(
         isset($group, $userRole)
-            && in_array($userRole, ['admin', 'karyawan'], true)
+            && $userRole === 'admin'
             && (int) session('admin_workspace_context.user_id', session('workspace_exit_context.user_id')) === (int) Auth::id()
             && (int) session('admin_workspace_context.group_id', session('workspace_exit_context.group_id')) === (int) $group->id
                 ? $group->id
@@ -370,7 +370,7 @@
         });
     }
 }" @toast.window="triggerToast($event.detail.message, $event.detail.type || 'info')"
-   <?php if(isset($group, $userRole) && in_array($userRole, ['admin', 'karyawan'], true)): ?> @click.capture="guardWorkspaceNavigation($event)" <?php endif; ?>
+   <?php if(isset($group, $userRole) && $userRole === 'admin'): ?> @click.capture="guardWorkspaceNavigation($event)" <?php endif; ?>
    @open-user-profile.window="openUserProfile($event.detail.userId)"
    x-init="
        <?php if(session('error')): ?> exitErrorMessage = <?php echo \Illuminate\Support\Js::from(session('error'))->toHtml() ?>; <?php endif; ?>
@@ -432,7 +432,7 @@
                         Beranda / Ringkasan
                     </a>
 
-                    <button @click="<?php if(isset($group, $userRole) && in_array($userRole, ['admin', 'karyawan'], true)): ?> requestWorkspaceExit('<?php echo e(route('dashboard', ['open' => 'friends'])); ?>') <?php else: ?> activeModal = 'modal-friend' <?php endif; ?>"
+                    <button @click="<?php if(isset($group, $userRole) && $userRole === 'admin'): ?> requestWorkspaceExit('<?php echo e(route('dashboard', ['open' => 'friends'])); ?>') <?php else: ?> activeModal = 'modal-friend' <?php endif; ?>"
                             class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800/60 hover:text-white transition-all text-left">
                         <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
@@ -615,7 +615,7 @@
         </main>
     </div>
 
-    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(isset($group, $userRole) && in_array($userRole, ['admin', 'karyawan'], true)): ?>
+    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(isset($group, $userRole) && $userRole === 'admin'): ?>
         <div x-show="activeModal === 'modal-exit-verification' || activeModal === 'modal-admin-exit'" x-transition.opacity
              class="fixed inset-0 z-[1100] overflow-y-auto" x-cloak role="dialog" aria-modal="true"
              aria-labelledby="exit-verification-title" @keydown.escape.window="cancelExit()">

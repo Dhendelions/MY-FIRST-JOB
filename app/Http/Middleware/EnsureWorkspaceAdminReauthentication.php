@@ -18,6 +18,7 @@ class EnsureWorkspaceAdminReauthentication
 
         if (!$isLogoutRequest && in_array($request->route()?->getName(), [
             'spreadsheet.export',
+            'groups.backup',
             'friends.list',
             'friends.search',
             'groups.users.search',
@@ -32,7 +33,7 @@ class EnsureWorkspaceAdminReauthentication
 
         $group = FisheriesGroup::find($context['group_id'] ?? null);
         $role = $group?->getMemberRole($request->user()->id);
-        if (!$group || !in_array($role, ['admin', 'karyawan'], true)) {
+        if (!$group || $role !== 'admin') {
             $request->session()->forget(['admin_workspace_context', 'workspace_exit_context']);
             return $next($request);
         }

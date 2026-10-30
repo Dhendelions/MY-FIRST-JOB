@@ -23,6 +23,7 @@ use App\Models\Notification;
 use App\Services\SpreadsheetFormulaReferenceRewriter;
 use App\Services\SpreadsheetWorkbookCalculator;
 use App\Services\SpreadsheetActivityRecorder;
+use App\Services\SpreadsheetXlsxExporter;
 
 class GroupController extends Controller
 {
@@ -76,9 +77,9 @@ class GroupController extends Controller
             || ($userRole !== 'admin' && $group->hasPassword() && !$group->isUnlockedForSession());
 
         $canAccessWorkspace = ($userRole === 'admin' && !$requiresAdminAccountVerification)
-            || ($userRole === 'karyawan' && (!$group->hasPassword() || $group->isUnlockedForSession()));
+            || ($userRole === 'leader' && (!$group->hasPassword() || $group->isUnlockedForSession()));
 
-        if (in_array($userRole, ['admin', 'karyawan'], true) && $canAccessWorkspace && $activeSheet) {
+        if ($userRole === 'admin' && $canAccessWorkspace && $activeSheet) {
             $context = [
                 'user_id' => $user->id,
                 'group_id' => $group->id,
@@ -89,8 +90,22 @@ class GroupController extends Controller
             $request->session()->put('workspace_exit_context', $context);
         }
 
-        // 4. Load members from database with normalized roles
+        // 4. Load members from database with normalized roles (Leader & Admin only)
         $members = $group->members()->with('user')->orderBy('joined_at')->get();
+        $managedMembers = $members->map(function ($m) use ($group) {
+            $normalizedRole = $group->getMemberRole($m->user_id) ?? 'admin';
+            return [
+                'id' => $m->id,
+                'user_id' => $m->user_id,
+                'user_name' => $m->user?->name ?? 'Pengguna',
+                'user_avatar' => $m->user?->avatar_url,
+                'user_title' => $m->user?->role_title ?? 'Anggota Tim',
+                'role' => $normalizedRole,
+                'pending_role' => $normalizedRole,
+                'is_founder' => $group->isFounder($m->user_id),
+                'status' => $m->status,
+            ];
+        })->values()->all();
 
         // 5. User's joined workspaces for sidebar switcher
         $userGroups = $user->groups()->with('sheets')->get();
@@ -100,6 +115,7 @@ class GroupController extends Controller
             'sheets',
             'activeSheet',
             'members',
+            'managedMembers',
             'userRole',
             'userGroups',
             'requiresPasswordSetup',
@@ -147,7 +163,7 @@ class GroupController extends Controller
             $request->session()->put('sheet_unlocked_' . $sheet->id, true);
         }
 
-        if (in_array($role, ['admin', 'karyawan'], true)) {
+        if ($role === 'admin') {
             $context = [
                 'user_id' => $user->id,
                 'group_id' => $group->id,
@@ -175,7 +191,7 @@ class GroupController extends Controller
             is_array($context)
                 && (int) ($context['user_id'] ?? 0) === (int) Auth::id()
                 && (int) ($context['group_id'] ?? 0) === $group->id
-                && in_array($userRole, ['admin', 'karyawan'], true),
+                && $userRole === 'admin',
             403,
             'Verifikasi keluar tidak berlaku untuk workspace ini.'
         );
@@ -288,7 +304,7 @@ class GroupController extends Controller
         $validated = $request->validate([
             'user_id' => ['nullable', 'integer', 'exists:users,id'],
             'email_or_phone' => ['nullable', 'string'],
-            'role' => ['required', 'string', 'in:leader,admin,karyawan'],
+            'role' => ['required', 'string', 'in:leader,admin'],
         ], [
             'role.required' => 'Pilih peran anggota yang akan ditambahkan.',
             'role.in' => 'Peran yang dipilih tidak valid.',
@@ -360,40 +376,115 @@ class GroupController extends Controller
     }
 
     /**
-     * Update an existing member's role.
+     * Update a member's role (Leader only).
+     *
+     * In the Multi-Leader & Multi-Admin system:
+     * - Only Leaders can change roles.
+     * - Leaders can promote members to Leader.
+     * - Leaders can demote promoted Leaders to Admin.
+     * - Leaders can change Admins to Leader and vice-versa.
+     * - Founder (workspace creator) is permanently protected and cannot be changed.
+     * - Members cannot change their own role.
+     * - No transfer of leadership: promotions/demotions are independent.
      */
     public function updateMemberRole(Request $request, FisheriesGroup $group, GroupMember $member)
     {
         $validated = $request->validate([
-            'role' => ['required', 'string', 'in:leader,admin,karyawan'],
+            'role' => ['required', 'string', 'in:leader,admin'],
+        ], [
+            'role.required' => 'Pilih peran yang valid.',
+            'role.in'       => 'Peran yang dipilih tidak dikenali oleh sistem.',
         ]);
 
-        Gate::authorize('changeRole', [$group, $member, $validated['role']]);
+        $newRole = $validated['role'];
+        $user    = Auth::user();
 
-        $oldRole = $member->role;
-        $member->update(['role' => $validated['role']]);
+        // 1. Authorization – only Leader may change roles (enforced in Policy)
+        Gate::authorize('changeRole', [$group, $member, $newRole]);
 
+        // 2. Extra guard: ensure target member belongs to this workspace
+        if ($member->group_id !== $group->id) {
+            abort(403, 'Anggota tidak terdaftar dalam workspace ini.');
+        }
+
+        // 3. Founder protection: creator role is permanently fixed
+        if ($group->isFounder($member->user_id)) {
+            abort(403, 'Role pembuat workspace (Founder) tidak dapat diubah.');
+        }
+
+        // 4. Cannot change own role
+        if ($member->user_id === $user->id) {
+            abort(403, 'Tidak dapat mengubah peran milik diri sendiri.');
+        }
+
+        $oldRole       = strtolower(trim($member->role));
+        $normalizedOld = $group->getMemberRole($member->user_id) ?? $oldRole;
+
+        // 5. Nothing to change
+        if ($normalizedOld === $newRole) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message'     => 'Peran anggota sudah sama. Tidak ada perubahan.',
+                    'new_role'    => $newRole,
+                    'member_id'   => $member->id,
+                    'target_name' => $member->user?->name,
+                ]);
+            }
+            return back()->with('info', 'Peran anggota sudah sama. Tidak ada perubahan yang disimpan.');
+        }
+
+        // 6. Independent role change (Multi-Leader & Multi-Admin)
+        DB::transaction(function () use ($member, $newRole) {
+            $member->update(['role' => $newRole]);
+        });
+
+        // 7. Activity Log
         app(SpreadsheetActivityRecorder::class)->recordWorkspace(
-            Auth::user(),
+            $user,
             $group,
             'role_changed',
-            ucfirst($oldRole),
-            ucfirst($validated['role']),
-            ['target_user_name' => $member->user?->name, 'target_user_id' => $member->user_id, 'old_role' => $oldRole, 'new_role' => $validated['role']]
+            ucfirst($normalizedOld),
+            ucfirst($newRole),
+            [
+                'actor_name'       => $user->name,
+                'actor_id'         => $user->id,
+                'target_user_name' => $member->user?->name,
+                'target_user_id'   => $member->user_id,
+                'old_role'         => $normalizedOld,
+                'new_role'         => $newRole,
+                'workspace_id'     => $group->id,
+                'workspace_name'   => $group->name,
+            ]
         );
 
-        return back()->with('success', "Peran anggota berhasil diperbarui menjadi {$validated['role']}.");
+        $actionText = $newRole === 'leader' ? 'dipromosikan menjadi Leader' : 'diubah menjadi Admin';
+        $successMsg = "Peran {$member->user?->name} berhasil {$actionText}.";
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message'     => $successMsg,
+                'new_role'    => $newRole,
+                'member_id'   => $member->id,
+                'target_name' => $member->user?->name,
+            ]);
+        }
+
+        return back()->with('success', $successMsg);
     }
 
     /**
-     * Remove a member from the workspace.
+     * Remove a member from the workspace (Leader only, cannot remove Founder).
      */
     public function removeMember(Request $request, FisheriesGroup $group, GroupMember $member)
     {
         Gate::authorize('removeMember', [$group, $member]);
 
-        $name = $member->user ? $member->user->name : 'Anggota';
-        $oldRole = $member->role;
+        if ($group->isFounder($member->user_id)) {
+            abort(403, 'Pembuat workspace (Founder) tidak dapat dihapus dari workspace.');
+        }
+
+        $name         = $member->user ? $member->user->name : 'Anggota';
+        $oldRole      = $group->getMemberRole($member->user_id) ?? strtolower(trim($member->role));
         $memberUserId = $member->user_id;
         $member->delete();
 
@@ -406,7 +497,81 @@ class GroupController extends Controller
             ['removed_user_name' => $name, 'removed_user_id' => $memberUserId, 'role' => $oldRole]
         );
 
-        return back()->with('success', "{$name} telah dikeluarkan dari workspace.");
+        $msg = "{$name} telah dikeluarkan dari workspace.";
+
+        if ($request->expectsJson()) {
+            return response()->json(['message' => $msg, 'member_id' => $member->id]);
+        }
+
+        return back()->with('success', $msg);
+    }
+
+    /**
+     * Backup all worksheets of the workspace into a single high-fidelity XLSX file.
+     */
+    public function backupXlsx(Request $request, FisheriesGroup $group, SpreadsheetXlsxExporter $exporter)
+    {
+        $user = Auth::user();
+        if (!$group->isMember($user->id)) {
+            abort(403, 'Akses ditolak: Anda bukan anggota resmi dari workspace ini.');
+        }
+
+        $userRole = $group->getMemberRole($user->id);
+        if (!in_array($userRole, ['leader', 'admin'], true)) {
+            abort(403, 'Akses dibatasi: Hanya Leader dan Admin yang memiliki izin untuk mem-backup seluruh spreadsheet.');
+        }
+
+        $sheetsCount = $group->sheets()->count();
+        if ($sheetsCount === 0) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Workspace tidak memiliki lembar kerja untuk di-backup.'], 422);
+            }
+            return back()->with('error', 'Workspace tidak memiliki lembar kerja untuk di-backup.');
+        }
+
+        $sanitizedName = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $group->name);
+        $sanitizedName = trim(preg_replace('/_+/', '_', $sanitizedName), '_');
+        if ($sanitizedName === '') {
+            $sanitizedName = 'Workspace_' . $group->id;
+        }
+
+        $filename = "Backup_{$sanitizedName}_" . date('Y-m-d') . '.xlsx';
+        $tempPath = tempnam(sys_get_temp_dir(), 'ws_backup_');
+        $xlsxPath = $tempPath . '.xlsx';
+        @unlink($tempPath);
+
+        try {
+            $exporter->saveWorkbook($group, $xlsxPath);
+
+            app(SpreadsheetActivityRecorder::class)->recordWorkspace(
+                $user,
+                $group,
+                'workspace_backup_downloaded',
+                'Backup Seluruh Spreadsheet',
+                $filename,
+                [
+                    'sheet_count' => $sheetsCount,
+                    'filename' => $filename,
+                ]
+            );
+
+            return response()->download($xlsxPath, $filename, [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            ])->deleteFileAfterSend(true);
+        } catch (\Throwable $e) {
+            @unlink($xlsxPath);
+            Log::error('Full workspace backup failed: ' . $e->getMessage(), [
+                'group_id' => $group->id,
+                'user_id' => $user->id,
+                'exception' => $e,
+            ]);
+
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Terjadi kesalahan saat memproses backup: ' . $e->getMessage()], 500);
+            }
+
+            return back()->with('error', 'Terjadi kesalahan saat memproses backup spreadsheet.');
+        }
     }
 
     /**

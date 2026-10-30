@@ -3,6 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Add an index on `formula` to speed up the EXISTS check in
@@ -11,6 +12,9 @@ use Illuminate\Support\Facades\Schema;
  *
  * The composite index (row_id, formula) allows the engine to satisfy
  * both predicates with a single index range scan.
+ *
+ * Fixed: replaced getDoctrineSchemaManager() (requires doctrine/dbal, removed
+ * in Laravel 11) with a raw information_schema query.
  */
 return new class extends Migration
 {
@@ -18,9 +22,7 @@ return new class extends Migration
     {
         Schema::table('spreadsheet_cells', function (Blueprint $table) {
             // Skip if the index already exists (idempotent migration).
-            $sm = Schema::getConnection()->getDoctrineSchemaManager();
-            $existingIndexes = array_keys($sm->listTableIndexes('spreadsheet_cells'));
-            if (!in_array('spreadsheet_cells_row_id_formula_index', $existingIndexes, true)) {
+            if (!$this->indexExists('spreadsheet_cells', 'spreadsheet_cells_row_id_formula_index')) {
                 $table->index(['row_id', 'formula'], 'spreadsheet_cells_row_id_formula_index');
             }
         });
@@ -29,7 +31,33 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('spreadsheet_cells', function (Blueprint $table) {
-            $table->dropIndex('spreadsheet_cells_row_id_formula_index');
+            if ($this->indexExists('spreadsheet_cells', 'spreadsheet_cells_row_id_formula_index')) {
+                $table->dropIndex('spreadsheet_cells_row_id_formula_index');
+            }
         });
+    }
+
+    /**
+     * Check whether a named index exists on the given table.
+     * Uses Schema::hasIndex with MySQL information_schema fallback.
+     */
+    private function indexExists(string $table, string $indexName): bool
+    {
+        if (method_exists(Schema::getFacadeRoot(), 'hasIndex') && Schema::hasIndex($table, $indexName)) {
+            return true;
+        }
+
+        if (DB::getDriverName() === 'mysql') {
+            $dbName  = config('database.connections.' . config('database.default') . '.database');
+            $results = DB::select(
+                "SELECT INDEX_NAME FROM information_schema.STATISTICS
+                 WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND INDEX_NAME = ?
+                 LIMIT 1",
+                [$dbName, $table, $indexName]
+            );
+            return count($results) > 0;
+        }
+
+        return false;
     }
 };

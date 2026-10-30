@@ -85,7 +85,9 @@
     </div>
 
     <!-- GRID TABEL SPREADSHEET (MICROSOFT EXCEL LOOK & FEEL) -->
-    <div class="flex-1 overflow-auto min-h-0 min-w-0 bg-slate-200 select-text relative spreadsheet-scroll" aria-label="Area kerja spreadsheet">
+    <div class="flex-1 overflow-auto min-h-0 min-w-0 bg-slate-200 select-text relative spreadsheet-scroll"
+         aria-label="Area kerja spreadsheet"
+         @scroll.passive="maybeExtendGrid($event)">
         <table class="spreadsheet-table bg-white w-max table-fixed text-xs border-separate border-spacing-0">
             <colgroup>
                 <col style="width: 48px; min-width: 48px; max-width: 48px;">
@@ -289,7 +291,7 @@
                                 wire:key="grid-cell-<?php echo e($coord); ?>"
                                 style="height:<?php echo e(!empty($row['height']) ? (float) $row['height'] * 1.333333 : $defaultRowHeightPx); ?>px; <?php echo e($bgColor ? "background-color: {$bgColor}; " : ''); ?><?php echo e($cellsStyleCss[$cellKey] ?? ''); ?><?php echo e($stickyStyle); ?>" 
                                 class="grid-cell-td p-0 relative bg-white select-none outline-none border-b border-r border-slate-200/60 <?php echo e($coord === ($activeCellCoord ?? 'A1') ? 'is-selected' : ''); ?>"
-                                @click="selectCell(<?php echo e(\Illuminate\Support\Js::from($coord)); ?>, <?php echo e($row['id'] ?? 'null'); ?>, <?php echo e($col['id'] ?? 'null'); ?>, <?php echo e($rIdx); ?>, <?php echo e($cIdx); ?>, <?php echo e($row['sort_order']); ?>, <?php echo e($col['sort_order']); ?>, <?php echo e(\Illuminate\Support\Js::from((string) $formula)); ?>, <?php echo e(\Illuminate\Support\Js::from((string) $val)); ?>, <?php echo e(\Illuminate\Support\Js::from((string) ($cellsDisplay[$cellKey] ?? $val))); ?>); if (<?php echo e($rIdx); ?> >= <?php echo e(count($gridRows) - 5); ?>) $wire.extendGrid('row'); if (<?php echo e($cIdx); ?> >= <?php echo e(count($gridColumns) - 3); ?>) $wire.extendGrid('column');"
+                                @click="selectCell(<?php echo e(\Illuminate\Support\Js::from($coord)); ?>, <?php echo e($row['id'] ?? 'null'); ?>, <?php echo e($col['id'] ?? 'null'); ?>, <?php echo e($rIdx); ?>, <?php echo e($cIdx); ?>, <?php echo e($row['sort_order']); ?>, <?php echo e($col['sort_order']); ?>, <?php echo e(\Illuminate\Support\Js::from((string) $formula)); ?>, <?php echo e(\Illuminate\Support\Js::from((string) $val)); ?>, <?php echo e(\Illuminate\Support\Js::from((string) ($cellsDisplay[$cellKey] ?? $val))); ?>); if (<?php echo e($rIdx); ?> >= <?php echo e(count($gridRows) - 5); ?>) extendGrid('row'); if (<?php echo e($cIdx); ?> >= <?php echo e(count($gridColumns) - 3); ?>) extendGrid('column');"
                                 @dblclick="startEditCell(<?php echo e(\Illuminate\Support\Js::from($coord)); ?>, <?php echo e($row['id'] ?? 'null'); ?>, <?php echo e($col['id'] ?? 'null'); ?>, <?php echo e($row['sort_order']); ?>, <?php echo e($col['sort_order']); ?>, <?php echo e(\Illuminate\Support\Js::from((string) ($formula ?: $val))); ?>)"
                                 @paste="if (<?php echo e(!empty($row['id']) && !empty($col['id']) ? 'true' : 'false'); ?>) handlePaste($event, <?php echo e($row['id'] ?? 0); ?>, <?php echo e($col['id'] ?? 0); ?>)"
                                 title="<?php echo e($hasFormula ? 'Formula: ' . $cellFormula : (!empty($format['external_reference']) ? 'Formula merujuk workbook eksternal; nilai tersimpan tidak dapat dihitung ulang tanpa sumber eksternal.' : '')); ?>">
