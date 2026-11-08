@@ -8,12 +8,73 @@
         renameSheetId: null,
         renameSheetName: '',
         unlockSheetId: {{ $activeSheet?->id ?? 'null' }},
-        workspacePasswordError: ''
+        workspacePasswordError: '',
+        workspaceIsUnlocked: {{ $requiresPasswordUnlock ? 'false' : 'true' }},
+        adminVerifiedSheetIds: {!! json_encode($requiresPasswordUnlock ? [] : ($activeSheet ? [$activeSheet->id] : [])) !!},
+        isSubmittingUnlock: false,
+        submitUnlock(event) {
+            const form = event.target;
+            const passwordInput = form.elements.password;
+            this.workspacePasswordError = '';
+            this.isSubmittingUnlock = true;
+
+            fetch(form.action, {
+                method: 'POST',
+                body: new FormData(form),
+                headers: { 
+                    'Accept': 'application/json', 
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.getAttribute('content') || ''
+                }
+            })
+            .then(async response => {
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    const validationError = Object.values(result.errors || {}).flat()[0];
+                    throw new Error(result.message || validationError || 'Password salah. Silakan coba lagi.');
+                }
+                return result;
+            })
+            .then(result => {
+                this.workspaceIsUnlocked = true;
+                this.workspaceModal = null;
+                this.isSubmittingUnlock = false;
+                if (passwordInput) passwordInput.value = '';
+
+                const redirectUrl = result.redirect || window.location.href;
+                try {
+                    const targetUrl = new URL(redirectUrl, window.location.origin);
+                    const currentUrl = new URL(window.location.href);
+                    if (targetUrl.pathname === currentUrl.pathname && targetUrl.search === currentUrl.search) {
+                        window.location.reload();
+                    } else {
+                        window.location.href = redirectUrl;
+                    }
+                } catch (e) {
+                    window.location.reload();
+                }
+            })
+            .catch(error => {
+                this.isSubmittingUnlock = false;
+                if (passwordInput) passwordInput.value = '';
+                this.workspacePasswordError = error.message || 'Verifikasi password gagal. Silakan coba lagi.';
+                this.$nextTick(() => {
+                    if (this.$refs.unlockPassword) this.$refs.unlockPassword.focus();
+                });
+            });
+        }
      }" 
      @open-add-sheet-modal.window="workspaceModal = 'modal-add-sheet'"
      @open-rename-modal.window="renameSheetId = $event.detail.id; renameSheetName = $event.detail.name; workspaceModal = 'modal-rename-sheet'"
      @if($userRole !== 'leader')
-     @sheet-switch.window="unlockSheetId = $event.detail.sheetId; workspaceModal = 'modal-password-unlock'; $nextTick(() => $refs.unlockPassword.focus())"
+     @sheet-switch.window="
+         const _sid = $event.detail.sheetId;
+         if (!workspaceIsUnlocked) {
+             unlockSheetId = _sid;
+             workspaceModal = 'modal-password-unlock';
+             $nextTick(() => $refs.unlockPassword && $refs.unlockPassword.focus());
+         }
+     "
      @endif>
 
     @persist('workspace-header-' . $group->id)
@@ -34,6 +95,15 @@
                 </div>
 
                 <div class="space-y-1">
+                    @if(isset($currentMonthlyWorkspace))
+                        <div class="flex items-center gap-1.5 text-xs font-semibold text-sky-600">
+                            <a href="{{ route('dashboard') }}" class="hover:underline">PT Dadhen Mandiri</a>
+                            <span class="text-slate-300">/</span>
+                            <a href="{{ route('company.year', $currentMonthlyWorkspace->year->year) }}" class="hover:underline">Workspace {{ $currentMonthlyWorkspace->year->year }}</a>
+                            <span class="text-slate-300">/</span>
+                            <span class="text-slate-800">{{ $currentMonthlyWorkspace->name }}</span>
+                        </div>
+                    @endif
                     <h1 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">{{ $group->name }}</h1>
                     <div class="flex flex-wrap items-center gap-3 text-xs text-slate-500">
                         <span>Peran Anda: <strong class="text-slate-800 uppercase font-mono">{{ $userRole }}</strong></span>
@@ -102,8 +172,81 @@
                 @endif
             </div>
         </div>
+
+        @if(isset($operationalYears) && $operationalYears->isNotEmpty())
+            <!-- Dynamic Year & Month Hierarchy Navigator -->
+            <div class="mt-3 pt-3 border-t border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+                <!-- Year Selector Pills -->
+                <div class="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0">
+                    <span class="text-slate-400 font-semibold uppercase tracking-wider text-[10px] shrink-0">Tahun:</span>
+                    @foreach($operationalYears as $opY)
+                        @php
+                            $isCurrentYear = $currentMonthlyWorkspace && $currentMonthlyWorkspace->year_id === $opY->id;
+                            $targetMonthNum = $currentMonthlyWorkspace ? $currentMonthlyWorkspace->month : 10;
+                            $targetMw = $opY->monthlyWorkspaces->firstWhere("month", $targetMonthNum) ?? $opY->monthlyWorkspaces->first();
+                        @endphp
+                        @if($targetMw)
+                            <a href="{{ route("group.workspace", $targetMw->group_id) }}" 
+                               class="px-2.5 py-1 rounded-lg font-bold transition-all shrink-0 flex items-center gap-1 {{ $isCurrentYear ? "bg-[#0A192F] text-sky-400 shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200" }}">
+                                <span>{{ $opY->year }}</span>
+                                @if($opY->is_archived)
+                                    <span class="text-[9px] px-1 py-0.2 rounded font-normal {{ $isCurrentYear ? "bg-amber-400/20 text-amber-300" : "bg-amber-100 text-amber-700" }}">Arsip</span>
+                                @endif
+                            </a>
+                        @endif
+                    @endforeach
+
+                    @if(Auth::user()->isOwner())
+                        <button type="button" 
+                                @click="workspaceModal = 'modal-add-year'"
+                                class="px-2.5 py-1 rounded-lg font-bold text-xs bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-200 transition-all shrink-0 flex items-center gap-1 shadow-xs ml-1"
+                                title="Tambah Tahun Operasional Baru">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                            <span>+ Add Year</span>
+                        </button>
+                    @endif
+                </div>
+
+                <!-- Month Selector Pills for Current Year -->
+                @php
+                    $activeYearModel = $currentMonthlyWorkspace ? $currentMonthlyWorkspace->year : $operationalYears->first();
+                @endphp
+                @if($activeYearModel)
+                    <div class="flex items-center gap-1 overflow-x-auto pb-1 md:pb-0">
+                        <span class="text-slate-400 font-semibold uppercase tracking-wider text-[10px] shrink-0 mr-1">Bulan:</span>
+                        @foreach($activeYearModel->monthlyWorkspaces as $mWork)
+                            @php
+                                $isCurrentMonth = $group->id === $mWork->group_id;
+                            @endphp
+                            <a href="{{ route("group.workspace", $mWork->group_id) }}" 
+                               title="{{ $mWork->name }} {{ $activeYearModel->year }}"
+                               class="px-2 py-1 rounded-md text-[11px] font-semibold transition-all shrink-0 {{ $isCurrentMonth ? "bg-sky-600 text-white shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900" }}">
+                                {{ substr($mWork->name, 0, 3) }}
+                            </a>
+                        @endforeach
+                    </div>
+                @endif
+            </div>
+        @endif
     </div>
     @endpersist
+
+    @if($group->isArchived())
+        <div class="px-4 py-2.5 bg-amber-50 border-b border-amber-200 flex flex-wrap items-center justify-between gap-3 text-xs text-amber-900 shrink-0">
+            <div class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-amber-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                <span><strong>Tahun Operasional Diarsipkan:</strong> Seluruh lembar kerja pada periode ini berada dalam mode <em>Hanya Baca (Read-Only)</em>. Pengubahan data dinonaktifkan.</span>
+            </div>
+            @if(Auth::user()->isOwner() && isset($currentMonthlyWorkspace))
+                <form action="{{ route("company.years.restore", $currentMonthlyWorkspace->year_id) }}" method="POST" class="inline">
+                    @csrf
+                    <button type="submit" class="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-xs shadow-xs transition-colors">
+                        Pulihkan Tahun Ini
+                    </button>
+                </form>
+            @endif
+        </div>
+    @endif
 
     <!-- Sheet tabs are now only at the bottom via the Livewire component -->
 
@@ -739,21 +882,39 @@
         </div>
     @endif
 
-    @if($requiresPasswordUnlock)
-        <div x-init="workspaceModal = 'modal-password-unlock'"></div>
+    @if($requiresPasswordConfiguration)
+        <div x-init="workspaceModal = 'modal-password-not-configured'"></div>
+        <div x-show="workspaceModal === 'modal-password-not-configured'" class="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 p-4" x-cloak role="dialog" aria-modal="true">
+            <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+                <h3 class="text-base font-bold text-slate-900">Password Workspace Belum Diatur</h3>
+                <p class="mt-2 text-sm text-slate-600">Admin hanya dapat masuk setelah Owner atau Leader menetapkan password workspace.</p>
+            </div>
+        </div>
+    @endif
+
+    @if($requiresPasswordUnlock && $group->hasPassword())
+        <div x-init="
+            if (!workspaceIsUnlocked) {
+                workspaceModal = 'modal-password-unlock';
+                $nextTick(() => $refs.unlockPassword && $refs.unlockPassword.focus());
+            }
+        "></div>
         <div x-show="workspaceModal === 'modal-password-unlock'" x-transition.opacity class="fixed inset-0 z-[60] overflow-y-auto" x-cloak role="dialog" aria-modal="true" aria-labelledby="password-unlock-title" @keydown.escape.prevent @wheel.prevent @touchmove.prevent>
             <div class="flex items-center justify-center min-h-screen px-4 py-8">
                 <div class="fixed inset-0 bg-slate-950/50 backdrop-blur-sm" aria-hidden="true"></div>
                 <div x-transition.scale.origin.center x-ref="passwordUnlockDialog" class="relative bg-white rounded-2xl max-w-md w-full p-6 text-left shadow-2xl border border-slate-100">
-                    <h3 id="password-unlock-title" class="text-base font-bold text-slate-900">{{ $userRole === 'admin' ? 'Verifikasi Password Akun' : 'Masukkan Password Workspace' }}</h3>
-                    <p class="text-xs text-slate-500 mt-1">{{ $userRole === 'admin' ? 'Admin wajib memasukkan password akun untuk membuka setiap lembar kerja.' : 'Password diperlukan setiap kali Anda masuk kembali ke workspace.' }}</p>
-                    <form action="{{ route('groups.unlock', $group->id) }}" method="POST" @submit.prevent="unlockWorkspace($event)" class="mt-5 space-y-4">
+                    <h3 id="password-unlock-title" class="text-base font-bold text-slate-900">Masukkan Password Workspace</h3>
+                    <p class="text-xs text-slate-500 mt-1">Password diperlukan setiap kali Anda masuk ke workspace ini.</p>
+                    <form action="{{ route('groups.unlock', $group->id) }}" method="POST" @submit.prevent="submitUnlock($event)" class="mt-5 space-y-4">
                         @csrf
                         <input type="hidden" name="sheet_id" :value="unlockSheetId">
-                        <input x-ref="unlockPassword" x-init="if ({{ $requiresPasswordUnlock ? 'true' : 'false' }}) $nextTick(() => $el.focus())" type="password" name="password" required autocomplete="off" autofocus placeholder="{{ $userRole === 'admin' ? 'Password akun Anda' : 'Password workspace' }}"
+                        <input x-ref="unlockPassword" x-init="if ({{ $requiresPasswordUnlock ? 'true' : 'false' }}) $nextTick(() => $el.focus())" type="password" name="password" required autocomplete="off" autofocus placeholder="Password workspace"
                             class="w-full text-sm px-3.5 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:outline-none">
                         <p x-show="workspacePasswordError" x-text="workspacePasswordError" class="text-xs text-rose-600" role="alert"></p>
-                        <button type="submit" class="w-full px-5 py-2.5 rounded-xl text-xs font-semibold bg-sky-600 hover:bg-sky-500 text-white">Masuk ke Workspace</button>
+                        <button type="submit" :disabled="isSubmittingUnlock" class="w-full px-5 py-2.5 rounded-xl text-xs font-semibold bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white transition-colors flex items-center justify-center gap-2">
+                            <span x-show="isSubmittingUnlock" class="inline-block w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                            <span x-text="isSubmittingUnlock ? 'Memverifikasi...' : 'Masuk ke Workspace'">Masuk ke Workspace</span>
+                        </button>
                     </form>
                 </div>
             </div>

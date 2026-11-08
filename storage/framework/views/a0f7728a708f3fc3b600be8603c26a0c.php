@@ -372,7 +372,7 @@
                     ?>
                     <div class="relative group/tab flex items-center">
                         <a wire:navigate href="<?php echo e(route('group.workspace', [$sheet->group_id, $sh->id])); ?>"
-                           <?php if(($memberRole === 'admin' || (!$isLeader && $sheet->group->hasPassword())) && $sh->id !== $sheetId && !$shRestricted): ?>
+                           <?php if($sheet->group->hasPassword() && !$sheet->group->isUnlockedForSession() && $sh->id !== $sheetId && !$shRestricted): ?>
                                @click.prevent="$dispatch('sheet-switch', { sheetId: <?php echo e($sh->id); ?> })"
                            <?php elseif(!$shRestricted): ?>
                                @click.prevent="requestSheetSwitch(<?php echo e($sh->id); ?>, $el.href)"

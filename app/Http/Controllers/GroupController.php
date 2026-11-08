@@ -40,11 +40,16 @@ class GroupController extends Controller
             abort(403, 'Akses ditolak: Anda bukan anggota resmi dari workspace ini.');
         }
 
+        if ($user->isAdmin() && $group->isArchived()) {
+            abort(403, 'Workspace ini telah diarsipkan dan tidak dapat diakses oleh Admin.');
+        }
+
         $userRole = $group->getMemberRole($user->id);
 
         // Workspace lama tanpa password hanya dapat dikonfigurasi oleh pemilik
         // sebelum isinya dibuka. Modal akan langsung ditampilkan di halaman.
-        $requiresPasswordSetup = !$group->hasPassword() && $userRole === 'leader';
+        $requiresPasswordSetup = !$user->isOwner() && !$group->hasPassword() && $userRole === 'leader';
+        $requiresPasswordConfiguration = $user->isAdmin() && !$group->hasPassword() && !$requiresPasswordSetup;
 
         // 2. Load all sheets for this workspace
         $sheets = $group->sheets()->get();
@@ -71,24 +76,12 @@ class GroupController extends Controller
 
         $isSheetRestricted = $activeSheet ? $activeSheet->isRestrictedForRole($userRole) : false;
 
-        $requiresAdminAccountVerification = $userRole === 'admin'
-            && !$group->isAdminSheetVerifiedForSession($user->id, $activeSheet?->id ?? 0);
-        $requiresPasswordUnlock = $requiresAdminAccountVerification
-            || ($userRole !== 'admin' && $group->hasPassword() && !$group->isUnlockedForSession());
+        $requiresPasswordUnlock = $user->isAdmin()
+            ? !$group->isUnlockedForSession()
+            : ($group->hasPassword() && !$group->isUnlockedForSession());
+        $requiresAdminAccountVerification = false;
 
-        $canAccessWorkspace = ($userRole === 'admin' && !$requiresAdminAccountVerification)
-            || ($userRole === 'leader' && (!$group->hasPassword() || $group->isUnlockedForSession()));
-
-        if ($userRole === 'admin' && $canAccessWorkspace && $activeSheet) {
-            $context = [
-                'user_id' => $user->id,
-                'group_id' => $group->id,
-                'sheet_id' => $activeSheet->id,
-                'role' => $userRole,
-            ];
-            $request->session()->put('admin_workspace_context', $context);
-            $request->session()->put('workspace_exit_context', $context);
-        }
+        $canAccessWorkspace = !$requiresPasswordUnlock;
 
         // 4. Load members from database with normalized roles (Leader & Admin only)
         $members = $group->members()->with('user')->orderBy('joined_at')->get();
@@ -110,6 +103,12 @@ class GroupController extends Controller
         // 5. User's joined workspaces for sidebar switcher
         $userGroups = $user->groups()->with('sheets')->get();
 
+        // 6. Dynamic Year & Month Company Hierarchy from Database
+        $operationalYears = \App\Models\OperationalYear::with(['monthlyWorkspaces.group.sheets'])
+            ->orderBy('year', 'desc')
+            ->get();
+        $currentMonthlyWorkspace = $group->monthlyWorkspace()->with('year')->first();
+
         return view('groups.workspace', compact(
             'group',
             'sheets',
@@ -118,86 +117,119 @@ class GroupController extends Controller
             'managedMembers',
             'userRole',
             'userGroups',
+            'operationalYears',
+            'currentMonthlyWorkspace',
             'requiresPasswordSetup',
+            'requiresPasswordConfiguration',
             'requiresPasswordUnlock',
             'requiresAdminAccountVerification',
             'isSheetRestricted'
         ));
     }
 
+    /**
+     * Dynamic Year & Month Company Workspace Router.
+     * Hierarchy: Company -> Year -> Month -> Spreadsheet
+     */
+    public function companyWorkspace(Request $request, int $year, int $month, ?string $sheetName = null)
+    {
+        $operationalYear = \App\Models\OperationalYear::where('year', $year)->firstOrFail();
+        $user = Auth::user();
+
+        if ($user && $user->isAdmin() && $operationalYear->isArchived()) {
+            abort(403, 'Workspace tahun ini telah diarsipkan dan tidak dapat diakses oleh Admin.');
+        }
+
+        $monthlyWorkspace = \App\Models\MonthlyWorkspace::where('year_id', $operationalYear->id)
+            ->where('month', $month)
+            ->firstOrFail();
+
+        $group = $monthlyWorkspace->group;
+        $sheet = null;
+        if ($sheetName) {
+            $sheet = $group->sheets()->where('name', $sheetName)->first();
+        }
+
+        return $this->workspace($request, $group, $sheet);
+    }
+
     /** Verify a workspace password for the current login session. */
     public function unlock(Request $request, FisheriesGroup $group)
     {
         abort_unless($group->isMember(Auth::id()), 403);
+        abort_if(Auth::user()->isAdmin() && $group->isArchived(), 403, 'Workspace ini telah diarsipkan dan tidak dapat diakses oleh Admin.');
 
         $validated = $request->validate([
             'password' => ['required', 'string', 'max:100'],
-            'sheet_id' => ['required', 'integer'],
+            'sheet_id' => ['nullable', 'integer'],
         ]);
 
-        $sheet = $group->sheets()->findOrFail($validated['sheet_id']);
+        $sheet = null;
+        if (!empty($validated['sheet_id'])) {
+            $sheet = $group->sheets()->find($validated['sheet_id']);
+        }
+        if (!$sheet) {
+            $sheet = $group->sheets()->firstOrFail();
+        }
+
         $user = Auth::user();
         $role = $group->getMemberRole($user->id);
 
-        if ($role === 'admin') {
-            if (!Hash::check($validated['password'], $user->password)) {
-                if ($request->expectsJson()) {
-                    return response()->json(['message' => 'Password akun salah. Silakan coba lagi.'], 422);
-                }
-
-                return back()->with('error', 'Password akun salah. Silakan coba lagi.');
+        if ($user->isAdmin() && !$group->hasPassword()) {
+            $message = 'Workspace belum memiliki password. Hubungi Owner atau Leader untuk mengaturnya.';
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $message], 409);
             }
 
-            // One verified target only: returning to another sheet requires a
-            // fresh account-password check, while a normal refresh does not.
-            $group->markAdminSheetVerifiedForSession($user->id, $sheet->id);
-        } else {
-            if (!$group->verifyPassword($validated['password'])) {
-                if ($request->expectsJson()) {
-                    return response()->json(['message' => 'Password workspace salah.'], 422);
-                }
-
-                return back()->with('error', 'Password workspace salah.');
-            }
-            $request->session()->put('workspace_unlocked_' . $group->id, true);
-            $request->session()->put('sheet_unlocked_' . $sheet->id, true);
+            return back()->with('error', $message);
         }
 
-        if ($role === 'admin') {
+        // Workspace authentication strictly verifies the WORKSPACE PASSWORD
+        if (!$group->verifyPassword($validated['password'])) {
+            $errorMsg = 'Password workspace salah. Silakan coba lagi.';
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $errorMsg], 422);
+            }
+
+            return back()->with('error', $errorMsg);
+        }
+
+        if ($user->isAdmin() && $group->hasPassword()) {
             $context = [
                 'user_id' => $user->id,
                 'group_id' => $group->id,
-                'sheet_id' => $sheet->id,
-                'role' => $role,
+                'role' => 'admin',
             ];
-            $request->session()->put('admin_workspace_context', $context);
-            $request->session()->put('workspace_exit_context', $context);
+            $request->session()->put('admin_workspace_auth', $context);
+        } else {
+            $request->session()->put('workspace_unlocked_' . $group->id, true);
+            $request->session()->put('sheet_unlocked_' . $sheet->id, true);
+
+            if ($opYear = $group->operationalYearModel()) {
+                $opYear->unlockForUser($user->id);
+            }
         }
+
+        // Commit session state immediately
+        $request->session()->save();
 
         $redirectUrl = route('group.workspace', [$group->id, $sheet->id]);
         if ($request->expectsJson()) {
-            return response()->json(['redirect' => $redirectUrl]);
+            return response()->json([
+                'success' => true,
+                'redirect' => $redirectUrl,
+                'role' => $role,
+                'sheet_id' => $sheet->id,
+            ]);
         }
 
         return redirect()->to($redirectUrl);
     }
 
-    /** Verify the account password before leaving the active workspace. */
+    /** Invalidate the current Admin workspace authorization before leaving. */
     public function leaveWorkspace(Request $request, FisheriesGroup $group)
     {
-        $context = $request->session()->get('admin_workspace_context') ?? $request->session()->get('workspace_exit_context');
-        $userRole = $group->getMemberRole(Auth::id());
-        abort_unless(
-            is_array($context)
-                && (int) ($context['user_id'] ?? 0) === (int) Auth::id()
-                && (int) ($context['group_id'] ?? 0) === $group->id
-                && $userRole === 'admin',
-            403,
-            'Verifikasi keluar tidak berlaku untuk workspace ini.'
-        );
-
         $validated = $request->validate([
-            'password' => ['required', 'string', 'max:100'],
             'destination' => ['required', 'string', 'max:2048'],
         ]);
 
@@ -221,16 +253,8 @@ class GroupController extends Controller
             'Tujuan navigasi tidak valid.'
         );
 
-        $request->session()->flash('workspace_exit_target', $destination);
-        if (!Hash::check($validated['password'], Auth::user()->password)) {
-            if ($request->expectsJson()) {
-                return response()->json(['message' => 'Password akun salah. Anda tetap berada di workspace.'], 422);
-            }
-
-            return back()->with('error', 'Password akun salah. Anda tetap berada di workspace.');
-        }
-
         $request->session()->forget([
+            'admin_workspace_auth',
             $group->adminVerificationSessionKey(Auth::id()),
             'admin_workspace_context',
             'workspace_exit_context',
@@ -604,11 +628,14 @@ class GroupController extends Controller
         }
 
         if (!empty($validated['password'])) {
-            $request->validate(['current_password' => ['required', 'string']]);
-            if (!$group->verifyPassword($request->input('current_password'))) {
-                return back()->with('error', 'Password saat ini tidak sesuai.');
+            if ($group->hasPassword()) {
+                $request->validate(['current_password' => ['required', 'string']]);
+                if (!$group->verifyPassword($request->input('current_password'))) {
+                    return back()->with('error', 'Password saat ini tidak sesuai.');
+                }
             }
             $updateData['password'] = \Illuminate\Support\Facades\Hash::make($validated['password']);
+            $request->session()->put('workspace_unlocked_' . $group->id, true);
         }
 
         $group->update($updateData);

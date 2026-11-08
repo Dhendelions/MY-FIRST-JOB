@@ -307,6 +307,8 @@
     unlockWorkspace(event) {
         const form = event.target;
         const password = form.elements.password;
+        const sheetIdInput = form.elements.sheet_id;
+        const sheetId = sheetIdInput ? parseInt(sheetIdInput.value, 10) : null;
         this.workspacePasswordError = '';
 
         fetch(form.action, {
@@ -323,11 +325,38 @@
             return result;
         })
         .then(result => {
-            password.value = '';
-            window.Livewire.navigate(result.redirect);
+            if (password) password.value = '';
+
+            // Mark workspace as unlocked in Alpine state so @sheet-switch guard works
+            this.workspaceIsUnlocked = true;
+            if (sheetId && !isNaN(sheetId)) {
+                if (!Array.isArray(this.adminVerifiedSheetIds)) this.adminVerifiedSheetIds = [];
+                if (!this.adminVerifiedSheetIds.includes(sheetId)) {
+                    this.adminVerifiedSheetIds.push(sheetId);
+                }
+            }
+
+            // Close the modal FIRST before any navigation
+            this.workspaceModal = null;
+            this.activeModal = null;
+
+            const redirectUrl = result.redirect || window.location.href;
+            try {
+                const targetUrl = new URL(redirectUrl, window.location.origin);
+                const currentUrl = new URL(window.location.href);
+                const isSameUrl = targetUrl.pathname === currentUrl.pathname && targetUrl.search === currentUrl.search;
+
+                if (isSameUrl) {
+                    window.location.reload();
+                } else {
+                    window.location.href = redirectUrl;
+                }
+            } catch (e) {
+                window.location.reload();
+            }
         })
         .catch(error => {
-            password.value = '';
+            if (password) password.value = '';
             this.workspacePasswordError = error.message || 'Verifikasi password gagal.';
         });
     },
@@ -432,7 +461,33 @@
                         Beranda / Ringkasan
                     </a>
 
-                    <button @click="<?php if(isset($group, $userRole) && $userRole === 'admin'): ?> requestWorkspaceExit('<?php echo e(route('dashboard', ['open' => 'friends'])); ?>') <?php else: ?> activeModal = 'modal-friend' <?php endif; ?>"
+                    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(Auth::user()?->isOwner()): ?>
+                        <a href="<?php echo e(route('company.analytics')); ?>" 
+                           class="flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all <?php echo e(request()->routeIs('company.analytics*') || request()->routeIs('company.yearly-comparison*') ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30' : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'); ?>">
+                            <svg class="w-5 h-5 <?php echo e(request()->routeIs('company.analytics*') ? 'text-sky-400' : 'text-slate-400'); ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                            </svg>
+                            Company Analytics
+                        </a>
+
+                        <a href="<?php echo e(route('company.users.index')); ?>" 
+                           class="flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all <?php echo e(request()->routeIs('company.users*') ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30' : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'); ?>">
+                            <svg class="w-5 h-5 <?php echo e(request()->routeIs('company.users*') ? 'text-sky-400' : 'text-slate-400'); ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                            </svg>
+                            Manajemen User
+                        </a>
+
+                        <a href="<?php echo e(route('company.activity-logs.index')); ?>" 
+                           class="flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all <?php echo e(request()->routeIs('company.activity-logs*') ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30' : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'); ?>">
+                            <svg class="w-5 h-5 <?php echo e(request()->routeIs('company.activity-logs*') ? 'text-sky-400' : 'text-slate-400'); ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            Activity Logs
+                        </a>
+                    <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+
+                    <button @click="activeModal = 'modal-friend'"
                             class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800/60 hover:text-white transition-all text-left">
                         <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
@@ -442,44 +497,100 @@
                 </nav>
             </div>
 
-            <!-- Switcher Workspace Tim -->
-            <div>
-                <div class="px-3 mb-2">
-                    <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Workspace Saya</p>
+            <!-- Dynamic Year & Month Company Workspace Navigation -->
+            <?php
+                $sidebarYears = $operationalYears ?? \App\Models\OperationalYear::with(['monthlyWorkspaces.group'])->orderBy('year', 'desc')->get();
+                $currentGroupYearId = isset($group) && $group->monthlyWorkspace ? $group->monthlyWorkspace->year_id : null;
+            ?>
+            <div x-data="{ openYear: <?php echo e($currentGroupYearId ? $currentGroupYearId : ($sidebarYears->first()?->id ?? 'null')); ?> }">
+                <div class="px-3 mb-2 flex items-center justify-between">
+                    <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Tahun Operasional</p>
+                    <span class="text-[10px] font-mono text-sky-400 bg-sky-950/80 px-1.5 py-0.5 rounded border border-sky-800/60">Perusahaan</span>
                 </div>
 
-                <div class="space-y-1.5 max-h-56 overflow-y-auto pr-1">
-                    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php $__currentLoopData = Auth::user()->groups; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $g): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                        <a href="<?php echo e(route('group.workspace', $g->id)); ?>" 
-                           class="flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all <?php echo e(isset($group) && $group->id === $g->id ? 'bg-slate-800 text-sky-300 ring-1 ring-sky-500/30' : 'text-slate-300 hover:bg-slate-800/40'); ?>">
-                            <div class="w-8 h-8 rounded-lg bg-sky-600/30 border border-sky-500/40 flex items-center justify-center font-bold text-sky-300 text-xs shrink-0 overflow-hidden">
-                                <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($g->avatar_url): ?>
-                                    <img src="<?php echo e($g->avatar_url); ?>" alt="<?php echo e($g->name); ?>" class="w-full h-full object-cover">
+                <div class="space-y-2 max-h-72 overflow-y-auto pr-1">
+                    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php $__empty_1 = true; $__currentLoopData = $sidebarYears; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $opYear): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+                        <div class="rounded-lg bg-slate-900/60 border border-slate-800/80 overflow-hidden">
+                            <!-- Year Toggle Button -->
+                            <button @click="openYear = (openYear === <?php echo e($opYear->id); ?> ? null : <?php echo e($opYear->id); ?>)" 
+                                    class="w-full flex items-center justify-between px-3 py-2 text-xs font-bold transition-colors text-left"
+                                    :class="openYear === <?php echo e($opYear->id); ?> ? 'text-sky-300 bg-slate-800/70' : 'text-slate-300 hover:text-white hover:bg-slate-800/40'">
+                                <div class="flex items-center gap-2">
+                                    <svg class="w-3.5 h-3.5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                    </svg>
+                                    <span>Tahun <?php echo e($opYear->year); ?></span>
+                                </div>
+                                <div class="flex items-center gap-1.5">
+                                    <span class="text-[10px] text-slate-400 font-normal">12 Bulan</span>
+                                    <svg class="w-3.5 h-3.5 transition-transform duration-200" 
+                                         :class="openYear === <?php echo e($opYear->id); ?> ? 'rotate-180 text-sky-400' : 'text-slate-500'" 
+                                         fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </div>
+                            </button>
+
+                            <!-- Months Grid -->
+                            <div x-show="openYear === <?php echo e($opYear->id); ?>" x-collapse class="p-2 grid grid-cols-3 gap-1 bg-[#060e1b]/40 border-t border-slate-800/50">
+                                <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php $__currentLoopData = $opYear->monthlyWorkspaces; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $mWork): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                    <?php
+                                        $isActiveMonth = isset($group) && $group->id === $mWork->group_id;
+                                    ?>
+                                    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(Auth::user()->isOwner() || !$opYear->is_archived): ?>
+                                        <a href="<?php echo e(route('group.workspace', $mWork->group_id)); ?>"
+                                           title="<?php echo e($mWork->name); ?> <?php echo e($opYear->year); ?>"
+                                           class="px-2 py-1.5 text-center rounded text-[11px] font-medium transition-all truncate <?php echo e($isActiveMonth ? 'bg-sky-500 text-white font-bold shadow-xs shadow-sky-500/30' : 'text-slate-300 hover:bg-slate-800 hover:text-white'); ?>">
+                                            <?php echo e(substr($mWork->name, 0, 3)); ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($opYear->is_archived): ?> 🔒<?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+                                        </a>
+                                    <?php else: ?>
+                                        <span title="🔒 Archived — hanya Owner yang dapat membuka"
+                                              aria-disabled="true"
+                                              class="px-2 py-1.5 text-center rounded text-[11px] font-medium truncate text-slate-500 opacity-60 cursor-not-allowed">
+                                            <?php echo e(substr($mWork->name, 0, 3)); ?> 🔒
+                                        </span>
+                                    <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+                            </div>
+                        </div>
+                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
+                        <p class="text-xs text-slate-500 px-3 py-2">Belum ada tahun operasional.</p>
+                    <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+                </div>
+
+                <!-- Legacy Workspaces Accordion (if any) -->
+                <?php
+                    $legacyGroups = Auth::user()->groups->where('is_legacy', true);
+                ?>
+                <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($legacyGroups->isNotEmpty()): ?>
+                    <div x-data="{ openLegacy: false }" class="mt-3">
+                        <button @click="openLegacy = !openLegacy" 
+                                class="w-full flex items-center justify-between px-3 py-1.5 rounded text-[11px] font-semibold text-slate-400 hover:text-slate-200 transition-colors">
+                            <span>Workspace Arsip (<?php echo e($legacyGroups->count()); ?>)</span>
+                            <svg class="w-3.5 h-3.5 transition-transform" :class="openLegacy ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </button>
+                        <div x-show="openLegacy" x-collapse class="mt-1 space-y-1 pl-1">
+                            <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php $__currentLoopData = $legacyGroups; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $g): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(Auth::user()->isOwner() || !$g->isArchived()): ?>
+                                    <a href="<?php echo e(route('group.workspace', $g->id)); ?>"
+                                       class="flex items-center gap-2 px-2.5 py-1.5 rounded text-xs transition-colors <?php echo e(isset($group) && $group->id === $g->id ? 'bg-slate-800 text-sky-300' : 'text-slate-400 hover:text-white hover:bg-slate-800/40'); ?>">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
+                                        <span class="truncate">
+                                            <?php echo e($g->name); ?>
+
+                                            <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($g->isArchived()): ?> 🔒 Archived <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+                                        </span>
+                                    </a>
                                 <?php else: ?>
-                                    <?php echo e(strtoupper(substr($g->name, 0, 2))); ?>
-
+                                    <span aria-disabled="true" title="🔒 Archived — hanya Owner yang dapat membuka"
+                                          class="flex items-center gap-2 px-2.5 py-1.5 rounded text-xs text-slate-500 opacity-60 cursor-not-allowed">
+                                        <span>🔒</span><span class="truncate"><?php echo e($g->name); ?> — Archived</span>
+                                    </span>
                                 <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
-                            </div>
-                            <div class="truncate flex-1">
-                                <p class="truncate font-semibold text-white"><?php echo e($g->name); ?></p>
-                                <p class="text-[10px] text-slate-400 truncate"><?php echo e($g->category); ?> • <?php echo e($g->sheets()->count()); ?> Lembar</p>
-                            </div>
-                        </a>
-                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
-                </div>
-
-                <div class="mt-3 px-2 flex gap-2">
-                    <button @click="activeModal = 'modal-create-group'" 
-                            class="flex-1 py-2 px-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white text-xs font-medium flex items-center justify-center gap-1.5 transition-colors">
-                        <svg class="w-3.5 h-3.5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                        Buat Baru
-                    </button>
-                    <button @click="activeModal = 'modal-join-group'" 
-                            class="flex-1 py-2 px-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white text-xs font-medium flex items-center justify-center gap-1.5 transition-colors">
-                        <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path></svg>
-                        Gabung
-                    </button>
-                </div>
+                            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+                        </div>
+                    </div>
+                <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
             </div>
         </div>
 
@@ -491,13 +602,12 @@
                 <img class="w-9 h-9 rounded-full object-cover ring-2 ring-sky-500/40" src="<?php echo e(Auth::user()->avatar_url); ?>" alt="<?php echo e(Auth::user()->name); ?>">
                 <div class="truncate">
                     <p class="text-xs font-semibold text-white truncate hover:underline"><?php echo e(Auth::user()->name); ?></p>
-                    <p class="text-[11px] text-sky-400 truncate capitalize font-mono"><?php echo e(Auth::user()->role_title ?? 'User'); ?></p>
+                    <p class="text-[11px] text-sky-400 truncate capitalize font-mono"><?php echo e(Auth::user()->display_role); ?></p>
                 </div>
             </div>
             <form action="<?php echo e(route('logout')); ?>" method="POST">
                 <?php echo csrf_field(); ?>
                 <button type="submit" title="Keluar / Logout"
-                        @click="if (workspaceExitGroupId) { $event.preventDefault(); requestWorkspaceExit('logout'); }"
                         class="p-2 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition-colors">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
@@ -601,7 +711,7 @@
                     <img class="w-8 h-8 rounded-full object-cover ring-1 ring-slate-300" src="<?php echo e(Auth::user()->avatar_url); ?>" alt="<?php echo e(Auth::user()->name); ?>">
                     <div class="hidden sm:block text-left">
                         <span class="text-xs font-semibold text-slate-700 block leading-tight hover:text-sky-600 underline decoration-slate-300"><?php echo e(Auth::user()->name); ?></span>
-                        <span class="text-[10px] text-slate-400 font-mono capitalize"><?php echo e(Auth::user()->role_title ?? 'User'); ?></span>
+                        <span class="text-[10px] text-slate-400 font-mono capitalize"><?php echo e(Auth::user()->display_role); ?></span>
                     </div>
                 </div>
             </div>
@@ -638,7 +748,7 @@
                     </div>
 
                     <p class="mt-3 text-sm leading-6 text-slate-600">
-                        Masukkan password akun Anda untuk melanjutkan navigasi keluar dari workspace <strong><?php echo e($group->name); ?></strong>.
+                        Masukkan password workspace untuk melanjutkan navigasi keluar dari workspace <strong><?php echo e($group->name); ?></strong>.
                     </p>
 
                     <form action="<?php echo e(route('groups.leave', $group->id)); ?>" method="POST" @submit.prevent="submitExitVerification($event)" class="mt-4 space-y-4">
@@ -653,7 +763,7 @@
 
                         <div>
                             <label class="block text-xs font-semibold text-slate-700 mb-1.5">
-                                Password Akun
+                                Password Workspace
                             </label>
                             <div class="relative">
                                 <input :type="showExitPassword ? 'text' : 'password'" 
@@ -662,7 +772,7 @@
                                        required 
                                        autocomplete="off" 
                                        autofocus
-                                       placeholder="Masukkan password akun Anda..."
+                                       placeholder="Masukkan password workspace..."
                                        :disabled="isSubmittingExit"
                                        class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:bg-slate-50 disabled:text-slate-400">
                                 <button type="button" 
@@ -725,104 +835,6 @@
     </div>
 
     <!-- GLOBAL MODAL DIALOGS -->
-
-    <!-- 1. Modal Buat Workspace Baru (Sederhana: Nama & Password Saja) -->
-    <div x-show="activeModal === 'modal-create-group'" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
-        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
-            <div class="fixed inset-0 bg-slate-900/70 backdrop-blur-xs transition-opacity" @click="activeModal = null"></div>
-            <div class="relative bg-white rounded-2xl max-w-md w-full p-6 text-left shadow-2xl border border-slate-100 my-8">
-                <div class="flex items-center justify-between pb-3 border-b border-slate-100">
-                    <div>
-                        <h3 class="text-base font-bold text-slate-900">Buat Workspace Tim Baru</h3>
-                        <p class="text-xs text-slate-500">Mulai kolaborasi dokumen dan spreadsheet bersama tim</p>
-                    </div>
-                    <button @click="activeModal = null" class="text-slate-400 hover:text-slate-600">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                    </button>
-                </div>
-
-                <form action="<?php echo e(route('groups.store')); ?>" method="POST" class="mt-4 space-y-4">
-                    <?php echo csrf_field(); ?>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">Nama Workspace <span class="text-rose-500">*</span></label>
-                        <input type="text" name="name" required placeholder="cth: Keuangan PT Maju Berkah / Proyek Alpha" 
-                               class="w-full text-xs sm:text-sm px-3.5 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:outline-none">
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">Password Workspace <span class="text-rose-500">*</span></label>
-                        <input type="password" name="password" required minlength="4" placeholder="Masukkan password untuk keamanan workspace..." 
-                               class="w-full text-xs sm:text-sm px-3.5 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:outline-none">
-                        <p class="text-[11px] text-slate-400 mt-1">Anggota yang ingin bergabung wajib memasukkan password ini.</p>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">Jenis Workspace</label>
-                        <select name="workspace_type" class="w-full text-xs sm:text-sm px-3.5 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:outline-none bg-white">
-                            <option value="manual">Manual (lembar kosong)</option>
-                            <option value="template">Template</option>
-                        </select>
-                    </div>
-
-                    <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
-                        <button type="button" @click="activeModal = null" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors">
-                            Batal
-                        </button>
-                        <button type="submit" class="px-5 py-2 rounded-xl text-xs font-semibold bg-sky-600 hover:bg-sky-500 text-white shadow-md shadow-sky-500/20 transition-all">
-                            Buat Workspace
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- 2. Modal Gabung Workspace (Dengan Verifikasi Password) -->
-    <div x-show="activeModal === 'modal-join-group'" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
-        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
-            <div class="fixed inset-0 bg-slate-900/70 backdrop-blur-xs transition-opacity" @click="activeModal = null"></div>
-            <div class="relative bg-white rounded-2xl max-w-md w-full p-6 text-left shadow-2xl border border-slate-100 my-8">
-                <div class="flex items-center justify-between pb-3 border-b border-slate-100">
-                    <div class="flex items-center gap-2.5">
-                        <div class="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path></svg>
-                        </div>
-                        <div>
-                            <h3 class="text-base font-bold text-slate-800">Gabung Workspace Tim</h3>
-                            <p class="text-xs text-slate-500">Masukkan nama dan password workspace</p>
-                        </div>
-                    </div>
-                    <button @click="activeModal = null" class="text-slate-400 hover:text-slate-600">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                    </button>
-                </div>
-
-                <form action="<?php echo e(route('groups.join')); ?>" method="POST" class="mt-4 space-y-4">
-                    <?php echo csrf_field(); ?>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">Nama Workspace <span class="text-rose-500">*</span></label>
-                        <input type="text" name="workspace_name" required placeholder="Masukkan nama workspace..." 
-                               class="w-full text-sm px-3.5 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none">
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">Password Workspace <span class="text-rose-500">*</span></label>
-                        <input type="password" name="password" required placeholder="Masukkan password workspace..." 
-                               class="w-full text-xs sm:text-sm px-3.5 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none">
-                        <p class="text-[11px] text-slate-400 mt-1">Dapatkan password dari pembuat workspace.</p>
-                    </div>
-
-                    <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
-                        <button type="button" @click="activeModal = null" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors">
-                            Batal
-                        </button>
-                        <button type="submit" class="px-5 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-500/20 transition-all">
-                            Gabung Sekarang
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
 
     <!-- 3. Modal Hubungkan Rekan Tim (Cari Berdasarkan Nama Teman & Database Nyata) -->
     <div x-show="activeModal === 'modal-friend'" 

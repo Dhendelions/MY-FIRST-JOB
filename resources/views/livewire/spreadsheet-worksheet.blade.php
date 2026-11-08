@@ -372,7 +372,7 @@
                     @endphp
                     <div class="relative group/tab flex items-center">
                         <a wire:navigate href="{{ route('group.workspace', [$sheet->group_id, $sh->id]) }}"
-                           @if(($memberRole === 'admin' || (!$isLeader && $sheet->group->hasPassword())) && $sh->id !== $sheetId && !$shRestricted)
+                           @if($sheet->group->hasPassword() && !$sheet->group->isUnlockedForSession() && $sh->id !== $sheetId && !$shRestricted)
                                @click.prevent="$dispatch('sheet-switch', { sheetId: {{ $sh->id }} })"
                            @elseif(!$shRestricted)
                                @click.prevent="requestSheetSwitch({{ $sh->id }}, $el.href)"

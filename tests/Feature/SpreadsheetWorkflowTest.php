@@ -24,15 +24,24 @@ class SpreadsheetWorkflowTest extends TestCase
     {
         $user = User::create(['name' => 'Owner', 'email' => 'owner@example.test', 'password' => 'password']);
 
-        $response = $this->actingAs($user)->post(route('groups.store'), [
+        // Manual workspace creation endpoint is removed; returns 404
+        $this->actingAs($user)->post('/groups', [
             'name' => 'Workbook test',
             'password' => 'rahasia',
-            'workspace_type' => 'manual',
-        ]);
+        ])->assertNotFound();
 
-        $response->assertRedirect();
-        $group = FisheriesGroup::where('name', 'Workbook test')->firstOrFail();
-        $this->assertDatabaseHas('group_members', ['group_id' => $group->id, 'user_id' => $user->id, 'role' => 'leader']);
+        // Internal workspace provisioning mechanism works properly
+        $group = FisheriesGroup::create([
+            'name' => 'Workbook test',
+            'password' => \Illuminate\Support\Facades\Hash::make('rahasia'),
+            'category' => 'Umum',
+            'location' => 'Utama',
+            'pond_count' => 5,
+            'invite_code' => 'WB-TEST-01',
+            'created_by' => $user->id,
+        ]);
+        $group->initializeStandardSheets();
+
         $this->assertSame(5, $group->sheets()->count());
         $firstSheet = $group->sheets()->firstOrFail();
         $this->assertSame(6, $firstSheet->columns()->count());

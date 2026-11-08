@@ -100,9 +100,11 @@ class SpreadsheetPerformanceOptimizationTest extends TestCase
         GroupMember::create([
             'group_id' => $this->group->id,
             'user_id' => $staff->id,
-            'role' => 'karyawan',
+            'role' => 'admin',
             'status' => 'Aktif',
         ]);
+        $this->group->markAdminSheetVerifiedForSession($staff->id, $this->sheet->id);
+
         $restrictedSheet = SpreadsheetSheet::create([
             'group_id' => $this->group->id,
             'name' => 'Rank',
@@ -125,11 +127,14 @@ class SpreadsheetPerformanceOptimizationTest extends TestCase
         GroupMember::create([
             'group_id' => $this->group->id,
             'user_id' => $staff->id,
-            'role' => 'karyawan',
+            'role' => 'admin',
             'status' => 'Aktif',
         ]);
 
         $targetSheet = $this->group->sheets()->orderBy('id')->skip(1)->firstOrFail();
+        $this->group->markAdminSheetVerifiedForSession($staff->id, $this->sheet->id);
+        $this->group->markAdminSheetVerifiedForSession($staff->id, $targetSheet->id);
+
         $component = Livewire::actingAs($staff)
             ->test(SpreadsheetWorksheet::class, ['sheet' => $this->sheet]);
 

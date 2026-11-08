@@ -39,8 +39,8 @@ class WorkspaceRoleAndHistoryTest extends TestCase
         $response->assertDontSee('+ Buat Workspace</button>', false);
 
         // 2. "Buat Baru" and "Gabung" buttons are maintained
-        $response->assertSee('Buat Baru');
-        $response->assertSee('Gabung');
+        $response->assertDontSee('Buat Baru');
+        $response->assertDontSee('Gabung');
     }
 
     public function test_user_search_and_add_member_by_name_and_role(): void
@@ -116,8 +116,7 @@ class WorkspaceRoleAndHistoryTest extends TestCase
         $rank->initializeBlankGrid();
 
         // 1. Analisa & Cost: Leader, Admin, Karyawan can access
-        $outsider = User::create(['name' => 'Outsider', 'email' => 'out_add@example.test', 'password' => 'password']);
-        $this->actingAs($outsider)->get(route('group.workspace', [$group->id, $analisa->id]))->assertOk();
+        $this->actingAs($karyawan)->get(route('group.workspace', [$group->id, $analisa->id]))->assertOk();
         $this->actingAs($admin)->get(route('group.workspace', [$group->id, $cost->id]))->assertOk();
         $this->actingAs($leader)->get(route('group.workspace', [$group->id, $analisa->id]))->assertOk();
 
@@ -129,10 +128,9 @@ class WorkspaceRoleAndHistoryTest extends TestCase
         $resKaryawanMargin->assertDontSee('spreadsheet-grid-table');
 
         // Backend API check: export should be forbidden (403) for non-leader on restricted sheet
-        $outsider = User::create(['name' => 'Outsider', 'email' => 'out_add@example.test', 'password' => 'password']);
+        $outsider = User::create(['name' => 'Outsider', 'email' => 'out_add1@example.test', 'password' => 'password']);
         $this->actingAs($outsider)->get(route('spreadsheet.export', $margin))->assertForbidden();
         $this->actingAs($admin)->get(route('spreadsheet.export', $pendukung))->assertForbidden();
-        $outsider = User::create(['name' => 'Outsider', 'email' => 'out_add@example.test', 'password' => 'password']);
         $this->actingAs($outsider)->get(route('spreadsheet.export', $rank))->assertForbidden();
 
         // Livewire access authorization check
@@ -148,7 +146,6 @@ class WorkspaceRoleAndHistoryTest extends TestCase
             ->assertOk();
 
         // 4. Karyawan cannot add members
-        $outsider = User::create(['name' => 'Outsider', 'email' => 'out_add@example.test', 'password' => 'password']);
         $this->actingAs($outsider)
             ->post(route('groups.members.add', $group->id), [
                 'user_id' => $leader->id,
@@ -157,9 +154,9 @@ class WorkspaceRoleAndHistoryTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_leader_sheet_switching_without_password_prompt(): void
+    public function test_owner_leader_sheet_switching_never_requires_password_prompt(): void
     {
-        $leader = User::create(['name' => 'Password Leader', 'email' => 'pwleader@example.test', 'password' => 'password']);
+        $leader = User::create(['name' => 'Password Leader', 'email' => 'pwleader@example.test', 'password' => 'password', 'role' => 'owner']);
         $group = FisheriesGroup::create([
             'name' => 'Secured Workspace',
             'invite_code' => 'WS-SEC-01',
@@ -173,9 +170,7 @@ class WorkspaceRoleAndHistoryTest extends TestCase
         $cost = $group->sheets()->create(['name' => 'Cost', 'category' => 'cost']);
         $cost->initializeBlankGrid();
 
-        // Unlock once for session
         $this->actingAs($leader)
-            ->withSession(['workspace_unlocked_' . $group->id => true])
             ->get(route('group.workspace', [$group->id, $cost->id]))
             ->assertOk()
             ->assertSee('x-teleport="body"', false)
@@ -183,7 +178,7 @@ class WorkspaceRoleAndHistoryTest extends TestCase
             ->assertDontSee('Masukkan Password Workspace');
     }
 
-    public function test_admin_must_verify_account_password_for_each_protected_sheet(): void
+    public function test_admin_workspace_authentication_applies_to_every_sheet_in_the_workspace(): void
     {
         $leader = User::create(['name' => 'Owner', 'email' => 'owner-admin-lock@example.test', 'password' => 'password']);
         $admin = User::create(['name' => 'Admin', 'email' => 'admin-lock@example.test', 'password' => 'akun-admin-aman']);
@@ -203,34 +198,29 @@ class WorkspaceRoleAndHistoryTest extends TestCase
         $this->actingAs($admin)
             ->get(route('group.workspace', [$group->id, $analisa->id]))
             ->assertOk()
-            ->assertSee('Verifikasi Password Akun')
+            ->assertSee('Masukkan Password Workspace')
             ->assertDontSee('spreadsheet-grid-table');
 
         $this->actingAs($admin)
-            ->post(route('groups.unlock', $group), ['sheet_id' => $analisa->id, 'password' => 'workspace-secret'])
+            ->post(route('groups.unlock', $group), ['sheet_id' => $analisa->id, 'password' => 'wrong-pass'])
             ->assertSessionHas('error');
 
         $this->actingAs($admin)
-            ->post(route('groups.unlock', $group), ['sheet_id' => $analisa->id, 'password' => 'akun-admin-aman'])
+            ->post(route('groups.unlock', $group), ['sheet_id' => $analisa->id, 'password' => 'workspace-secret'])
             ->assertRedirect(route('group.workspace', [$group->id, $analisa->id]));
 
         $this->actingAs($admin)
-            ->withSession([$group->adminVerificationSessionKey($admin->id) => $analisa->id])
             ->get(route('spreadsheet.export', $analisa))
             ->assertOk();
 
-        // The grant is scoped to Analisa only, so Cost cannot be fetched
-        // through either the page or direct export endpoint without reauth.
+        // Workspace authorization persists across sheets in this workspace.
         $this->actingAs($admin)
-            ->withSession([$group->adminVerificationSessionKey($admin->id) => $analisa->id])
             ->get(route('group.workspace', [$group->id, $cost->id]))
             ->assertOk()
-            ->assertSee('Verifikasi Password Akun')
-            ->assertDontSee('spreadsheet-grid-table');
+            ->assertDontSee('Masukkan Password Workspace');
         $this->actingAs($admin)
-            ->withSession([$group->adminVerificationSessionKey($admin->id) => $analisa->id])
             ->get(route('spreadsheet.export', $cost))
-            ->assertForbidden();
+            ->assertOk();
     }
 
     public function test_activity_history_records_events_and_displays_in_asia_jakarta(): void

@@ -23,7 +23,45 @@ class FisheriesGroup extends Model
         'pond_count',
         'avatar',
         'created_by',
+        'is_legacy',
+        'operational_year',
+        'operational_month',
     ];
+
+    protected $casts = [
+        'is_legacy' => 'boolean',
+        'operational_year' => 'integer',
+        'operational_month' => 'integer',
+    ];
+
+    /**
+     * Relationship: Monthly workspace metadata if this group represents an operational month.
+     */
+    public function monthlyWorkspace(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(MonthlyWorkspace::class, 'group_id');
+    }
+
+    /**
+     * Determine if this workspace belongs to an archived operational year.
+     */
+    public function isArchived(): bool
+    {
+        if ($this->relationLoaded('monthlyWorkspace') && $this->monthlyWorkspace) {
+            return $this->monthlyWorkspace->year ? (bool) $this->monthlyWorkspace->year->is_archived : false;
+        }
+
+        $mw = $this->monthlyWorkspace()->with('year')->first();
+        if ($mw && $mw->year) {
+            return (bool) $mw->year->is_archived;
+        }
+
+        if ($this->operational_year) {
+            return (bool) OperationalYear::where('year', $this->operational_year)->value('is_archived');
+        }
+
+        return false;
+    }
 
     /**
      * The attributes that should be hidden for serialization.
@@ -35,11 +73,41 @@ class FisheriesGroup extends Model
     ];
 
     /**
+     * Helper to get the parent OperationalYear model if this workspace belongs to an operational year.
+     */
+    public function operationalYearModel(): ?OperationalYear
+    {
+        if ($this->relationLoaded('monthlyWorkspace') && $this->monthlyWorkspace) {
+            return $this->monthlyWorkspace->year;
+        }
+
+        $mw = $this->monthlyWorkspace()->with('year')->first();
+        if ($mw && $mw->year) {
+            return $mw->year;
+        }
+
+        if ($this->operational_year !== null) {
+            return OperationalYear::where('year', $this->operational_year)->first();
+        }
+
+        return null;
+    }
+
+    /**
      * Determine if workspace has a password set.
      */
     public function hasPassword(): bool
     {
-        return !empty($this->password);
+        if (!empty($this->password)) {
+            return true;
+        }
+
+        $opYear = $this->operationalYearModel();
+        if ($opYear && $opYear->hasPassword()) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -47,15 +115,19 @@ class FisheriesGroup extends Model
      */
     public function verifyPassword(?string $plainPassword): bool
     {
-        if (empty($this->password)) {
-            return true;
+        if (!empty($this->password)) {
+            if (empty($plainPassword)) {
+                return false;
+            }
+            return \Illuminate\Support\Facades\Hash::check($plainPassword, $this->password);
         }
 
-        if (empty($plainPassword)) {
-            return false;
+        $opYear = $this->operationalYearModel();
+        if ($opYear && $opYear->hasPassword()) {
+            return $opYear->verifyPassword($plainPassword);
         }
 
-        return \Illuminate\Support\Facades\Hash::check($plainPassword, $this->password);
+        return true;
     }
 
     /**
@@ -66,6 +138,36 @@ class FisheriesGroup extends Model
      */
     public function isUnlockedForSession(): bool
     {
+        $user = \Illuminate\Support\Facades\Auth::user();
+        if ($user && $user->isOwner()) {
+            return true;
+        }
+
+        if ($user && $user->isAdmin()) {
+            if (!$this->hasPassword()) {
+                return false;
+            }
+
+            $authentication = request()->hasSession()
+                ? request()->session()->get('admin_workspace_auth')
+                : null;
+
+            return is_array($authentication)
+                && (int) ($authentication['user_id'] ?? 0) === (int) $user->id
+                && (int) ($authentication['group_id'] ?? 0) === (int) $this->id;
+        }
+
+        $opYear = $this->operationalYearModel();
+        if ($opYear) {
+            if ($opYear->hasPassword()) {
+                return $opYear->isUnlockedForUser($user?->id);
+            }
+
+            if (!$this->hasPassword()) {
+                return true;
+            }
+        }
+
         if (!$this->hasPassword()) {
             return true;
         }
@@ -106,23 +208,38 @@ class FisheriesGroup extends Model
             return true;
         }
 
-        if (!request()->hasSession()) {
-            return false;
+        $session = request()->hasSession() ? request()->session() : session();
+        if ((int) $session->get($this->adminVerificationSessionKey($userId), 0) === $sheetId) {
+            return true;
         }
 
-        return (int) request()->session()->get($this->adminVerificationSessionKey($userId), 0) === $sheetId;
+        $verifiedSheets = $session->get($this->adminVerificationSessionKey($userId) . '_sheets', []);
+        return is_array($verifiedSheets) && in_array($sheetId, $verifiedSheets, true);
     }
 
     public function markAdminSheetVerifiedForSession(int $userId, int $sheetId): void
     {
-        request()->session()->put($this->adminVerificationSessionKey($userId), $sheetId);
+        $session = request()->hasSession() ? request()->session() : session();
+        $session->put($this->adminVerificationSessionKey($userId), $sheetId);
+
+        $key = $this->adminVerificationSessionKey($userId) . '_sheets';
+        $verifiedSheets = $session->get($key, []);
+        if (!is_array($verifiedSheets)) {
+            $verifiedSheets = [];
+        }
+        if (!in_array($sheetId, $verifiedSheets, true)) {
+            $verifiedSheets[] = $sheetId;
+        }
+        $session->put($key, $verifiedSheets);
     }
 
     public function clearAdminSheetVerificationForSession(int $userId): void
     {
-        if (request()->hasSession()) {
-            request()->session()->forget($this->adminVerificationSessionKey($userId));
-        }
+        $session = request()->hasSession() ? request()->session() : session();
+        $session->forget([
+            $this->adminVerificationSessionKey($userId),
+            $this->adminVerificationSessionKey($userId) . '_sheets',
+        ]);
     }
 
     public function adminVerificationSessionKey(int $userId): string
@@ -266,6 +383,11 @@ class FisheriesGroup extends Model
     }
 
     /**
+     * In-memory cache for resolved member roles on this group instance.
+     */
+    private array $_cachedMemberRoles = [];
+
+    /**
      * Check if a user is the original creator (founder) of this workspace.
      */
     public function isFounder(int $userId): bool
@@ -281,32 +403,41 @@ class FisheriesGroup extends Model
      */
     public function getMemberRole(int $userId): ?string
     {
-        // Founder is permanently protected and recognized as leader
-        if ($this->isFounder($userId)) {
-            return 'leader';
+        $user = User::find($userId);
+        if (!$user || !$user->isActive()) {
+            return null;
         }
 
+        // 1. Centralized monthly workspaces: strictly follow users.role
+        if ($this->monthlyWorkspace()->exists() || $this->operational_year !== null) {
+            return $user->isAdmin() ? 'admin' : ($user->isOwner() ? 'leader' : 'admin');
+        }
+
+        // 2. Standalone or legacy workspaces with explicit membership record
         $member = $this->members()
             ->where('user_id', $userId)
             ->where('status', 'Aktif')
             ->first();
 
-        if (!$member) {
-            return null;
+        if ($member) {
+            $role = strtolower(trim($member->role));
+            if (in_array($role, ['leader', 'ketua tambak', 'pemilik/pengelola tambak', 'owner', 'ketua'], true)) {
+                return 'leader';
+            }
+            return 'admin';
         }
 
-        $role = strtolower(trim($member->role));
-
-        if ($role === 'leader') {
+        // 3. Workspace founder is leader
+        if ($this->isFounder($userId)) {
             return 'leader';
         }
 
-        // Legacy aliases for leader
-        if (in_array($role, ['ketua tambak', 'pemilik/pengelola tambak', 'owner', 'ketua'], true)) {
+        // 4. Global company Owner has leader privileges
+        if ($user->isOwner()) {
             return 'leader';
         }
 
-        return 'admin';
+        return null;
     }
 
     /**

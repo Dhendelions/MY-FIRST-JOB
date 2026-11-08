@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use App\Models\FisheriesGroup;
 use App\Models\GroupMember;
 use App\Models\SpreadsheetSheet;
 use App\Models\SpreadsheetCell;
@@ -18,35 +17,11 @@ class DashboardController extends Controller
     /**
      * Dashboard Overview View with Real-time KPIs & Workspace Catalog from Database.
      */
-    public function index(Request $request)
+    public function index()
     {
         $user = Auth::user();
 
-        // Re-entering a workspace from the dashboard requires an admin to
-        // authenticate again; no account password is retained in the session.
-        foreach ($user->groups()->pluck('fisheries_groups.id') as $groupId) {
-            $request->session()->forget('admin_sheet_verified_' . $groupId . '_' . $user->id);
-        }
-
-        // 1. Fetch user's joined workspaces from database
-        $search = $request->query('q');
-
         $userGroupIds = $user->groups()->pluck('fisheries_groups.id');
-
-        $groupsQuery = FisheriesGroup::with(['creator', 'activeMembers.user', 'sheets'])
-            ->whereIn('id', $userGroupIds);
-
-        if ($search) {
-            $groupsQuery->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('location', 'like', "%{$search}%");
-            });
-        }
-
-        $myGroups = $groupsQuery->latest()->get();
-        $manageableGroups = $myGroups
-            ->filter(fn (FisheriesGroup $group) => $group->isLeader($user->id))
-            ->values();
 
         // 2. Real-Time KPI Statistics (Purely based on user's actual database records)
         $totalWorkspaces = $userGroupIds->count();
@@ -70,10 +45,14 @@ class DashboardController extends Controller
         $notifications = $user->notifications()->take(10)->get();
         $unreadCount = $user->unreadNotifications()->count();
 
+        // 4. Centralized Company Workspace: Operational Years & Monthly Workspaces
+        $operationalYears = \App\Models\OperationalYear::with(['monthlyWorkspaces.group.sheets'])
+            ->orderBy('year', 'desc')
+            ->get();
+
         return view('dashboard', compact(
             'user',
-            'myGroups',
-            'manageableGroups',
+            'operationalYears',
             'totalWorkspaces',
             'totalSheetsCount',
             'totalRecordedCells',
@@ -81,153 +60,12 @@ class DashboardController extends Controller
             'totalFriends',
             'notifications',
             'unreadCount',
-            'search'
         ));
     }
 
     /**
      * Create a new Workspace.
      */
-    /**
-     * Create a new Workspace with Name and Password.
-     * Category, pond_count, location, and description are given sensible defaults.
-     */
-    public function createGroup(Request $request)
-    {
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'password' => ['required', 'string', 'min:4', 'max:100'],
-            'workspace_type' => ['nullable', 'in:manual,template'],
-        ], [
-            'name.required' => 'Nama workspace wajib diisi.',
-            'password.required' => 'Password workspace wajib diisi.',
-            'password.min' => 'Password workspace minimal 4 karakter.',
-            'password.max' => 'Password workspace maksimal 100 karakter.',
-        ]);
-
-        $user = Auth::user();
-
-        $group = DB::transaction(function () use ($validated, $user) {
-            // Kolom lama ini tetap dipenuhi demi kompatibilitas database, tetapi
-            // tidak lagi digunakan atau ditampilkan sebagai cara bergabung.
-            $internalInviteCode = FisheriesGroup::generateInviteCode('Umum');
-            $createdGroup = FisheriesGroup::create([
-                'name' => trim($validated['name']),
-                'password' => \Illuminate\Support\Facades\Hash::make($validated['password']),
-                'category' => 'Umum',
-                'location' => 'Utama',
-                'pond_count' => 5,
-                'description' => null,
-                'invite_code' => $internalInviteCode,
-                'created_by' => $user->id,
-            ]);
-
-            // Attach user as Leader
-            GroupMember::create([
-                'group_id' => $createdGroup->id,
-                'user_id' => $user->id,
-                'role' => 'leader',
-                'status' => 'Aktif',
-                'joined_at' => now(),
-            ]);
-
-            if (($validated['workspace_type'] ?? 'manual') === 'template') {
-                app(\App\Services\OktAnalisaTemplateImporter::class)->import($createdGroup);
-            } else {
-                $createdGroup->initializeStandardSheets();
-            }
-
-            // Create persistent notification
-            Notification::create([
-                'user_id' => $user->id,
-                'type' => 'success',
-                'title' => "Workspace '{$createdGroup->name}' Berhasil Dibuat",
-                'description' => 'Password telah diamankan. Lembar spreadsheet siap digunakan.',
-                'is_read' => false,
-            ]);
-
-            return $createdGroup;
-        });
-
-        $request->session()->put('workspace_unlocked_' . $group->id, true);
-        $request->session()->put('sheet_unlocked_' . $group->sheets()->first()->id, true);
-        return redirect()->route('group.workspace', $group->id)
-            ->with('success', "Workspace '{$group->name}' berhasil dibuat! Password tersimpan dengan aman.");
-    }
-
-    /**
-     * Join existing Workspace using its name and workspace password.
-     */
-    public function joinGroup(Request $request)
-    {
-        $validated = $request->validate([
-            'workspace_name' => ['required', 'string', 'max:255'],
-            'password' => ['required', 'string', 'max:100'],
-        ], [
-            'workspace_name.required' => 'Nama workspace wajib dimasukkan.',
-            'password.required' => 'Password workspace wajib dimasukkan.',
-        ]);
-
-        $user = Auth::user();
-        $workspaceName = trim($validated['workspace_name']);
-        $group = FisheriesGroup::where('name', $workspaceName)->first();
-
-        if (!$group) {
-            return back()->with('error', "Workspace '{$workspaceName}' tidak ditemukan. Periksa kembali namanya.");
-        }
-
-        $existing = GroupMember::where('group_id', $group->id)->where('user_id', $user->id)->first();
-        if ($existing) {
-            return redirect()->route('group.workspace', $group->id)->with('info', "Anda sudah menjadi anggota di workspace '{$group->name}'.");
-        }
-
-        // Verify Workspace Password
-        if ($group->hasPassword()) {
-            if (!$group->verifyPassword($validated['password'])) {
-                return back()->with('error', 'Password workspace salah. Akses ditolak.');
-            }
-        } else {
-            // Workspace lama yang belum diset password-nya: set password yang diinput jika belum ada
-            if (!empty($validated['password'])) {
-                $group->update(['password' => \Illuminate\Support\Facades\Hash::make($validated['password'])]);
-            }
-        }
-
-        DB::transaction(function () use ($group, $user) {
-            GroupMember::create([
-                'group_id' => $group->id,
-                'user_id' => $user->id,
-                'role' => 'karyawan',
-                'status' => 'Aktif',
-                'joined_at' => now(),
-            ]);
-
-            // Notify group creator & joined user
-            Notification::create([
-                'user_id' => $group->created_by,
-                'type' => 'group_invite',
-                'title' => 'Anggota Baru Bergabung',
-                'description' => "{$user->name} telah bergabung ke workspace '{$group->name}' setelah verifikasi password berhasil.",
-                'is_read' => false,
-            ]);
-
-            Notification::create([
-                'user_id' => $user->id,
-                'type' => 'success',
-                'title' => "Bergabung ke {$group->name}",
-                'description' => "Password terverifikasi. Anda kini dapat mengakses dokumen spreadsheet '{$group->name}'.",
-                'is_read' => false,
-            ]);
-        });
-
-        // Password sudah diverifikasi pada proses bergabung ini; akses berikutnya
-        // setelah logout/login tetap akan meminta password lagi.
-        $request->session()->put('workspace_unlocked_' . $group->id, true);
-        $request->session()->put('sheet_unlocked_' . $group->sheets()->first()->id, true);
-
-        return redirect()->route('group.workspace', $group->id)->with('success', "Autentikasi berhasil! Selamat bergabung ke workspace {$group->name}.");
-    }
-
     /**
      * Search friends by Name in the database.
      * Handles ambiguity and multiple results.

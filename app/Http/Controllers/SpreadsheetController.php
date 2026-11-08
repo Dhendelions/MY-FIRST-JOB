@@ -73,7 +73,7 @@ class SpreadsheetController extends Controller
      */
     public function importCsv(Request $request, SpreadsheetSheet $sheet)
     {
-        $this->authorizeSheetAccess($sheet);
+        $this->authorizeSheetModification($sheet);
 
         $request->validate([
             'csv_file' => ['required', 'file', 'mimes:csv,txt', 'max:5120'], // Max 5MB
@@ -189,7 +189,7 @@ class SpreadsheetController extends Controller
             abort(422, 'Inkonsistensi data: Baris dan kolom berasal dari lembar kerja yang berbeda.');
         }
 
-        $this->authorizeSheetAccess($row->sheet);
+        $this->authorizeSheetModification($row->sheet);
 
         $value = $validated['value'] ?? '';
         $formula = $validated['formula'] ?? null;
@@ -276,7 +276,7 @@ class SpreadsheetController extends Controller
      */
     public function addColumn(Request $request, SpreadsheetSheet $sheet)
     {
-        $this->authorizeSheetAccess($sheet);
+        $this->authorizeSheetModification($sheet);
 
         $nextLetter = $sheet->getNextColumnLetter();
         $maxOrder = $sheet->columns()->max('sort_order') ?? 0;
@@ -300,7 +300,7 @@ class SpreadsheetController extends Controller
      */
     public function deleteColumn(Request $request, SpreadsheetColumn $column)
     {
-        $this->authorizeSheetAccess($column->sheet);
+        $this->authorizeSheetModification($column->sheet);
 
         $populatedCount = $column->populatedCellsCount();
 
@@ -331,7 +331,7 @@ class SpreadsheetController extends Controller
      */
     public function updateColumn(Request $request, SpreadsheetColumn $column)
     {
-        $this->authorizeSheetAccess($column->sheet);
+        $this->authorizeSheetModification($column->sheet);
 
         $validated = $request->validate([
             'title' => ['nullable', 'string', 'max:100'],
@@ -352,7 +352,7 @@ class SpreadsheetController extends Controller
      */
     public function addRow(Request $request, SpreadsheetSheet $sheet)
     {
-        $this->authorizeSheetAccess($sheet);
+        $this->authorizeSheetModification($sheet);
 
         $maxOrder = $sheet->rows()->max('sort_order') ?? 0;
 
@@ -372,7 +372,7 @@ class SpreadsheetController extends Controller
      */
     public function deleteRow(Request $request, SpreadsheetRow $row)
     {
-        $this->authorizeSheetAccess($row->sheet);
+        $this->authorizeSheetModification($row->sheet);
 
         $rowOrder = $row->sort_order;
         $row->delete();
@@ -403,17 +403,30 @@ class SpreadsheetController extends Controller
             abort(403, 'Akses ditolak: Anda tidak memiliki wewenang untuk membaca atau mengubah lembar kerja ini.');
         }
 
+        if ($user->isAdmin() && $group->isArchived()) {
+            abort(403, 'Workspace ini telah diarsipkan dan tidak dapat diakses oleh Admin.');
+        }
+
         $userRole = $group->getMemberRole($user->id);
         if ($sheet->isRestrictedForRole($userRole)) {
-            abort(403, 'Akses dibatasi: Hanya Leader yang memiliki izin untuk mengakses lembar kerja ' . $sheet->name . '.');
+            abort(403, 'Akses dibatasi: Hanya Owner yang memiliki izin untuk mengakses lembar kerja ' . $sheet->name . '.');
         }
 
-        if ($userRole === 'admin' && !$group->isAdminSheetVerifiedForSession($user->id, $sheet->id)) {
-            abort(403, 'Lembar kerja ini memerlukan verifikasi password akun admin.');
-        }
-
-        if ($userRole !== 'admin' && !$group->isUnlockedForSession()) {
+        if ($group->hasPassword() && !$group->isUnlockedForSession()) {
             abort(403, 'Lembar kerja ini belum diotorisasi.');
+        }
+    }
+
+    /**
+     * Authorize write/modification access to a sheet.
+     * Enforces that archived operational years are strictly read-only.
+     */
+    protected function authorizeSheetModification(SpreadsheetSheet $sheet): void
+    {
+        $this->authorizeSheetAccess($sheet);
+
+        if ($sheet->isArchived()) {
+            abort(403, 'Tahun operasional ini telah diarsipkan. Lembar kerja bersifat read-only.');
         }
     }
 }

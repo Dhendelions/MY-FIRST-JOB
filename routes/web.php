@@ -5,7 +5,11 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GroupController;
 use App\Http\Controllers\SpreadsheetController;
+use App\Http\Controllers\CompanyYearController;
+use App\Http\Controllers\CompanyUserController;
+use App\Http\Controllers\CompanyActivityLogController;
 use App\Http\Middleware\EnsureWorkspaceAdminReauthentication;
+use App\Http\Middleware\EnsureWorkspaceAccess;
 
 /*
 |--------------------------------------------------------------------------
@@ -31,12 +35,10 @@ Route::middleware('guest')->group(function () {
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout')->middleware(['auth', EnsureWorkspaceAdminReauthentication::class]);
 
 // Protected Application Routes (Strictly Authenticated)
-Route::middleware(['auth', EnsureWorkspaceAdminReauthentication::class])->group(function () {
+Route::middleware(['auth', EnsureWorkspaceAdminReauthentication::class, EnsureWorkspaceAccess::class])->group(function () {
     
     // Dashboard & Overview
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-    Route::post('/groups', [DashboardController::class, 'createGroup'])->name('groups.store');
-    Route::post('/groups/join', [DashboardController::class, 'joinGroup'])->name('groups.join')->middleware('throttle:15,1');
     
     // Friends & Colleague Networking
     Route::get('/friends/search', [DashboardController::class, 'searchFriends'])->name('friends.search');
@@ -50,7 +52,29 @@ Route::middleware(['auth', EnsureWorkspaceAdminReauthentication::class])->group(
     
     Route::post('/notifications/read-all', [DashboardController::class, 'markNotificationsRead'])->name('notifications.read-all');
 
+    // Company Operational Year Management & Analytics
+    Route::get('/company/year/{year}', [CompanyYearController::class, 'show'])->name('company.year');
+    Route::post('/company/year/{year}/unlock', [CompanyYearController::class, 'unlock'])->name('company.year.unlock');
+    Route::post('/company/year/{year}/password', [CompanyYearController::class, 'setPassword'])->name('company.year.password');
+    Route::post('/company/years', [CompanyYearController::class, 'store'])->name('company.years.store');
+    Route::post('/company/years/{year}/archive', [CompanyYearController::class, 'archive'])->name('company.years.archive');
+    Route::post('/company/years/{year}/restore', [CompanyYearController::class, 'restore'])->name('company.years.restore');
+    Route::get('/company/analytics', [CompanyYearController::class, 'analytics'])->name('company.analytics');
+    Route::get('/company/yearly-comparison', [CompanyYearController::class, 'yearlyComparison'])->name('company.yearly-comparison');
+
+    // Company User Management (Owner Only)
+    Route::get('/company/users', [CompanyUserController::class, 'index'])->name('company.users.index');
+    Route::post('/company/users', [CompanyUserController::class, 'store'])->name('company.users.store');
+    Route::put('/company/users/{user}', [CompanyUserController::class, 'update'])->name('company.users.update');
+    Route::post('/company/users/{user}/role', [CompanyUserController::class, 'changeRole'])->name('company.users.role');
+    Route::post('/company/users/{user}/toggle-status', [CompanyUserController::class, 'toggleStatus'])->name('company.users.toggle-status');
+    Route::post('/company/users/{user}/reset-password', [CompanyUserController::class, 'resetPassword'])->name('company.users.reset-password');
+
+    // Company Activity Logs (Owner Only)
+    Route::get('/company/activity-logs', [CompanyActivityLogController::class, 'index'])->name('company.activity-logs.index');
+
     // Group Workspace & Sheets (Verified in GroupController)
+    Route::get('/company/workspace/{year}/{month}/{sheetName?}', [GroupController::class, 'companyWorkspace'])->name('company.workspace');
     Route::get('/groups/{group}/workspace/{sheet?}', [GroupController::class, 'workspace'])->name('group.workspace');
     Route::get('/groups/{group}/search-users', [GroupController::class, 'searchUsers'])->name('groups.users.search');
     Route::post('/groups/{group}/unlock', [GroupController::class, 'unlock'])->name('groups.unlock');

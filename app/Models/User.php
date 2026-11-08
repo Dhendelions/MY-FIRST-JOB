@@ -22,9 +22,117 @@ class User extends Authenticatable
         'email',
         'password',
         'whatsapp',
+        'role',
         'role_title',
         'avatar',
+        'is_active',
+        'last_active_at',
     ];
+
+    /**
+     * Appended dynamic accessors for JSON serialization.
+     */
+    protected $appends = [
+        'avatar_url',
+        'display_role',
+    ];
+
+    /**
+     * Determine if user is Company Owner based strictly on the database role column.
+     */
+    public function isOwner(): bool
+    {
+        $role = strtolower(trim((string)($this->attributes['role'] ?? 'admin')));
+        return $role === 'owner';
+    }
+
+    /**
+     * Determine if user is Admin based strictly on the database role column.
+     */
+    public function isAdmin(): bool
+    {
+        return !$this->isOwner();
+    }
+
+    /**
+     * Authoritative dynamic role accessor ('owner' or 'admin').
+     */
+    public function getRoleAttribute($value): string
+    {
+        $role = strtolower(trim((string)($value ?? ($this->attributes['role'] ?? 'admin'))));
+        return $role === 'owner' ? 'owner' : 'admin';
+    }
+
+    /**
+     * Authoritative dynamic role title accessor ('Owner' or 'Admin').
+     * Always synchronized with the database role column.
+     */
+    public function getRoleTitleAttribute($value): string
+    {
+        return $this->isOwner() ? 'Owner' : 'Admin';
+    }
+
+    /**
+     * Authoritative display role accessor ('Owner' or 'Admin').
+     */
+    public function getDisplayRoleAttribute(): string
+    {
+        return $this->isOwner() ? 'Owner' : 'Admin';
+    }
+
+    /**
+     * Role mutator ensuring role is always 'owner' or 'admin' and syncs role_title.
+     */
+    public function setRoleAttribute($value): void
+    {
+        $normalized = strtolower(trim((string)$value));
+        $role = $normalized === 'owner' ? 'owner' : 'admin';
+        $this->attributes['role'] = $role;
+        $this->attributes['role_title'] = $role === 'owner' ? 'Owner' : 'Admin';
+    }
+
+    /**
+     * Role title mutator ensuring sync with role column.
+     */
+    public function setRoleTitleAttribute($value): void
+    {
+        $normalized = strtolower(trim((string)$value));
+        if ($normalized === 'owner' || $normalized === 'leader') {
+            $this->attributes['role'] = 'owner';
+            $this->attributes['role_title'] = 'Owner';
+        } else {
+            $this->attributes['role'] = 'admin';
+            $this->attributes['role_title'] = 'Admin';
+        }
+    }
+
+    /**
+     * Check if user account is active.
+     */
+    public function isActive(): bool
+    {
+        return (bool) ($this->is_active ?? true);
+    }
+
+    /**
+     * Check if this user is the last active Owner in the company.
+     */
+    public function isLastActiveOwner(): bool
+    {
+        if (!$this->isOwner() || !$this->isActive()) {
+            return false;
+        }
+
+        return static::where('role', 'owner')->where('is_active', true)->count() <= 1;
+    }
+
+    /**
+     * Scope query to only active users.
+     */
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
+    }
 
     /**
      * The attributes that should be hidden for serialization.
@@ -45,6 +153,8 @@ class User extends Authenticatable
     {
         return [
             'password' => 'hashed',
+            'is_active' => 'boolean',
+            'last_active_at' => 'datetime',
         ];
     }
 

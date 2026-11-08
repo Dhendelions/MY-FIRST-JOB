@@ -130,16 +130,29 @@ class SpreadsheetWorksheet extends Component
             abort(403, 'Akses ditolak: Anda tidak memiliki wewenang pada workspace ini.');
         }
 
+        if ($user->isAdmin() && $this->sheet->group->isArchived()) {
+            abort(403, 'Workspace ini telah diarsipkan dan tidak dapat diakses oleh Admin.');
+        }
+
         if ($this->sheet->isRestrictedForRole($userRole)) {
             abort(403, 'Akses dibatasi: Hanya Leader yang memiliki izin untuk mengakses lembar kerja ' . $this->sheet->name . '.');
         }
 
-        if ($userRole === 'admin' && !$this->sheet->group->isAdminSheetVerifiedForSession($user->id, $this->sheet->id)) {
-            abort(403, 'Lembar kerja ini memerlukan verifikasi password akun admin.');
+        if (!$this->sheet->group->isUnlockedForSession()) {
+            abort(403, 'Lembar kerja ini harus dibuka dengan password workspace terlebih dahulu.');
         }
+    }
 
-        if ($userRole !== 'admin' && !$this->sheet->group->isUnlockedForSession()) {
-            abort(403, 'Lembar kerja ini harus dibuka dengan password terlebih dahulu.');
+    /**
+     * Authorize mutation operations on the sheet.
+     * Enforces read-only behavior if operational year is archived.
+     */
+    protected function authorizeModification(): void
+    {
+        $this->authorizeAccess();
+
+        if ($this->sheet && $this->sheet->isArchived()) {
+            abort(403, 'Tahun operasional ini telah diarsipkan. Lembar kerja bersifat read-only.');
         }
     }
 
@@ -495,7 +508,7 @@ class SpreadsheetWorksheet extends Component
      */
     public function updateCell(int $rowId, int $colId, ?string $value, ?int $expectedVersion = null)
     {
-        $this->authorizeAccess();
+        $this->authorizeModification();
         $this->assertCellBelongsToSheet($rowId, $colId);
 
         $key = "{$rowId}_{$colId}";
@@ -737,7 +750,7 @@ class SpreadsheetWorksheet extends Component
      */
     public function formatCell(string $property, mixed $value = null, ?int $rowId = null, ?int $colId = null)
     {
-        $this->authorizeAccess();
+        $this->authorizeModification();
 
         if ($rowId && $colId) {
             $this->activeRowId = $rowId;
@@ -781,7 +794,7 @@ class SpreadsheetWorksheet extends Component
      */
     public function undo()
     {
-        $this->authorizeAccess();
+        $this->authorizeModification();
         if (empty($this->undoStack)) {
             $this->dispatch('toast', message: 'Tidak ada tindakan untuk di-undo', type: 'info');
             return;
@@ -824,7 +837,7 @@ class SpreadsheetWorksheet extends Component
      */
     public function redo()
     {
-        $this->authorizeAccess();
+        $this->authorizeModification();
         if (empty($this->redoStack)) {
             $this->dispatch('toast', message: 'Tidak ada tindakan untuk di-redo', type: 'info');
             return;
@@ -878,7 +891,7 @@ class SpreadsheetWorksheet extends Component
      */
     public function sortColumn(int $colId, string $direction = 'asc')
     {
-        $this->authorizeAccess();
+        $this->authorizeModification();
 
         $rowsWithVal = [];
         foreach ($this->rows as $row) {
@@ -919,7 +932,7 @@ class SpreadsheetWorksheet extends Component
      */
     public function executeFindReplace()
     {
-        $this->authorizeAccess();
+        $this->authorizeModification();
 
         $find = trim($this->findText);
         $replace = $this->replaceText;
@@ -962,7 +975,7 @@ class SpreadsheetWorksheet extends Component
      */
     public function addColumn()
     {
-        $this->authorizeAccess();
+        $this->authorizeModification();
 
         $nextLetter = $this->sheet->getNextColumnLetter();
         $maxOrder = $this->sheet->columns()->max('sort_order') ?? 0;
@@ -984,7 +997,7 @@ class SpreadsheetWorksheet extends Component
      */
     public function requestDeleteColumn(int $colId)
     {
-        $this->authorizeAccess();
+        $this->authorizeModification();
 
         $col = SpreadsheetColumn::where('sheet_id', $this->sheetId)->find($colId);
         if (!$col) return;
@@ -1005,7 +1018,7 @@ class SpreadsheetWorksheet extends Component
 
     public function forceDeleteColumn()
     {
-        $this->authorizeAccess();
+        $this->authorizeModification();
 
         if ($this->columnPendingDeleteId) {
             $col = SpreadsheetColumn::where('sheet_id', $this->sheetId)->find($this->columnPendingDeleteId);
@@ -1035,7 +1048,7 @@ class SpreadsheetWorksheet extends Component
      */
     public function setColumnWidth(int $colId, int $width)
     {
-        $this->authorizeAccess();
+        $this->authorizeModification();
 
         // Keep resizing a presentation concern: it never touches cell data or formulas.
         $width = max(64, min(900, $width));
@@ -1059,7 +1072,7 @@ class SpreadsheetWorksheet extends Component
     /** Persist a user-resized row without changing its contents. */
     public function setRowHeight(int $rowId, int $height)
     {
-        $this->authorizeAccess();
+        $this->authorizeModification();
 
         $storedHeight = max(15, min(300, $height / 1.333333));
         SpreadsheetRow::where('sheet_id', $this->sheetId)
@@ -1086,7 +1099,7 @@ class SpreadsheetWorksheet extends Component
      */
     public function updateColumnTitle(int $colId, string $title)
     {
-        $this->authorizeAccess();
+        $this->authorizeModification();
 
         $trimmed = trim($title);
         SpreadsheetColumn::where('sheet_id', $this->sheetId)
@@ -1110,7 +1123,7 @@ class SpreadsheetWorksheet extends Component
      */
     public function addRow()
     {
-        $this->authorizeAccess();
+        $this->authorizeModification();
 
         $orderedRows = $this->sheet->rows()->with('cells')->orderBy('sort_order')->get();
         $footer = $orderedRows->last(fn (SpreadsheetRow $row) => $row->cells->contains(fn (SpreadsheetCell $cell) => !empty($cell->formula)));
@@ -1178,7 +1191,7 @@ class SpreadsheetWorksheet extends Component
      */
     public function deleteRow(int $rowId)
     {
-        $this->authorizeAccess();
+        $this->authorizeModification();
 
         $row = SpreadsheetRow::where('sheet_id', $this->sheetId)->where('id', $rowId)->firstOrFail();
         $order = $row->sort_order;
@@ -1195,7 +1208,7 @@ class SpreadsheetWorksheet extends Component
      */
     public function pasteTsvData(int $startRowId, int $startColId, string $tsvContent)
     {
-        $this->authorizeAccess();
+        $this->authorizeModification();
         $this->assertCellBelongsToSheet($startRowId, $startColId);
 
         // Do not trim clipboard text: blank cells and spaces are meaningful in a
@@ -1325,7 +1338,10 @@ class SpreadsheetWorksheet extends Component
 
     public function render()
     {
-        return view('livewire.spreadsheet-worksheet');
+        $isArchived = $this->sheet ? $this->sheet->isArchived() : false;
+        return view('livewire.spreadsheet-worksheet', [
+            'isArchived' => $isArchived,
+        ]);
     }
 
     private function assertCellBelongsToSheet(int $rowId, int $columnId): void

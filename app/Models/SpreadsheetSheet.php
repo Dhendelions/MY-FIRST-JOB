@@ -14,10 +14,42 @@ class SpreadsheetSheet extends Model
 
     protected $fillable = [
         'group_id',
+        'monthly_workspace_id',
         'name',
         'category',
         'metadata',
     ];
+
+    /**
+     * Relationship: The monthly workspace this sheet belongs to.
+     */
+    public function monthlyWorkspace(): BelongsTo
+    {
+        return $this->belongsTo(MonthlyWorkspace::class, 'monthly_workspace_id');
+    }
+
+    /**
+     * Determine if this spreadsheet sheet belongs to an archived operational year.
+     */
+    public function isArchived(): bool
+    {
+        if ($this->relationLoaded('monthlyWorkspace') && $this->monthlyWorkspace) {
+            return $this->monthlyWorkspace->year ? (bool) $this->monthlyWorkspace->year->is_archived : false;
+        }
+
+        if ($this->monthly_workspace_id) {
+            $mw = $this->monthlyWorkspace()->with('year')->first();
+            if ($mw && $mw->year) {
+                return (bool) $mw->year->is_archived;
+            }
+        }
+
+        if ($this->group) {
+            return $this->group->isArchived();
+        }
+
+        return false;
+    }
 
     protected $casts = [
         'metadata' => 'array',
@@ -154,7 +186,7 @@ class SpreadsheetSheet extends Model
      */
     public function isRestrictedForRole(?string $role): bool
     {
-        if ($role === 'leader') {
+        if ($role === 'owner' || $role === 'leader') {
             return false;
         }
 

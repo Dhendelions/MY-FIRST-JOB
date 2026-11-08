@@ -9,9 +9,13 @@
 
         <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div class="space-y-2">
-                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-500/10 border border-sky-400/20 text-xs font-semibold text-sky-300">
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-500/15 border border-sky-400/30 text-xs font-semibold text-sky-300">
                     <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                    Sistem Kolaborasi Spreadsheet Aktif
+                    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(Auth::user()->isOwner()): ?>
+                        Executive Portal &bull; Owner PT Dadhen Mandiri
+                    <?php else: ?>
+                        Workspace Kolaboratif &bull; Admin
+                    <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
                 </div>
                 <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
                     Halo, <?php echo e($user->name); ?>! 👋
@@ -21,24 +25,24 @@
                 </p>
             </div>
 
-            <!-- TIGA TOMBOL AKSI CEPAT UTAMA -->
+            <!-- TOMBOL AKSI CEPAT UTAMA -->
             <div class="flex flex-wrap sm:flex-nowrap items-center gap-2.5 shrink-0">
-                <button @click="activeModal = 'modal-create-group'" 
-                        class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-sky-600 hover:from-sky-400 hover:to-sky-500 text-white text-xs sm:text-sm font-bold shadow-lg shadow-sky-500/25 flex items-center gap-2 transition-all">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                    Buat Workspace
-                </button>
-
-                <button @click="activeModal = 'modal-join-group'" 
-                        class="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-bold shadow-lg shadow-emerald-500/20 flex items-center gap-2 transition-all">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path></svg>
-                    Gabung Tim
-                </button>
-
+                <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(Auth::user()->isOwner()): ?>
+                    <a href="<?php echo e(route('company.analytics')); ?>" 
+                       class="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-bold flex items-center gap-1.5 transition-all duration-200 hover:-translate-y-0.5 shadow-xs">
+                        <svg class="w-4 h-4 text-sky-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"/></svg>
+                        <span>Analytics</span>
+                    </a>
+                    <a href="<?php echo e(route('company.users.index')); ?>" 
+                       class="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-bold flex items-center gap-1.5 transition-all duration-200 hover:-translate-y-0.5 shadow-xs">
+                        <svg class="w-4 h-4 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                        <span>Pengguna</span>
+                    </a>
+                <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
                 <button @click="activeModal = 'modal-friend'" 
-                        class="px-4 py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs sm:text-sm font-bold flex items-center gap-2 transition-all">
-                    <svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
-                    Hubungkan Rekan
+                        class="px-4 py-2.5 rounded-xl bg-sky-600/90 hover:bg-sky-500 border border-sky-400/30 text-white text-xs sm:text-sm font-bold flex items-center gap-2 transition-all duration-200 hover:-translate-y-0.5 shadow-xs">
+                    <svg class="w-4 h-4 text-sky-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
+                    <span>Hubungkan Rekan</span>
                 </button>
             </div>
         </div>
@@ -48,10 +52,10 @@
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         
         <!-- KPI 1: Total Workspace -->
-        <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md transition-shadow reveal-on-scroll">
+        <div class="group relative bg-white hover:bg-gradient-to-br hover:from-white hover:to-sky-50/30 rounded-2xl p-5 border border-slate-200/80 hover:border-sky-300/80 shadow-xs hover:shadow-lg hover:shadow-sky-500/5 transition-all duration-200 ease-out hover:-translate-y-0.5 reveal-on-scroll overflow-hidden">
             <div class="flex items-center justify-between">
                 <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Workspace Tim</span>
-                <div class="w-9 h-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center font-bold">
+                <div class="w-9 h-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center font-bold group-hover:scale-110 group-hover:bg-sky-500 group-hover:text-white transition-all duration-200 shadow-xs">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
                 </div>
             </div>
@@ -60,13 +64,14 @@
                 <span class="text-xs text-sky-600 font-medium">Workspace Aktif</span>
             </div>
             <p class="text-[11px] text-slate-400 mt-1">Ruang kerja kolaboratif Anda</p>
+            <div class="absolute bottom-0 inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-sky-400 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
         </div>
 
         <!-- KPI 2: Lembar Spreadsheet Aktif -->
-        <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md transition-shadow reveal-on-scroll">
+        <div class="group relative bg-white hover:bg-gradient-to-br hover:from-white hover:to-emerald-50/30 rounded-2xl p-5 border border-slate-200/80 hover:border-emerald-300/80 shadow-xs hover:shadow-lg hover:shadow-emerald-500/5 transition-all duration-200 ease-out hover:-translate-y-0.5 reveal-on-scroll overflow-hidden">
             <div class="flex items-center justify-between">
                 <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Lembar Spreadsheet</span>
-                <div class="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                <div class="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold group-hover:scale-110 group-hover:bg-emerald-500 group-hover:text-white transition-all duration-200 shadow-xs">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                 </div>
             </div>
@@ -75,13 +80,14 @@
                 <span class="text-xs text-emerald-600 font-medium">Lembar Terbuka</span>
             </div>
             <p class="text-[11px] text-slate-400 mt-1">Multi-sheet dokumen tim</p>
+            <div class="absolute bottom-0 inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-emerald-400 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
         </div>
 
         <!-- KPI 3: Total Sel Data Tercatat -->
-        <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md transition-shadow reveal-on-scroll">
+        <div class="group relative bg-white hover:bg-gradient-to-br hover:from-white hover:to-amber-50/30 rounded-2xl p-5 border border-slate-200/80 hover:border-amber-300/80 shadow-xs hover:shadow-lg hover:shadow-amber-500/5 transition-all duration-200 ease-out hover:-translate-y-0.5 reveal-on-scroll overflow-hidden">
             <div class="flex items-center justify-between">
                 <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Sel Data Tercatat</span>
-                <div class="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+                <div class="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold group-hover:scale-110 group-hover:bg-amber-500 group-hover:text-white transition-all duration-200 shadow-xs">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
                 </div>
             </div>
@@ -90,13 +96,14 @@
                 <span class="text-xs text-amber-600 font-medium">Sel Terisi</span>
             </div>
             <p class="text-[11px] text-slate-400 mt-1">Data tersimpan di database</p>
+            <div class="absolute bottom-0 inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-amber-400 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
         </div>
 
         <!-- KPI 4: Jumlah Rekan Terhubung -->
-        <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md transition-shadow reveal-on-scroll">
+        <div class="group relative bg-white hover:bg-gradient-to-br hover:from-white hover:to-indigo-50/30 rounded-2xl p-5 border border-slate-200/80 hover:border-indigo-300/80 shadow-xs hover:shadow-lg hover:shadow-indigo-500/5 transition-all duration-200 ease-out hover:-translate-y-0.5 reveal-on-scroll overflow-hidden">
             <div class="flex items-center justify-between">
                 <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Rekan Terhubung</span>
-                <div class="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+                <div class="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold group-hover:scale-110 group-hover:bg-indigo-500 group-hover:text-white transition-all duration-200 shadow-xs">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
                 </div>
             </div>
@@ -105,260 +112,379 @@
                 <span class="text-xs text-indigo-600 font-medium">Rekan Kolaboratif</span>
             </div>
             <p class="text-[11px] text-slate-400 mt-1">Jaringan rekan kerja aktif</p>
+            <div class="absolute bottom-0 inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-indigo-400 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
         </div>
     </div>
 
-    <!-- 3. KATALOG WORKSPACE TIM -->
+    <!-- 2.5 WORKSPACE PERUSAHAAN TERPUSAT (HIERARKI TAHUN & BULAN) -->
+    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(isset($operationalYears) && $operationalYears->isNotEmpty()): ?>
     <div class="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-6 space-y-6 reveal-on-scroll"
-         x-data="{
-            manageableWorkspaces: <?php echo \Illuminate\Support\Js::from($manageableGroups->map(fn ($workspace) => ['id' => (int) $workspace->id, 'name' => $workspace->name])->values())->toHtml() ?>,
-            selectedWorkspaceIds: [],
-            showBulkDeleteConfirmation: false,
-            isDeleting: false,
-            get selectedWorkspaceDetails() {
-                return this.manageableWorkspaces.filter(workspace => this.selectedWorkspaceIds.includes(workspace.id));
-            },
-            cleanSelection() {
-                const validIds = new Set(this.manageableWorkspaces.map(workspace => workspace.id));
-                this.selectedWorkspaceIds = this.selectedWorkspaceIds.filter(id => validIds.has(id));
-            },
-            toggleWorkspace(workspace, checked) {
-                const selectedIds = new Set(this.selectedWorkspaceIds);
-                if (checked) {
-                    selectedIds.add(workspace.id);
-                } else {
-                    selectedIds.delete(workspace.id);
-                }
-                this.selectedWorkspaceIds = [...selectedIds];
-                this.cleanSelection();
-            },
-            toggleAllWorkspaces() {
-                this.cleanSelection();
-                this.selectedWorkspaceIds = this.selectedWorkspaceIds.length === this.manageableWorkspaces.length
-                    ? []
-                    : this.manageableWorkspaces.map(workspace => workspace.id);
-            },
-            submitBulkDelete(event) {
-                if (this.isDeleting || this.selectedWorkspaceIds.length === 0) {
-                    return;
-                }
-
-                this.isDeleting = true;
-                event.target.submit();
-            }
-         }"
-         x-init="cleanSelection()">
-        
-        <!-- Filter & Search Bar -->
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+         x-data="{ showAddYearModal: false }">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
             <div>
-                <h2 class="text-lg font-bold text-slate-900 tracking-tight">Katalog Workspace Tim</h2>
-                <p class="text-xs text-slate-500">Pilih workspace untuk membuka lembar kerja spreadsheet kolaboratif</p>
-            </div>
-
-            <!-- Search and Filter Form -->
-            <form action="<?php echo e(route('dashboard')); ?>" method="GET" class="flex flex-wrap items-center gap-2.5">
-                <div class="relative min-w-[220px]">
-                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                <div class="flex items-center gap-2">
+                    <span class="px-2.5 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200 font-semibold text-[11px] flex items-center gap-1.5">
+                        <span class="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse"></span>
+                        Sistem Terpusat
                     </span>
-                    <input type="text" name="q" value="<?php echo e(request('q')); ?>" placeholder="Cari nama workspace..."
-                           class="w-full pl-9 pr-3.5 py-2 text-xs border border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:outline-none bg-slate-50/50">
+                    <h2 class="text-lg font-bold text-slate-900 tracking-tight">Workspace Perusahaan Dadhen Mandiri</h2>
                 </div>
-
-                <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(request('q')): ?>
-                    <a href="<?php echo e(route('dashboard')); ?>" class="text-xs text-rose-600 hover:underline px-2">Reset</a>
+                <p class="text-xs text-slate-500 mt-1">
+                    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(Auth::user()->isOwner()): ?>
+                        Struktur pembukuan terpusat: Tahun &rarr; Bulan &rarr; 5 Lembar Kerja (Analisa, Cost, Margin, Pendukung, Rank)
+                    <?php else: ?>
+                        Struktur pembukuan terpusat: Tahun &rarr; Bulan &rarr; Lembar Kerja Operasional (Analisa &amp; Cost)
+                    <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+                </p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+                <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(Auth::user()->isOwner()): ?>
+                    <a href="<?php echo e(route('company.analytics')); ?>" class="px-3.5 py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-300 text-slate-700 text-xs font-bold transition-all duration-200 flex items-center gap-1.5 shadow-xs hover:-translate-y-0.5">
+                        <svg class="w-3.5 h-3.5 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"/></svg>
+                        <span>Analytics</span>
+                    </a>
                 <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
-            </form>
+                <span class="text-xs font-mono text-slate-500 mr-1">Total: <strong><?php echo e($operationalYears->count()); ?> Tahun</strong></span>
+                <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(Auth::user()->isOwner()): ?>
+                    <button type="button" @click="showAddYearModal = true" class="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-sky-600 to-sky-700 hover:from-sky-500 hover:to-sky-600 text-white font-bold text-xs shadow-xs hover:shadow-md hover:shadow-sky-500/20 transition-all duration-200 flex items-center gap-1.5 hover:-translate-y-0.5 active:translate-y-0">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                        <span>+ Add Year</span>
+                    </button>
+                <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+            </div>
         </div>
 
-        <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($manageableGroups->isNotEmpty()): ?>
-            <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                <div class="flex flex-wrap items-center gap-4">
-                    <label class="inline-flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer select-none">
-                        <input type="checkbox"
-                               :checked="selectedWorkspaceIds.length === manageableWorkspaces.length && manageableWorkspaces.length > 0"
-                               x-effect="$el.indeterminate = selectedWorkspaceIds.length > 0 && selectedWorkspaceIds.length < manageableWorkspaces.length"
-                               @change="toggleAllWorkspaces()"
-                               class="rounded border-slate-300 text-sky-600 focus:ring-sky-500">
-                        <span x-text="selectedWorkspaceIds.length === manageableWorkspaces.length && manageableWorkspaces.length > 0 ? 'Batalkan Semua Pilihan' : 'Pilih Semua yang Dapat Dikelola'">Pilih Semua yang Dapat Dikelola</span>
-                    </label>
-                    <span class="text-xs text-slate-500"><span x-text="selectedWorkspaceIds.length"></span> workspace dipilih</span>
-                </div>
-                <div class="flex items-center gap-2">
-                    <button type="button" @click="selectedWorkspaceIds = []"
-                            :disabled="selectedWorkspaceIds.length === 0"
-                            class="rounded-lg px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-white disabled:cursor-not-allowed disabled:opacity-40">
-                        Batalkan Pilihan
-                    </button>
-                    <button type="button" @click="showBulkDeleteConfirmation = true"
-                            x-show="selectedWorkspaceIds.length > 0"
-                            class="rounded-lg bg-rose-600 px-3 py-2 text-xs font-semibold text-white shadow-xs transition hover:bg-rose-700">
-                        Hapus Workspace Terpilih
-                    </button>
-                </div>
-            </div>
-        <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
-
-        <!-- Grid Kartu Workspace -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php $__empty_1 = true; $__currentLoopData = $myGroups; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $grp): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
-                <div class="group relative bg-white rounded-2xl border border-slate-200 hover:border-sky-300 shadow-xs hover:shadow-xl transition-all duration-200 flex flex-col justify-between overflow-hidden"
-                     :class="selectedWorkspaceIds.includes(<?php echo e($grp->id); ?>) ? 'border-sky-500 ring-2 ring-sky-200 bg-sky-50/30' : ''">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5"
+             x-data="{
+                activeUnlockYear: null,
+                activePasswordModalYear: null,
+                openUnlockModal(year) {
+                    this.activeUnlockYear = year;
+                },
+                openPasswordModal(year) {
+                    this.activePasswordModalYear = year;
+                }
+             }">
+            <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php $__currentLoopData = $operationalYears; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $opY): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                <?php
+                    $isUnlocked = $opY->isUnlockedForUser(Auth::id());
+                ?>
+                <div class="group relative rounded-2xl bg-gradient-to-br from-[#0A192F] via-[#0D2038] to-[#132A4A] text-white p-5 sm:p-6 border border-slate-800/90 hover:border-sky-500/50 shadow-md hover:shadow-xl hover:shadow-sky-950/40 transition-all duration-200 ease-out <?php echo e($opY->is_archived && Auth::user()->isAdmin() ? 'opacity-60 cursor-not-allowed' : 'hover:-translate-y-1 cursor-pointer'); ?> flex flex-col justify-between overflow-hidden select-none"
+                     @click="<?php if(Auth::user()->isOwner() || (!$opY->is_archived && $isUnlocked)): ?> window.location.href = '<?php echo e(route('company.year', $opY->year)); ?>' <?php elseif(!$opY->is_archived): ?> openUnlockModal(<?php echo e($opY->year); ?>) <?php endif; ?>">
                     
-                    <!-- Card Top Accent Header -->
-                    <div class="h-2 bg-gradient-to-r from-sky-500 via-emerald-400 to-indigo-500"></div>
+                    <!-- Top-right Ambient Cyan Glow on Hover -->
+                    <div class="absolute -top-16 -right-16 w-40 h-40 bg-gradient-to-bl from-sky-400/10 via-cyan-400/5 to-transparent rounded-full blur-2xl group-hover:from-sky-400/25 group-hover:via-cyan-300/10 transition-all duration-300 pointer-events-none"></div>
 
-                    <div class="p-5 flex-1 space-y-4">
-                        
-                        <!-- Header & Category Tag -->
+                    <!-- Bottom Gradient Accent Border on Hover -->
+                    <div class="absolute bottom-0 inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-sky-400 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+
+                    <div class="relative z-10 space-y-4">
+                        <!-- Card Header: Year Emblem, Title, Status & Arrow Indicator -->
                         <div class="flex items-start justify-between gap-3">
                             <div class="flex items-center gap-3">
-                                <div class="w-12 h-12 rounded-xl bg-sky-50 border border-sky-100 flex items-center justify-center font-bold text-sky-700 text-sm shadow-xs shrink-0">
-                                    <?php echo e(strtoupper(substr($grp->name, 0, 2))); ?>
+                                <div class="w-12 h-12 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center font-extrabold text-lg text-sky-300 group-hover:bg-sky-500/20 group-hover:border-sky-400/40 group-hover:text-white transition-all duration-200 shadow-inner shrink-0">
+                                    <?php echo e($opY->year); ?>
 
                                 </div>
                                 <div>
-                                    <h3 class="text-base font-bold text-slate-900 group-hover:text-sky-600 transition-colors line-clamp-1">
-                                        <?php echo e($grp->name); ?>
+                                    <h3 class="font-extrabold text-white text-base group-hover:text-sky-300 transition-colors tracking-tight">
+                                        Workspace <?php echo e($opY->year); ?>
 
                                     </h3>
-                                    <p class="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-                                        <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path></svg>
-                                        <?php echo e($grp->location ?: 'Utama'); ?>
-
+                                    <p class="text-xs text-slate-300/90 mt-0.5">
+                                        12 Bulan Operasional &bull; 60 Dokumen
                                     </p>
                                 </div>
                             </div>
 
-                            <span class="px-2.5 py-1 rounded-full text-[11px] font-semibold tracking-wide shrink-0 bg-sky-50 text-sky-700 border border-sky-200">
-                                <?php echo e($grp->category); ?>
-
-                            </span>
-                        </div>
-                        <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($grp->isLeader($user->id)): ?>
-                            <label class="inline-flex items-center gap-2 text-xs font-medium text-slate-600" @click.stop>
-                                <input type="checkbox"
-                                       :checked="selectedWorkspaceIds.includes(<?php echo e($grp->id); ?>)"
-                                       @change="toggleWorkspace({ id: <?php echo e($grp->id); ?>, name: <?php echo \Illuminate\Support\Js::from($grp->name)->toHtml() ?> }, $event.target.checked)"
-                                       @click.stop
-                                       aria-label="Pilih workspace <?php echo e($grp->name); ?>"
-                                       class="rounded border-slate-300 text-sky-600 focus:ring-sky-500">
-                                Pilih workspace
-                            </label>
-                        <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
-
-                        <!-- Description -->
-                        <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($grp->description): ?>
-                            <p class="text-xs text-slate-600 line-clamp-2 leading-relaxed">
-                                <?php echo e($grp->description); ?>
-
-                            </p>
-                        <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
-
-                        <!-- Metrics: Capacity & Sheets count -->
-                        <div class="grid grid-cols-2 gap-2 py-2 px-3 rounded-xl bg-slate-50 border border-slate-100 text-xs">
-                            <div>
-                                <span class="text-slate-400 text-[10px] uppercase font-semibold">Kapasitas Tim</span>
-                                <p class="font-bold text-slate-800 font-mono"><?php echo e($grp->pond_count ?? 5); ?> Anggota</p>
-                            </div>
-                            <div>
-                                <span class="text-slate-400 text-[10px] uppercase font-semibold">Lembar Kerja</span>
-                                <p class="font-bold text-slate-800 font-mono"><?php echo e($grp->sheets->count()); ?> Sheet Aktif</p>
-                            </div>
-                        </div>
-
-                        <!-- Member Avatars (Clickable to view profile) -->
-                        <div class="flex items-center justify-between pt-1">
-                            <span class="text-[11px] text-slate-400 font-medium">Anggota Tim:</span>
-                            <div class="flex -space-x-2 overflow-hidden">
-                                <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php $__empty_2 = true; $__currentLoopData = $grp->activeMembers->take(4); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $m): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_2 = false; ?>
-                                    <img class="inline-block h-6 w-6 rounded-full ring-2 ring-white object-cover cursor-pointer hover:ring-sky-400 hover:scale-110 transition-transform" 
-                                         src="<?php echo e($m->user->avatar_url); ?>" 
-                                         alt="<?php echo e($m->user->name); ?>" 
-                                         title="Lihat profil <?php echo e($m->user->name); ?> (<?php echo e($m->role); ?>)"
-                                         @click="openUserProfile(<?php echo e($m->user->id); ?>)">
-                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_2): ?>
-                                    <span class="text-[11px] text-slate-400">1 Anggota</span>
-                                <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
-                                <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($grp->activeMembers->count() > 4): ?>
-                                    <span class="inline-flex items-center justify-center h-6 w-6 rounded-full ring-2 ring-white bg-slate-200 text-slate-700 text-[10px] font-bold">
-                                        +<?php echo e($grp->activeMembers->count() - 4); ?>
-
+                            <div class="flex items-center gap-2">
+                                <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($opY->is_archived): ?>
+                                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                        🔒 Diarsipkan
+                                    </span>
+                                <?php else: ?>
+                                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                        Aktif
                                     </span>
                                 <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+
+                                <!-- Directional Indicator Arrow -->
+                                <div class="w-7 h-7 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 group-hover:text-sky-300 group-hover:bg-sky-500/20 group-hover:border-sky-400/30 transition-all duration-200">
+                                    <svg class="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                    </svg>
+                                </div>
                             </div>
                         </div>
+
+                        <!-- Status & Security Badges -->
+                        <div class="flex flex-wrap items-center gap-2 pt-1">
+                            <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($opY->hasPassword()): ?>
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800/90 border border-slate-700/80 text-[11px] font-medium text-amber-300">
+                                    <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                                    <span>Protected</span>
+                                </span>
+                            <?php else: ?>
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800/90 border border-slate-700/80 text-[11px] font-medium text-slate-300">
+                                    <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"/></svg>
+                                    <span>Terbuka</span>
+                                </span>
+                            <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+
+                            <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(Auth::user()->isOwner()): ?>
+                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-950/70 border border-sky-800/70 text-[11px] font-semibold text-sky-300">
+                                    <span>Owner Access</span>
+                                </span>
+                            <?php elseif($isUnlocked): ?>
+                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-950/70 border border-emerald-800/70 text-[11px] font-semibold text-emerald-300">
+                                    <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                    <span>Terverifikasi</span>
+                                </span>
+                            <?php else: ?>
+                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-950/70 border border-rose-800/70 text-[11px] font-semibold text-rose-300">
+                                    <span>Terkunci</span>
+                                </span>
+                            <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+                        </div>
+
+                        <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(!Auth::user()->isOwner() && $isUnlocked): ?>
+                            <!-- Accessible Spreadsheet Shortcuts for Admin (Analisa & Cost) -->
+                            <div class="pt-2 border-t border-white/10 flex items-center gap-2" @click.stop>
+                                <span class="text-[10px] text-slate-400 font-medium">Buka Cepat:</span>
+                                <a href="<?php echo e(route('company.workspace', [$opY->year, 1, 'Analisa'])); ?>" 
+                                   class="px-2.5 py-1 rounded-md bg-white/10 hover:bg-sky-500 hover:text-white text-[10px] font-semibold text-sky-200 border border-white/10 transition-all duration-180 hover:-translate-y-0.5 flex items-center gap-1">
+                                    <span>Analisa</span>
+                                </a>
+                                <a href="<?php echo e(route('company.workspace', [$opY->year, 1, 'Cost'])); ?>" 
+                                   class="px-2.5 py-1 rounded-md bg-white/10 hover:bg-emerald-500 hover:text-white text-[10px] font-semibold text-emerald-200 border border-white/10 transition-all duration-180 hover:-translate-y-0.5 flex items-center gap-1">
+                                    <span>Cost</span>
+                                </a>
+                            </div>
+                        <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
                     </div>
 
-                    <!-- Open Workspace Button -->
-                    <div class="p-4 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between">
-                        <span class="text-xs text-slate-500 font-medium">Spreadsheet Kolaboratif</span>
-                        <a href="<?php echo e(route('group.workspace', $grp->id)); ?>" 
-                           class="px-3.5 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-all">
-                            <span>Buka Ruang Kerja</span>
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-                        </a>
-                    </div>
-                </div>
-            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
-                <div class="col-span-full py-12 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                    <div class="w-12 h-12 rounded-2xl bg-sky-100 text-sky-600 flex items-center justify-center mx-auto mb-3">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
-                    </div>
-                    <h3 class="text-sm font-bold text-slate-800">Belum ada workspace ditemukan</h3>
-                    <p class="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-                        Mulai dengan membuat workspace tim baru atau bergabung ke workspace yang sudah ada.
-                    </p>
-                    <div class="mt-4 flex items-center justify-center gap-2">
-                        <button @click="activeModal = 'modal-create-group'" class="px-4 py-2 bg-sky-600 text-white rounded-xl text-xs font-semibold hover:bg-sky-500 transition-colors">
-                            + Buat Workspace Baru
-                        </button>
-                    </div>
-                </div>
-            <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
-        </div>
+                    <!-- Bottom Action Footer -->
+                    <div class="relative z-10 pt-4 mt-4 border-t border-white/10 flex items-center justify-between gap-2" @click.stop>
+                        <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(Auth::user()->isOwner()): ?>
+                            <div class="flex items-center gap-1.5">
+                                <button type="button" 
+                                        @click="openPasswordModal(<?php echo e($opY->year); ?>)"
+                                        class="px-2.5 py-1.5 rounded-lg border border-white/15 bg-white/5 hover:bg-white/15 text-slate-200 hover:text-white text-xs font-semibold transition-all duration-180 flex items-center gap-1 hover:-translate-y-0.5 active:translate-y-0">
+                                    <svg class="w-3.5 h-3.5 text-slate-400 group-hover:text-amber-300 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+                                    <span>Password</span>
+                                </button>
 
-        <div x-show="showBulkDeleteConfirmation" x-transition.opacity
-             class="fixed inset-0 z-[1100] overflow-y-auto" x-cloak role="dialog" aria-modal="true"
-             aria-labelledby="bulk-delete-workspaces-title" @keydown.escape.window="showBulkDeleteConfirmation = false">
-            <div class="flex min-h-screen items-center justify-center px-4 py-8">
-                <div class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm" @click="showBulkDeleteConfirmation = false"></div>
-                <div class="relative w-full max-w-lg overflow-hidden rounded-2xl bg-white text-left shadow-2xl ring-1 ring-black/5">
-                    <div class="h-1.5 bg-gradient-to-r from-rose-500 via-red-500 to-orange-400"></div>
-                    <div class="p-6">
-                        <p class="text-[11px] font-bold uppercase tracking-widest text-rose-600">Tindakan permanen</p>
-                        <h3 id="bulk-delete-workspaces-title" class="mt-1 text-lg font-bold text-slate-900">
-                            Hapus <span x-text="selectedWorkspaceIds.length"></span> workspace terpilih?
-                        </h3>
-                        <p class="mt-2 text-sm leading-6 text-slate-600">
-                            Workspace dan data terkaitnya, termasuk sheet, sel, anggota, formula, gambar, serta riwayat aktivitas, akan dihapus sesuai kebijakan aplikasi dan tidak dapat dipulihkan.
+                                <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($opY->is_archived): ?>
+                                    <form action="<?php echo e(route('company.years.restore', $opY->id)); ?>" method="POST" class="inline">
+                                        <?php echo csrf_field(); ?>
+                                        <button type="submit" class="px-2.5 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-semibold text-xs border border-emerald-500/30 transition-all duration-180 hover:-translate-y-0.5 active:translate-y-0">
+                                            Pulihkan
+                                        </button>
+                                    </form>
+                                <?php else: ?>
+                                    <form action="<?php echo e(route('company.years.archive', $opY->id)); ?>" method="POST" class="inline" onsubmit="return confirm('Arsipkan tahun <?php echo e($opY->year); ?>? Semua lembar kerja di tahun ini akan menjadi mode hanya baca (read-only).');">
+                                        <?php echo csrf_field(); ?>
+                                        <button type="submit" class="px-2.5 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-semibold text-xs border border-amber-500/30 transition-all duration-180 hover:-translate-y-0.5 active:translate-y-0">
+                                            Arsipkan
+                                        </button>
+                                    </form>
+                                <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+                            </div>
+
+                            <a href="<?php echo e(route('company.year', $opY->year)); ?>" 
+                               class="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-sky-500 to-cyan-500 hover:from-sky-400 hover:to-cyan-400 text-white font-bold text-xs shadow-xs hover:shadow-md hover:shadow-sky-500/25 transition-all duration-200 flex items-center gap-1 hover:-translate-y-0.5 active:translate-y-0">
+                                <span>Buka Workspace</span>
+                                <svg class="w-3.5 h-3.5 text-white/90 group-hover:translate-x-0.5 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                            </a>
+                        <?php else: ?>
+                            
+                            <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($isUnlocked): ?>
+                                <a href="<?php echo e(route('company.year', $opY->year)); ?>" 
+                                   class="w-full py-2.5 rounded-xl bg-gradient-to-r from-sky-600 via-sky-500 to-cyan-600 hover:from-sky-500 hover:via-sky-400 hover:to-cyan-500 text-white font-bold text-xs shadow-xs hover:shadow-md hover:shadow-sky-500/20 text-center transition-all duration-200 flex items-center justify-center gap-2 hover:-translate-y-0.5 active:translate-y-0">
+                                    <span>Buka Workspace <?php echo e($opY->year); ?></span>
+                                    <svg class="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                </a>
+                            <?php else: ?>
+                                <button type="button" 
+                                        @click="openUnlockModal(<?php echo e($opY->year); ?>)"
+                                        class="w-full py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 hover:border-sky-400/40 text-white font-bold text-xs shadow-xs text-center transition-all duration-200 flex items-center justify-center gap-2 hover:-translate-y-0.5 active:translate-y-0">
+                                    <svg class="w-4 h-4 text-amber-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                                    <span>Buka Workspace <?php echo e($opY->year); ?></span>
+                                    <svg class="w-3.5 h-3.5 text-slate-400 group-hover:translate-x-1 group-hover:text-sky-300 transition-all duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                </button>
+                            <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+                        <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+                    </div>
+                </div>
+            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+
+            <!-- Modal Unlock Password Workspace (Admin) -->
+            <div x-show="activeUnlockYear !== null" 
+                 x-cloak
+                 class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs"
+                 @keydown.escape.window="activeUnlockYear = null">
+                <div class="bg-white w-full max-w-md rounded-2xl border border-slate-200 shadow-2xl p-6 space-y-5"
+                     @click.outside="activeUnlockYear = null">
+                    <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                        <div class="flex items-center gap-2">
+                            <div class="w-8 h-8 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center font-bold text-sm">
+                                🔒
+                            </div>
+                            <h3 class="text-base font-bold text-slate-900" x-text="'Masukkan Password Workspace ' + activeUnlockYear"></h3>
+                        </div>
+                        <button type="button" @click="activeUnlockYear = null" class="text-slate-400 hover:text-slate-600 text-lg">&times;</button>
+                    </div>
+
+                    <form :action="'/company/year/' + activeUnlockYear + '/unlock'" method="POST" class="space-y-4">
+                        <?php echo csrf_field(); ?>
+                        <p class="text-xs text-slate-500">
+                            Masukkan password yang telah ditentukan oleh Owner untuk membuka seluruh workspace bulanan pada tahun ini.
                         </p>
-                        <ul class="mt-4 max-h-40 space-y-1 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-                            <template x-for="workspace in selectedWorkspaceDetails" :key="workspace.id">
-                                <li class="flex items-center gap-2"><span class="text-rose-500">•</span><span x-text="workspace.name"></span></li>
-                            </template>
-                        </ul>
-                        <form action="<?php echo e(route('groups.bulk-destroy')); ?>" method="POST" @submit.prevent="submitBulkDelete($event)" class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                            <?php echo csrf_field(); ?>
-                            <template x-for="workspaceId in selectedWorkspaceIds" :key="workspaceId">
-                                <input type="hidden" name="groups[]" :value="workspaceId">
-                            </template>
-                            <button type="button" @click="showBulkDeleteConfirmation = false"
-                                    class="rounded-xl px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100">
+
+                        <div>
+                            <label for="dashboard_admin_unlock_password" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                Password Workspace
+                            </label>
+                            <input type="password" 
+                                   name="password" 
+                                   id="dashboard_admin_unlock_password" 
+                                   required 
+                                   placeholder="Password workspace" 
+                                   class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:border-sky-500 focus:ring-2 focus:ring-sky-100 text-sm text-slate-900 outline-none transition-all">
+                        </div>
+
+                        <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                            <button type="button" 
+                                    @click="activeUnlockYear = null" 
+                                    class="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold text-xs transition-colors">
                                 Batal
                             </button>
-                            <button type="submit" :disabled="isDeleting || selectedWorkspaceIds.length === 0"
-                                    class="rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-rose-700">
-                                <span x-show="!isDeleting">Hapus Workspace</span>
-                                <span x-show="isDeleting">Menghapus...</span>
+                            <button type="submit" 
+                                    class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs shadow-xs transition-colors flex items-center gap-1.5">
+                                <span>Masuk ke Workspace</span>
                             </button>
-                        </form>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Modal Set Password Workspace (Owner) -->
+            <div x-show="activePasswordModalYear !== null" 
+                 x-cloak
+                 class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs"
+                 @keydown.escape.window="activePasswordModalYear = null">
+                <div class="bg-white w-full max-w-md rounded-2xl border border-slate-200 shadow-2xl p-6 space-y-5"
+                     @click.outside="activePasswordModalYear = null">
+                    <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                        <div class="flex items-center gap-2">
+                            <div class="w-8 h-8 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center font-bold text-sm">
+                                🔑
+                            </div>
+                            <h3 class="text-base font-bold text-slate-900" x-text="'Atur Password Workspace ' + activePasswordModalYear"></h3>
+                        </div>
+                        <button type="button" @click="activePasswordModalYear = null" class="text-slate-400 hover:text-slate-600 text-lg">&times;</button>
                     </div>
+
+                    <form :action="'/company/year/' + activePasswordModalYear + '/password'" method="POST" class="space-y-4">
+                        <?php echo csrf_field(); ?>
+                        <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 leading-relaxed">
+                            <p class="font-bold">Perhatian:</p>
+                            <p class="mt-0.5">
+                                Mengubah password akan membatalkan sesi Admin yang sedang aktif untuk tahun ini. Kosongkan kolom jika ingin mematikan proteksi password.
+                            </p>
+                        </div>
+
+                        <div>
+                            <label for="dashboard_new_password" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                Password Baru (Min. 4 Karakter)
+                            </label>
+                            <input type="password" 
+                                   name="password" 
+                                   id="dashboard_new_password" 
+                                   placeholder="Kosongkan untuk menghapus password"
+                                   class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:border-sky-500 focus:ring-2 focus:ring-sky-100 text-sm text-slate-900 outline-none transition-all">
+                        </div>
+
+                        <div>
+                            <label for="dashboard_new_password_confirmation" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                Konfirmasi Password Baru
+                            </label>
+                            <input type="password" 
+                                   name="password_confirmation" 
+                                   id="dashboard_new_password_confirmation" 
+                                   placeholder="Ulangi password baru"
+                                   class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:border-sky-500 focus:ring-2 focus:ring-sky-100 text-sm text-slate-900 outline-none transition-all">
+                        </div>
+
+                        <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                            <button type="button" 
+                                    @click="activePasswordModalYear = null" 
+                                    class="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold text-xs transition-colors">
+                                Batal
+                            </button>
+                            <button type="submit" 
+                                    class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs shadow-xs transition-colors">
+                                Simpan Password
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
+
+        <!-- Add Year Modal -->
+        <div x-show="showAddYearModal" 
+             x-cloak
+             class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs"
+             @keydown.escape.window="showAddYearModal = false">
+            <div class="bg-white w-full max-w-md rounded-2xl border border-slate-200 shadow-2xl p-6 space-y-5"
+                 @click.outside="showAddYearModal = false">
+                <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-lg bg-sky-100 text-sky-600 flex items-center justify-center font-bold text-sm">
+                            📅
+                        </div>
+                        <h3 class="text-base font-bold text-slate-900">Tambah Tahun Operasional Baru</h3>
+                    </div>
+                    <button type="button" @click="showAddYearModal = false" class="text-slate-400 hover:text-slate-600 text-lg">&times;</button>
+                </div>
+
+                <form action="<?php echo e(route('company.years.store')); ?>" method="POST" class="space-y-4">
+                    <?php echo csrf_field(); ?>
+                    <div>
+                        <label for="year_input" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                            Tahun Operasional (4 Digit)
+                        </label>
+                        <input type="number" 
+                               name="year" 
+                               id="year_input" 
+                               required 
+                               min="1000" 
+                               max="9999" 
+                               placeholder="Contoh: 2027" 
+                               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:border-sky-500 focus:ring-2 focus:ring-sky-100 text-sm font-mono text-slate-900 placeholder:text-slate-400 outline-none transition-all">
+                        <p class="text-[11px] text-slate-500 mt-1.5">
+                            Sistem akan otomatis membuat 12 workspace bulanan (Januari - Desember) dan 60 lembar kerja dengan formula standar.
+                        </p>
+                    </div>
+
+                    <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                        <button type="button" 
+                                @click="showAddYearModal = false" 
+                                class="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold text-xs transition-colors">
+                            Batal
+                        </button>
+                        <button type="submit" 
+                                class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs shadow-xs transition-colors flex items-center gap-1.5">
+                            <span>Create Workspace</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
+    <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+
 </div>
 <?php $__env->stopSection(); ?>
 

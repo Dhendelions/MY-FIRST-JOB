@@ -21,11 +21,13 @@ class WorkspaceSelectionAndAdminExitTest extends TestCase
             'name' => 'Workspace Owner',
             'email' => 'bulk-owner@example.test',
             'password' => 'password',
+            'role' => 'owner',
         ]);
         $otherOwner = User::create([
             'name' => 'Other Owner',
             'email' => 'other-owner@example.test',
             'password' => 'password',
+            'role' => 'owner',
         ]);
 
         $first = $this->createGroup($leader, 'First workspace');
@@ -55,9 +57,8 @@ class WorkspaceSelectionAndAdminExitTest extends TestCase
         $this->actingAs($leader)
             ->get(route('dashboard'))
             ->assertOk()
-            ->assertSee('Pilih Semua yang Dapat Dikelola')
-            ->assertSee('aria-label="Pilih workspace First workspace"', false)
-            ->assertDontSee('aria-label="Pilih workspace Untouched workspace"', false);
+            ->assertDontSee('Katalog Workspace Tim')
+            ->assertDontSee('Pilih Semua yang Dapat Dikelola');
 
         $this->actingAs($leader)
             ->post(route('groups.bulk-destroy'), ['groups' => [$first->id, $second->id]])
@@ -77,32 +78,27 @@ class WorkspaceSelectionAndAdminExitTest extends TestCase
         $this->assertDatabaseHas('users', ['id' => $leader->id]);
     }
 
-    public function test_dashboard_bulk_selection_only_includes_manageable_workspaces_matching_search(): void
+    public function test_dashboard_catalog_is_removed_without_deleting_workspace_records(): void
     {
-        $leader = User::create(['name' => 'Search Owner', 'email' => 'search-owner@example.test', 'password' => 'password']);
+        $leader = User::create(['name' => 'Search Owner', 'email' => 'search-owner@example.test', 'password' => 'password', 'role' => 'owner']);
         $visible = $this->createGroup($leader, 'Visible workspace');
         $hidden = $this->createGroup($leader, 'Hidden workspace');
 
-        $response = $this->actingAs($leader)
-            ->get(route('dashboard', ['q' => 'Visible']))
+        $this->actingAs($leader)
+            ->get(route('dashboard'))
             ->assertOk()
-            ->assertSee('aria-label="Pilih workspace Visible workspace"', false)
-            ->assertDontSee('aria-label="Pilih workspace Hidden workspace"', false)
-            ->assertSee('Pilih Semua yang Dapat Dikelola')
-            ->assertSee('Batalkan Pilihan')
-            ->assertSee('submitBulkDelete($event)');
+            ->assertDontSee('Katalog Workspace Tim')
+            ->assertDontSee('Visible workspace')
+            ->assertDontSee('Hidden workspace')
+            ->assertDontSee('groups.bulk-destroy');
 
-        preg_match('/manageableWorkspaces: (.+?),\s*selectedWorkspaceIds:/s', $response->getContent(), $selectionState);
-        $this->assertNotEmpty($selectionState);
-        $this->assertStringContainsString('Visible workspace', $selectionState[1]);
-        $this->assertStringNotContainsString('Hidden workspace', $selectionState[1]);
         $this->assertDatabaseHas('fisheries_groups', ['id' => $visible->id]);
         $this->assertDatabaseHas('fisheries_groups', ['id' => $hidden->id]);
     }
 
     public function test_bulk_delete_reports_unavailable_workspaces_and_deletes_other_selected_workspaces(): void
     {
-        $leader = User::create(['name' => 'Partial Owner', 'email' => 'partial-owner@example.test', 'password' => 'password']);
+        $leader = User::create(['name' => 'Partial Owner', 'email' => 'partial-owner@example.test', 'password' => 'password', 'role' => 'owner']);
         $selected = $this->createGroup($leader, 'Available workspace');
         $untouched = $this->createGroup($leader, 'Not selected workspace');
 
@@ -164,82 +160,50 @@ class WorkspaceSelectionAndAdminExitTest extends TestCase
         $this->assertDatabaseHas('fisheries_groups', ['id' => $group->id]);
     }
 
-    public function test_admin_must_reauthenticate_to_leave_and_direct_navigation_is_guarded(): void
+    public function test_admin_dashboard_navigation_invalidates_workspace_authorization(): void
     {
-        $leader = User::create(['name' => 'Owner', 'email' => 'exit-owner@example.test', 'password' => 'password']);
-        $admin = User::create([
-            'name' => 'Workspace Admin',
-            'email' => 'exit-admin@example.test',
-            'password' => Hash::make('account-secret'),
-        ]);
-        $employee = User::create(['name' => 'Employee', 'email' => 'exit-employee@example.test', 'password' => 'password']);
-        $group = $this->createGroup($leader, 'Admin exit workspace');
+        $leader = User::create(['name' => 'Owner', 'email' => 'exit-owner@example.test', 'password' => 'password', 'role' => 'owner']);
+        $admin = User::create(['name' => 'Workspace Admin', 'email' => 'exit-admin@example.test', 'password' => 'account-secret']);
+        $group = $this->createGroup($leader, 'Admin exit workspace', 'exit-ws-pass');
         GroupMember::create(['group_id' => $group->id, 'user_id' => $admin->id, 'role' => 'admin', 'status' => 'Aktif']);
-        GroupMember::create(['group_id' => $group->id, 'user_id' => $employee->id, 'role' => 'admin', 'status' => 'Aktif']);
         $sheet = $group->sheets()->create(['name' => 'Analisa', 'category' => 'analisa']);
 
         $this->actingAs($admin)
             ->get(route('group.workspace', [$group->id, $sheet->id]))
             ->assertOk()
-            ->assertSee('Verifikasi Password Akun');
+            ->assertSee('Masukkan Password Workspace');
 
         $this->actingAs($admin)
             ->postJson(route('groups.unlock', $group), [
                 'sheet_id' => $sheet->id,
-                'password' => 'wrong-account-password',
+                'password' => 'wrong-password',
             ])
             ->assertUnprocessable()
-            ->assertJsonPath('message', 'Password akun salah. Silakan coba lagi.');
+            ->assertJsonPath('message', 'Password workspace salah. Silakan coba lagi.');
 
         $this->actingAs($admin)
             ->postJson(route('groups.unlock', $group), [
                 'sheet_id' => $sheet->id,
-                'password' => 'account-secret',
+                'password' => 'exit-ws-pass',
             ])
             ->assertOk()
             ->assertJsonPath('redirect', route('group.workspace', [$group->id, $sheet->id]));
 
         $this->actingAs($admin)
             ->get(route('dashboard', ['open' => 'friends']))
-            ->assertRedirect(route('group.workspace', [$group->id, $sheet->id]))
-            ->assertSessionHas('workspace_exit_target', '/dashboard?open=friends');
+            ->assertOk();
+        $this->assertFalse(session()->has('admin_workspace_auth'));
 
         $this->actingAs($admin)
-            ->post(route('groups.leave', $group), [
-                'password' => 'wrong-password',
-                'destination' => '/dashboard?open=friends',
-            ])
-            ->assertRedirect()
-            ->assertSessionHas('error');
-        $this->assertTrue(session()->has('admin_workspace_context'));
-
-        $this->actingAs($admin)
-            ->post(route('groups.leave', $group), [
-                'password' => 'account-secret',
-                'destination' => 'https://example.test/',
-            ])
-            ->assertStatus(422);
-        $this->assertTrue(session()->has('admin_workspace_context'));
-
-        $this->actingAs($admin)
-            ->post(route('groups.leave', $group), [
-                'password' => 'account-secret',
-                'destination' => '/dashboard?open=friends',
-            ])
-            ->assertRedirect('/dashboard?open=friends');
-        $this->assertFalse(session()->has('admin_workspace_context'));
-
-        $this->actingAs($admin)
-            ->post(route('groups.leave', $group), [
-                'password' => 'account-secret',
-                'destination' => '/dashboard',
-            ])
-            ->assertForbidden();
+            ->get(route('group.workspace', [$group->id, $sheet->id]))
+            ->assertOk()
+            ->assertSee('Masukkan Password Workspace')
+            ->assertDontSee('spreadsheet-grid-table');
 
         $this->actingAs($leader)
             ->get(route('group.workspace', [$group->id, $sheet->id]))
             ->assertOk()
-            ->assertDontSee('Verifikasi Password Akun');
+            ->assertDontSee('Masukkan Password Workspace');
     }
 
     public function test_workspace_header_controls_render_on_each_sheet_for_admin_and_employee(): void
@@ -273,76 +237,52 @@ class WorkspaceSelectionAndAdminExitTest extends TestCase
         }
     }
 
-    public function test_admin_must_reauthenticate_with_account_password_to_leave_workspace(): void
+    public function test_workspace_data_endpoints_require_active_admin_workspace_authorization(): void
     {
-        $leader = User::create(['name' => 'Admin Owner', 'email' => 'admin-owner@example.test', 'password' => 'password']);
-        $admin = User::create([
-            'name' => 'Admin Member',
-            'email' => 'workspace-password@example.test',
-            'password' => Hash::make('account-secret'),
-        ]);
-        $group = $this->createGroup($leader, 'Admin password workspace');
+        $leader = User::create(['name' => 'Admin Owner', 'email' => 'admin-owner@example.test', 'password' => 'password', 'role' => 'owner']);
+        $admin = User::create(['name' => 'Admin Member', 'email' => 'workspace-password@example.test', 'password' => 'account-secret']);
+        $group = $this->createGroup($leader, 'Admin password workspace', 'ws-secret');
         GroupMember::create(['group_id' => $group->id, 'user_id' => $admin->id, 'role' => 'admin', 'status' => 'Aktif']);
         $sheet = $group->sheets()->create(['name' => 'Analisa', 'category' => 'analisa']);
 
         $this->actingAs($admin)
             ->get(route('group.workspace', [$group->id, $sheet->id]))
             ->assertOk()
-            ->assertSee('Verifikasi Password Akun');
+            ->assertSee('Masukkan Password Workspace');
+
+        $this->actingAs($admin)
+            ->get(route('spreadsheet.export', $sheet))
+            ->assertForbidden();
 
         $this->actingAs($admin)
             ->postJson(route('groups.unlock', $group), [
                 'sheet_id' => $sheet->id,
-                'password' => 'wrong-password',
-            ])
-            ->assertUnprocessable()
-            ->assertJsonPath('message', 'Password akun salah. Silakan coba lagi.');
-
-        $this->actingAs($admin)
-            ->postJson(route('groups.unlock', $group), [
-                'sheet_id' => $sheet->id,
-                'password' => 'account-secret',
+                'password' => 'ws-secret',
             ])
             ->assertOk()
             ->assertJsonPath('redirect', route('group.workspace', [$group->id, $sheet->id]));
 
-        // Direct navigation to dashboard is guarded
         $this->actingAs($admin)
             ->get(route('dashboard'))
-            ->assertRedirect(route('group.workspace', [$group->id, $sheet->id]))
-            ->assertSessionHas('workspace_exit_target', '/dashboard');
+            ->assertOk();
+        $this->assertFalse(session()->has('admin_workspace_auth'));
 
-        // Wrong password leaves user in workspace
         $this->actingAs($admin)
-            ->post(route('groups.leave', $group), [
-                'password' => 'wrong-account-password',
-                'destination' => '/dashboard',
-            ])
-            ->assertRedirect()
-            ->assertSessionHas('error');
-        $this->assertTrue(session()->has('admin_workspace_context'));
+            ->get(route('spreadsheet.export', $sheet))
+            ->assertForbidden();
 
-        // Correct account password allows exit to destination
-        $this->actingAs($admin)
-            ->post(route('groups.leave', $group), [
-                'password' => 'account-secret',
-                'destination' => '/dashboard',
-            ])
-            ->assertRedirect('/dashboard');
-        $this->assertFalse(session()->has('admin_workspace_context'));
+        $this->actingAs($leader)
+            ->get(route('spreadsheet.export', $sheet))
+            ->assertOk();
     }
 
-    public function test_user_navigating_directly_to_another_workspace_must_reauthenticate_previous_workspace_first(): void
+    public function test_switching_workspaces_invalidates_the_previous_workspace_authentication(): void
     {
         $leader = User::create(['name' => 'Multi Owner', 'email' => 'multi-owner@example.test', 'password' => 'password']);
-        $admin = User::create([
-            'name' => 'Multi Admin',
-            'email' => 'multi-admin@example.test',
-            'password' => Hash::make('account-secret'),
-        ]);
+        $admin = User::create(['name' => 'Multi Admin', 'email' => 'multi-admin@example.test', 'password' => 'account-secret']);
 
-        $firstGroup = $this->createGroup($leader, 'First Workspace');
-        $secondGroup = $this->createGroup($leader, 'Second Workspace');
+        $firstGroup = $this->createGroup($leader, 'First Workspace', 'ws1-secret');
+        $secondGroup = $this->createGroup($leader, 'Second Workspace', 'ws2-secret');
 
         GroupMember::create(['group_id' => $firstGroup->id, 'user_id' => $admin->id, 'role' => 'admin', 'status' => 'Aktif']);
         GroupMember::create(['group_id' => $secondGroup->id, 'user_id' => $admin->id, 'role' => 'admin', 'status' => 'Aktif']);
@@ -350,74 +290,65 @@ class WorkspaceSelectionAndAdminExitTest extends TestCase
         $firstSheet = $firstGroup->sheets()->create(['name' => 'Sheet 1', 'category' => 'analisa']);
         $secondSheet = $secondGroup->sheets()->create(['name' => 'Sheet 2', 'category' => 'analisa']);
 
-        // Unlock first workspace as admin
+        // Unlock first workspace as admin with workspace password
         $this->actingAs($admin)
             ->postJson(route('groups.unlock', $firstGroup), [
                 'sheet_id' => $firstSheet->id,
-                'password' => 'account-secret',
+                'password' => 'ws1-secret',
             ])
             ->assertOk();
 
-        // Enter first workspace to register active session context
         $this->actingAs($admin)
             ->get(route('group.workspace', [$firstGroup->id, $firstSheet->id]))
             ->assertOk();
 
-        // Attempting to visit second workspace directly is guarded by first workspace
-        $targetPath = "/groups/{$secondGroup->id}/workspace/{$secondSheet->id}";
         $this->actingAs($admin)
-            ->get($targetPath)
-            ->assertRedirect(route('group.workspace', [$firstGroup->id, $firstSheet->id]))
-            ->assertSessionHas('workspace_exit_target', $targetPath);
+            ->get(route('group.workspace', [$secondGroup->id, $secondSheet->id]))
+            ->assertOk()
+            ->assertSee('Masukkan Password Workspace')
+            ->assertDontSee('spreadsheet-grid-table');
 
-        // Verify with account password to leave first workspace
+        $this->assertFalse(session()->has('admin_workspace_auth'));
+
         $this->actingAs($admin)
-            ->post(route('groups.leave', $firstGroup), [
-                'password' => 'account-secret',
-                'destination' => $targetPath,
+            ->postJson(route('groups.unlock', $secondGroup), [
+                'sheet_id' => $secondSheet->id,
+                'password' => 'ws2-secret',
             ])
-            ->assertRedirect($targetPath);
+            ->assertOk();
 
-        $this->assertFalse(session()->has('admin_workspace_context'));
+        $this->actingAs($admin)
+            ->get(route('group.workspace', [$secondGroup->id, $secondSheet->id]))
+            ->assertOk()
+            ->assertDontSee('Masukkan Password Workspace');
     }
 
-    public function test_admin_and_employee_logout_from_workspace_requires_account_password(): void
+    public function test_logout_invalidates_admin_workspace_authorization_without_an_exit_prompt(): void
     {
-        $leader = User::create(['name' => 'Logout Owner', 'email' => 'logout-owner@example.test', 'password' => 'password']);
-        $admin = User::create([
-            'name' => 'Logout Admin',
-            'email' => 'logout-admin@example.test',
-            'password' => Hash::make('account-secret'),
-        ]);
-        $group = $this->createGroup($leader, 'Logout workspace');
+        $leader = User::create(['name' => 'Logout Owner', 'email' => 'logout-owner@example.test', 'password' => 'password', 'role' => 'owner']);
+        $admin = User::create(['name' => 'Logout Admin', 'email' => 'logout-admin@example.test', 'password' => 'account-secret']);
+        $group = $this->createGroup($leader, 'Logout workspace', 'ws-logout-secret');
         GroupMember::create(['group_id' => $group->id, 'user_id' => $admin->id, 'role' => 'admin', 'status' => 'Aktif']);
         $sheet = $group->sheets()->create(['name' => 'Analisa', 'category' => 'analisa']);
 
         $this->actingAs($admin)
             ->postJson(route('groups.unlock', $group), [
                 'sheet_id' => $sheet->id,
-                'password' => 'account-secret',
+                'password' => 'ws-logout-secret',
             ])
             ->assertOk();
 
         $this->actingAs($admin)
             ->post(route('logout'))
-            ->assertRedirect(route('group.workspace', [$group->id, $sheet->id]))
-            ->assertSessionHas('workspace_exit_target', 'logout');
-
-        $this->actingAs($admin)
-            ->post(route('groups.leave', $group), [
-                'password' => 'account-secret',
-                'destination' => 'logout',
-            ])
             ->assertRedirect(route('login'));
         $this->assertGuest();
     }
 
-    private function createGroup(User $owner, string $name): FisheriesGroup
+    private function createGroup(User $owner, string $name, ?string $password = null): FisheriesGroup
     {
         $group = FisheriesGroup::create([
             'name' => $name,
+            'password' => $password ? Hash::make($password) : null,
             'invite_code' => strtoupper(str_replace(' ', '-', $name)) . '-' . random_int(1000, 9999),
             'created_by' => $owner->id,
         ]);
