@@ -20,7 +20,7 @@ return new class extends Migration
             $table->string('location');
             $table->integer('pond_count')->default(1);
             $table->string('avatar')->nullable();
-            $table->foreignId('created_by')->constrained('users')->onDelete('cascade');
+            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
         });
     }

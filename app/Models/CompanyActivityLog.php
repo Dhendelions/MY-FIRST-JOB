@@ -40,5 +40,13 @@ class CompanyActivityLog extends Model
     {
         return $this->belongsTo(User::class, 'user_id');
     }
+
+    /**
+     * Alias for actor relationship.
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'user_id');
+    }
 }
 

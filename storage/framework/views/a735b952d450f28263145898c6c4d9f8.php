@@ -186,7 +186,7 @@
                         ?>
                         <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($targetMw): ?>
                             <a href="<?php echo e(route("group.workspace", $targetMw->group_id)); ?>" 
-                               class="px-2.5 py-1 rounded-lg font-bold transition-all shrink-0 flex items-center gap-1 <?php echo e($isCurrentYear ? "bg-[#0A192F] text-sky-400 shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200"); ?>">
+                               class="px-2.5 py-1 rounded-lg font-bold transition-all shrink-0 flex items-center gap-1 <?php echo e($isCurrentYear ? "bg-[#142B4A] text-white shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200"); ?>">
                                 <span><?php echo e($opY->year); ?></span>
                                 <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($opY->is_archived): ?>
                                     <span class="text-[9px] px-1 py-0.2 rounded font-normal <?php echo e($isCurrentYear ? "bg-amber-400/20 text-amber-300" : "bg-amber-100 text-amber-700"); ?>">Arsip</span>
@@ -219,7 +219,7 @@
                             ?>
                             <a href="<?php echo e(route("group.workspace", $mWork->group_id)); ?>" 
                                title="<?php echo e($mWork->name); ?> <?php echo e($activeYearModel->year); ?>"
-                               class="px-2 py-1 rounded-md text-[11px] font-semibold transition-all shrink-0 <?php echo e($isCurrentMonth ? "bg-sky-600 text-white shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900"); ?>">
+                               class="px-2 py-1 rounded-md text-[11px] font-semibold transition-all shrink-0 <?php echo e($isCurrentMonth ? "bg-[#142B4A] text-white shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900"); ?>">
                                 <?php echo e(substr($mWork->name, 0, 3)); ?>
 
                             </a>
@@ -267,7 +267,7 @@
                     ?>
                     <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($accessibleSheet): ?>
                         <a href="<?php echo e(route('group.workspace', [$group->id, $accessibleSheet->id])); ?>" 
-                           class="px-4 py-2 rounded-xl text-xs font-semibold bg-sky-600 hover:bg-sky-500 text-white shadow-sm transition-colors">
+                           class="px-4 py-2 rounded-xl text-xs font-semibold bg-[#142B4A] hover:bg-[#1a3860] text-white shadow-sm transition-colors">
                             Buka Lembar <?php echo e($accessibleSheet->name); ?>
 
                         </a>
@@ -383,7 +383,7 @@ if (isset($__slots)) unset($__slots);
          }"
          class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
         <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
-            <div class="fixed inset-0 bg-slate-900/70 backdrop-blur-xs transition-opacity" @click="workspaceModal = null"></div>
+            <div class="fixed inset-0 bg-[#142B4A]/30 backdrop-blur-xs transition-opacity" @click="workspaceModal = null"></div>
             <div class="relative bg-white rounded-2xl max-w-md w-full p-6 text-left shadow-2xl border border-slate-100 my-8">
                 <div class="flex items-center justify-between pb-3 border-b border-slate-100">
                     <div class="flex items-center gap-2.5">
@@ -476,7 +476,7 @@ if (isset($__slots)) unset($__slots);
                         </button>
                         <button type="submit" 
                                 :disabled="!selectedUserId"
-                                :class="!selectedUserId ? 'opacity-50 cursor-not-allowed bg-slate-300 text-slate-500' : 'bg-sky-600 hover:bg-sky-500 text-white shadow-md shadow-sky-500/20'"
+                                :class="!selectedUserId ? 'opacity-50 cursor-not-allowed bg-slate-300 text-slate-500' : 'bg-[#142B4A] hover:bg-[#1a3860] text-white shadow-md shadow-[#142B4A]/20'"
                                 class="px-5 py-2 rounded-xl text-xs font-semibold transition-all">
                             Tambahkan Anggota
                         </button>
@@ -497,7 +497,7 @@ if (isset($__slots)) unset($__slots);
          })"
          class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
         <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
-            <div class="fixed inset-0 bg-slate-900/70 backdrop-blur-xs transition-opacity" @click="workspaceModal = null"></div>
+            <div class="fixed inset-0 bg-[#142B4A]/30 backdrop-blur-xs transition-opacity" @click="workspaceModal = null"></div>
             <div class="relative bg-white rounded-2xl max-w-2xl w-full text-left shadow-2xl border border-slate-100 my-8 overflow-hidden flex flex-col">
 
                 <!-- Header -->
@@ -649,7 +649,7 @@ if (isset($__slots)) unset($__slots);
              x-transition:enter-start="opacity-0"
              x-transition:enter-end="opacity-100"
              class="fixed inset-0 z-[60] flex items-center justify-center px-4" x-cloak>
-            <div class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm" @click="closeConfirm()"></div>
+            <div class="fixed inset-0 bg-[#142B4A]/30 backdrop-blur-xs" @click="closeConfirm()"></div>
             <div x-transition:enter="transition ease-out duration-150"
                  x-transition:enter-start="opacity-0 scale-95"
                  x-transition:enter-end="opacity-100 scale-100"
@@ -680,7 +680,7 @@ if (isset($__slots)) unset($__slots);
     <!-- MODAL 3: Pengaturan Workspace (Leader & Admin) -->
     <div x-show="workspaceModal === 'modal-group-settings'" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
         <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
-            <div class="fixed inset-0 bg-slate-900/70 backdrop-blur-xs transition-opacity" @click="workspaceModal = null"></div>
+            <div class="fixed inset-0 bg-[#142B4A]/30 backdrop-blur-xs transition-opacity" @click="workspaceModal = null"></div>
             <div class="relative bg-white rounded-2xl max-w-lg w-full p-6 text-left shadow-2xl border border-slate-100 my-8">
                 <div class="flex items-center justify-between pb-3 border-b border-slate-100">
                     <div class="flex items-center gap-2.5">
@@ -767,7 +767,7 @@ if (isset($__slots)) unset($__slots);
                             <button type="button" @click="workspaceModal = null" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100">
                                 Batal
                             </button>
-                            <button type="submit" class="px-5 py-2 rounded-xl text-xs font-semibold bg-sky-600 hover:bg-sky-500 text-white shadow-xs">
+                            <button type="submit" class="px-5 py-2 rounded-xl text-xs font-semibold bg-[#142B4A] hover:bg-[#1a3860] text-white shadow-xs">
                                 Simpan Perubahan
                             </button>
                         </div>
@@ -781,7 +781,7 @@ if (isset($__slots)) unset($__slots);
     <!-- MODAL: Konfirmasi hapus workspace -->
     <div x-show="workspaceModal === 'modal-delete-workspace'" x-transition.opacity class="fixed inset-0 z-[60] overflow-y-auto" x-cloak role="dialog" aria-modal="true" aria-labelledby="delete-workspace-title" @keydown.escape.window="workspaceModal = null">
         <div class="flex min-h-screen items-center justify-center px-4 py-8">
-            <div class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm" @click="workspaceModal = null"></div>
+            <div class="fixed inset-0 bg-[#142B4A]/30 backdrop-blur-xs" @click="workspaceModal = null"></div>
             <div x-transition.scale.origin.center class="relative w-full max-w-md overflow-hidden rounded-2xl bg-white text-left shadow-2xl ring-1 ring-black/5">
                 <div class="h-1.5 bg-gradient-to-r from-rose-500 via-red-500 to-orange-400"></div>
                 <div class="p-6">
@@ -815,7 +815,7 @@ if (isset($__slots)) unset($__slots);
     <!-- MODAL 4: Tambah Lembar Baru -->
     <div x-show="workspaceModal === 'modal-add-sheet'" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
         <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
-            <div class="fixed inset-0 bg-slate-900/70 backdrop-blur-xs transition-opacity" @click="workspaceModal = null"></div>
+            <div class="fixed inset-0 bg-[#142B4A]/30 backdrop-blur-xs transition-opacity" @click="workspaceModal = null"></div>
             <div class="relative bg-white rounded-2xl max-w-sm w-full p-6 text-left shadow-2xl border border-slate-100 my-8">
                 <div class="flex items-center justify-between pb-3 border-b border-slate-100">
                     <h3 class="text-base font-bold text-slate-800">Tambah Lembar Kerja Baru</h3>
@@ -836,7 +836,7 @@ if (isset($__slots)) unset($__slots);
                         <button type="button" @click="workspaceModal = null" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100">
                             Batal
                         </button>
-                        <button type="submit" class="px-5 py-2 rounded-xl text-xs font-semibold bg-sky-600 hover:bg-sky-500 text-white">
+                        <button type="submit" class="px-5 py-2 rounded-xl text-xs font-semibold bg-[#142B4A] hover:bg-[#1a3860] text-white">
                             Buat Lembar
                         </button>
                     </div>
@@ -848,7 +848,7 @@ if (isset($__slots)) unset($__slots);
     <!-- MODAL 5: Ganti Nama Lembar (Rename Sheet) -->
     <div x-show="workspaceModal === 'modal-rename-sheet'" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
         <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
-            <div class="fixed inset-0 bg-slate-900/70 backdrop-blur-xs transition-opacity" @click="workspaceModal = null"></div>
+            <div class="fixed inset-0 bg-[#142B4A]/30 backdrop-blur-xs transition-opacity" @click="workspaceModal = null"></div>
             <div class="relative bg-white rounded-2xl max-w-sm w-full p-6 text-left shadow-2xl border border-slate-100 my-8">
                 <div class="flex items-center justify-between pb-3 border-b border-slate-100">
                     <h3 class="text-base font-bold text-slate-800">Ganti Nama Lembar</h3>
@@ -870,7 +870,7 @@ if (isset($__slots)) unset($__slots);
                         <button type="button" @click="workspaceModal = null" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100">
                             Batal
                         </button>
-                        <button type="submit" class="px-5 py-2 rounded-xl text-xs font-semibold bg-sky-600 hover:bg-sky-500 text-white">
+                        <button type="submit" class="px-5 py-2 rounded-xl text-xs font-semibold bg-[#142B4A] hover:bg-[#1a3860] text-white">
                             Simpan Nama
                         </button>
                     </div>
@@ -884,7 +884,7 @@ if (isset($__slots)) unset($__slots);
         <div x-init="workspaceModal = 'modal-password-required'"></div>
         <div x-show="workspaceModal === 'modal-password-required'" x-transition.opacity class="fixed inset-0 z-[60] overflow-y-auto" x-cloak role="dialog" aria-modal="true" aria-labelledby="password-setup-title" @keydown.escape.prevent>
             <div class="flex items-center justify-center min-h-screen px-4 py-8">
-                <div class="fixed inset-0 bg-slate-950/50 backdrop-blur-sm" aria-hidden="true"></div>
+                <div class="fixed inset-0 bg-[#142B4A]/30 backdrop-blur-xs" aria-hidden="true"></div>
                 <div x-transition.scale.origin.center x-ref="passwordSetupDialog" class="relative bg-white rounded-2xl max-w-md w-full p-6 text-left shadow-2xl border border-slate-100">
                     <h3 id="password-setup-title" class="text-base font-bold text-slate-900">Tambahkan Password Workspace</h3>
                     <p class="text-xs text-slate-500 mt-1">Workspace ini belum memiliki password. Buat password untuk melanjutkan.</p>
@@ -895,9 +895,9 @@ if (isset($__slots)) unset($__slots);
                         <div>
                             <label class="block text-xs font-semibold text-slate-700 mb-1">Password <span class="text-rose-500">*</span></label>
                             <input x-init="$nextTick(() => $el.focus())" type="password" name="password" required minlength="4" autofocus placeholder="Minimal 4 karakter"
-                                class="w-full text-sm px-3.5 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                                class="w-full text-sm px-3.5 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#142B4A] focus:outline-none">
                         </div>
-                        <button type="submit" class="w-full px-5 py-2.5 rounded-xl text-xs font-semibold bg-sky-600 hover:bg-sky-500 text-white">Simpan Password</button>
+                        <button type="submit" class="w-full px-5 py-2.5 rounded-xl text-xs font-semibold bg-[#142B4A] hover:bg-[#1a3860] text-white transition-colors">Simpan Password</button>
                     </form>
                 </div>
             </div>
@@ -906,8 +906,8 @@ if (isset($__slots)) unset($__slots);
 
     <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($requiresPasswordConfiguration): ?>
         <div x-init="workspaceModal = 'modal-password-not-configured'"></div>
-        <div x-show="workspaceModal === 'modal-password-not-configured'" class="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 p-4" x-cloak role="dialog" aria-modal="true">
-            <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+        <div x-show="workspaceModal === 'modal-password-not-configured'" class="fixed inset-0 z-[60] flex items-center justify-center bg-[#142B4A]/30 backdrop-blur-xs p-4" x-cloak role="dialog" aria-modal="true">
+            <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-slate-100">
                 <h3 class="text-base font-bold text-slate-900">Password Workspace Belum Diatur</h3>
                 <p class="mt-2 text-sm text-slate-600">Admin hanya dapat masuk setelah Owner atau Leader menetapkan password workspace.</p>
             </div>
@@ -923,7 +923,7 @@ if (isset($__slots)) unset($__slots);
         "></div>
         <div x-show="workspaceModal === 'modal-password-unlock'" x-transition.opacity class="fixed inset-0 z-[60] overflow-y-auto" x-cloak role="dialog" aria-modal="true" aria-labelledby="password-unlock-title" @keydown.escape.prevent @wheel.prevent @touchmove.prevent>
             <div class="flex items-center justify-center min-h-screen px-4 py-8">
-                <div class="fixed inset-0 bg-slate-950/50 backdrop-blur-sm" aria-hidden="true"></div>
+                <div class="fixed inset-0 bg-[#142B4A]/30 backdrop-blur-xs" aria-hidden="true"></div>
                 <div x-transition.scale.origin.center x-ref="passwordUnlockDialog" class="relative bg-white rounded-2xl max-w-md w-full p-6 text-left shadow-2xl border border-slate-100">
                     <h3 id="password-unlock-title" class="text-base font-bold text-slate-900">Masukkan Password Workspace</h3>
                     <p class="text-xs text-slate-500 mt-1">Password diperlukan setiap kali Anda masuk ke workspace ini.</p>
@@ -931,9 +931,9 @@ if (isset($__slots)) unset($__slots);
                         <?php echo csrf_field(); ?>
                         <input type="hidden" name="sheet_id" :value="unlockSheetId">
                         <input x-ref="unlockPassword" x-init="if (<?php echo e($requiresPasswordUnlock ? 'true' : 'false'); ?>) $nextTick(() => $el.focus())" type="password" name="password" required autocomplete="off" autofocus placeholder="Password workspace"
-                            class="w-full text-sm px-3.5 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                            class="w-full text-sm px-3.5 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#142B4A] focus:outline-none">
                         <p x-show="workspacePasswordError" x-text="workspacePasswordError" class="text-xs text-rose-600" role="alert"></p>
-                        <button type="submit" :disabled="isSubmittingUnlock" class="w-full px-5 py-2.5 rounded-xl text-xs font-semibold bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white transition-colors flex items-center justify-center gap-2">
+                        <button type="submit" :disabled="isSubmittingUnlock" class="w-full px-5 py-2.5 rounded-xl text-xs font-semibold bg-[#142B4A] hover:bg-[#1a3860] disabled:opacity-50 text-white transition-colors flex items-center justify-center gap-2">
                             <span x-show="isSubmittingUnlock" class="inline-block w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
                             <span x-text="isSubmittingUnlock ? 'Memverifikasi...' : 'Masuk ke Workspace'">Masuk ke Workspace</span>
                         </button>
@@ -946,7 +946,7 @@ if (isset($__slots)) unset($__slots);
     <!-- MODAL 6: Akses Dibatasi Berdasarkan Peran -->
     <div x-show="workspaceModal === 'modal-access-restricted'" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
         <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
-            <div class="fixed inset-0 bg-slate-900/70 backdrop-blur-xs transition-opacity" @click="workspaceModal = null"></div>
+            <div class="fixed inset-0 bg-[#142B4A]/30 backdrop-blur-xs transition-opacity" @click="workspaceModal = null"></div>
             <div class="relative bg-white rounded-2xl max-w-md w-full p-6 text-left shadow-2xl border border-slate-100 my-8">
                 <div class="flex items-start gap-4">
                     <div class="w-12 h-12 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
@@ -984,7 +984,7 @@ if (isset($__slots)) unset($__slots);
                     ?>
                     <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($fallbackSheet): ?>
                         <a href="<?php echo e(route('group.workspace', [$group->id, $fallbackSheet->id])); ?>" 
-                           class="px-4 py-2 rounded-xl text-xs font-semibold bg-sky-600 hover:bg-sky-500 text-white shadow-xs transition-colors">
+                           class="px-4 py-2 rounded-xl text-xs font-semibold bg-[#142B4A] hover:bg-[#1a3860] text-white shadow-xs transition-colors">
                             Buka Lembar <?php echo e($fallbackSheet->name); ?>
 
                         </a>
@@ -997,7 +997,7 @@ if (isset($__slots)) unset($__slots);
     <!-- MODAL 7: Riwayat Aktivitas Workspace -->
     <div x-show="workspaceModal === 'modal-activity-history'" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
         <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
-            <div class="fixed inset-0 bg-slate-900/70 backdrop-blur-xs transition-opacity" @click="workspaceModal = null"></div>
+            <div class="fixed inset-0 bg-[#142B4A]/30 backdrop-blur-xs transition-opacity" @click="workspaceModal = null"></div>
             <div class="relative bg-white rounded-2xl max-w-2xl w-full text-left shadow-2xl border border-slate-100 my-8 overflow-hidden flex flex-col">
                 <div class="p-5 pb-3 border-b border-slate-100 flex items-center justify-between">
                     <div class="flex items-center gap-2.5">
@@ -1068,7 +1068,7 @@ if (isset($__slots)) unset($__slots);
          aria-labelledby="backup-workspace-title"
          @keydown.escape.window="!isExporting && (workspaceModal = null)">
         <div class="flex items-center justify-center min-h-screen px-4 py-8">
-            <div class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm" @click="!isExporting && (workspaceModal = null)"></div>
+            <div class="fixed inset-0 bg-[#142B4A]/30 backdrop-blur-xs" @click="!isExporting && (workspaceModal = null)"></div>
             <div x-transition.scale.origin.center class="relative bg-white rounded-2xl max-w-md w-full p-6 text-left shadow-2xl border border-slate-100">
                 <div class="flex items-center justify-between pb-3 border-b border-slate-100">
                     <div class="flex items-center gap-2.5">

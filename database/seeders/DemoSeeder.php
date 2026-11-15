@@ -35,35 +35,40 @@ class DemoSeeder extends Seeder
                 'email'      => 'budi@dadhenmandiri.id',
                 'password'   => 'password123',
                 'whatsapp'   => '+6281234567890',
-                'role_title' => 'leader',
+                'role'       => 'owner',
+                'role_title' => 'Owner',
             ],
             [
                 'name'       => 'Siti Rahayu',
                 'email'      => 'siti@dadhenmandiri.id',
                 'password'   => 'password123',
                 'whatsapp'   => '+6285678901234',
-                'role_title' => 'admin',
+                'role'       => 'admin',
+                'role_title' => 'Admin',
             ],
             [
                 'name'       => 'Ahmad Wijaya',
                 'email'      => 'ahmad@dadhenmandiri.id',
                 'password'   => 'password123',
                 'whatsapp'   => '+6287654321098',
-                'role_title' => 'admin',
+                'role'       => 'admin',
+                'role_title' => 'Admin',
             ],
             [
                 'name'       => 'Dewi Lestari',
                 'email'      => 'dewi@dadhenmandiri.id',
                 'password'   => 'password123',
                 'whatsapp'   => null, // Optional phone test
-                'role_title' => 'karyawan',
+                'role'       => 'admin',
+                'role_title' => 'Admin',
             ],
             [
                 'name'       => 'Hendra Pratama',
                 'email'      => 'hendra@dadhenmandiri.id',
                 'password'   => 'password123',
                 'whatsapp'   => '+6289012345678',
-                'role_title' => 'leader',
+                'role'       => 'admin',
+                'role_title' => 'Admin',
             ],
         ];
 
@@ -81,6 +86,7 @@ class DemoSeeder extends Seeder
                 'email'      => $userData['email'],
                 'password'   => Hash::make($userData['password']),
                 'whatsapp'   => $userData['whatsapp'],
+                'role'       => $userData['role'],
                 'role_title' => $userData['role_title'],
             ]);
             $this->command->info("  ✅ User '{$userData['name']}' dibuat.");

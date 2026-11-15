@@ -240,7 +240,7 @@ class CompanyYearController extends Controller
             ->firstOrFail();
 
         $user = Auth::user();
-        abort_if($user->isAdmin() && $operationalYear->isArchived(), 403, 'Workspace tahun ini telah diarsipkan dan tidak dapat diakses oleh Admin.');
+        abort_if($user->isAdmin() && (\App\Services\WorkspaceSecurityService::isYearArchived($year) || $operationalYear->isArchived()), 403, 'Workspace tahun ini telah diarsipkan dan tidak dapat diakses oleh Admin.');
         $isUnlocked = $operationalYear->isUnlockedForUser($user?->id);
 
         return view('company.year', compact('operationalYear', 'isUnlocked', 'user'));
@@ -254,7 +254,7 @@ class CompanyYearController extends Controller
         $operationalYear = OperationalYear::where('year', $year)->firstOrFail();
         $user = Auth::user();
 
-        abort_if($user->isAdmin() && $operationalYear->isArchived(), 403, 'Workspace tahun ini telah diarsipkan dan tidak dapat diakses oleh Admin.');
+        abort_if($user->isAdmin() && (\App\Services\WorkspaceSecurityService::isYearArchived($year) || $operationalYear->isArchived()), 403, 'Workspace tahun ini telah diarsipkan dan tidak dapat diakses oleh Admin.');
 
         $validated = $request->validate([
             'password' => ['required', 'string'],

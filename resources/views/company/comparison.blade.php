@@ -23,7 +23,7 @@
                 <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"/></svg>
                 <span>Company Analytics</span>
             </a>
-            <a href="{{ route('dashboard') }}" class="px-4 py-2 bg-navy-900 hover:bg-navy-800 text-white text-xs font-bold rounded-xl transition-all shadow-xs">
+            <a href="{{ route('dashboard') }}" class="px-4 py-2 bg-[#142B4A] hover:bg-[#1B355A] text-white text-xs font-bold rounded-xl transition-all shadow-xs hover:-translate-y-0.5">
                 Kembali ke Dashboard
             </a>
         </div>

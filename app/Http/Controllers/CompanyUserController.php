@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Services\ActivityLogger;
+use App\Services\UserDeletionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -308,6 +309,45 @@ class CompanyUserController extends Controller
         }
 
         return redirect()->route('company.users.index')->with('success', "Password untuk {$user->name} berhasil diperbarui.");
+    }
+
+    public function destroy(Request $request, User $user, UserDeletionService $deletionService)
+    {
+        $currentUser = $this->authorizeOwner();
+
+        $this->validateDeleteTarget($user);
+
+        $deletionService->delete($currentUser, $user);
+
+        ActivityLogger::log('user_deleted', "Akun pengguna '{$user->name}' dihapus oleh Owner.", $user, [
+            'deleted_user_id' => $user->id,
+            'deleted_user_name' => $user->name,
+            'deleted_user_email' => $user->email,
+        ], $currentUser);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'status' => 'success',
+                'message' => "Pengguna {$user->name} berhasil dihapus.",
+            ]);
+        }
+
+        return redirect()->route('company.users.index')->with('success', "Pengguna {$user->name} berhasil dihapus.");
+    }
+
+    protected function validateDeleteTarget(User $user): void
+    {
+        if ($user->isOwner()) {
+            $remainingOwners = User::query()
+                ->where('role', 'owner')
+                ->where('is_active', true)
+                ->whereKeyNot($user->id)
+                ->exists();
+
+            if (!$remainingOwners) {
+                abort(422, 'Tidak dapat menghapus Owner terakhir. Perusahaan wajib memiliki minimal satu Owner aktif.');
+            }
+        }
     }
 }
 

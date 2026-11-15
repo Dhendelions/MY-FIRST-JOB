@@ -11,4 +11,5 @@ class SpreadsheetActivity extends Model
     protected $casts = ['details' => 'array', 'committed_at' => 'datetime'];
     public function user(): BelongsTo { return $this->belongsTo(User::class); }
     public function sheet(): BelongsTo { return $this->belongsTo(SpreadsheetSheet::class); }
+    public function group(): BelongsTo { return $this->belongsTo(FisheriesGroup::class, 'group_id'); }
 }

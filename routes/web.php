@@ -69,6 +69,7 @@ Route::middleware(['auth', EnsureWorkspaceAdminReauthentication::class, EnsureWo
     Route::post('/company/users/{user}/role', [CompanyUserController::class, 'changeRole'])->name('company.users.role');
     Route::post('/company/users/{user}/toggle-status', [CompanyUserController::class, 'toggleStatus'])->name('company.users.toggle-status');
     Route::post('/company/users/{user}/reset-password', [CompanyUserController::class, 'resetPassword'])->name('company.users.reset-password');
+    Route::delete('/company/users/{user}', [CompanyUserController::class, 'destroy'])->name('company.users.destroy');
 
     // Company Activity Logs (Owner Only)
     Route::get('/company/activity-logs', [CompanyActivityLogController::class, 'index'])->name('company.activity-logs.index');

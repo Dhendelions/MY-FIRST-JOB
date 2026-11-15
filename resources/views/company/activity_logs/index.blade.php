@@ -82,7 +82,7 @@
                 <input type="date" name="date_to" value="{{ request('date_to') }}" class="px-2.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-sky-500 focus:outline-none">
             </div>
 
-            <button type="submit" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl transition-colors cursor-pointer">
+            <button type="submit" class="px-4 py-2 bg-[#142B4A] hover:bg-[#1B355A] text-white text-xs font-bold rounded-xl transition-all duration-200 shadow-xs hover:-translate-y-0.5 cursor-pointer">
                 Filter
             </button>
             @if(request()->anyFilled(['search', 'action', 'user_id', 'date_from', 'date_to']))

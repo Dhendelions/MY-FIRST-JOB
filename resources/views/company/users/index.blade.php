@@ -56,7 +56,7 @@
 
             <div class="flex items-center gap-2.5">
                 <button @click="openAddUser()"
-                        class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-sky-600 to-sky-500 hover:from-sky-500 hover:to-sky-400 text-white text-xs sm:text-sm font-bold shadow-md shadow-sky-600/20 flex items-center gap-2 transition-all cursor-pointer">
+                        class="px-4 py-2.5 rounded-xl bg-[#142B4A] hover:bg-[#1B355A] text-white text-xs sm:text-sm font-bold shadow-xs flex items-center gap-2 transition-all duration-200 hover:-translate-y-0.5 cursor-pointer">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
                     + Tambah Pengguna
                 </button>
@@ -232,6 +232,16 @@
                                                     @endif
                                                 </button>
                                             </form>
+
+                                            <form action="{{ route('company.users.destroy', $u->id) }}" method="POST" class="inline" onsubmit="return confirm('Hapus akun {{ addslashes($u->name) }}? Tindakan ini hanya menghapus data personal dan relasi akun, tetapi tidak menghapus workspace atau data organisasi yang dibagikan.')">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit"
+                                                        title="Hapus Akun"
+                                                        class="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors cursor-pointer">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                                </button>
+                                            </form>
                                         @endif
                                     </div>
                                 </td>
@@ -259,7 +269,7 @@
     <!-- MODAL 1: TAMBAH PENGGUNA -->
     <div x-show="activeUserModal === 'modal-add-user'" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
         <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
-            <div class="fixed inset-0 bg-slate-900/70 backdrop-blur-xs transition-opacity" @click="activeUserModal = null"></div>
+            <div class="fixed inset-0 bg-[#142B4A]/30 backdrop-blur-xs transition-opacity" @click="activeUserModal = null"></div>
             <div class="relative bg-white rounded-2xl max-w-md w-full p-6 text-left shadow-2xl border border-slate-100 my-8">
                 <div class="flex items-center justify-between pb-3 border-b border-slate-100">
                     <h3 class="text-base font-bold text-slate-900">+ Tambah Pengguna Baru</h3>
@@ -302,7 +312,7 @@
     <!-- MODAL 2: EDIT PENGGUNA -->
     <div x-show="activeUserModal === 'modal-edit-user'" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
         <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
-            <div class="fixed inset-0 bg-slate-900/70 backdrop-blur-xs transition-opacity" @click="activeUserModal = null"></div>
+            <div class="fixed inset-0 bg-[#142B4A]/30 backdrop-blur-xs transition-opacity" @click="activeUserModal = null"></div>
             <div class="relative bg-white rounded-2xl max-w-md w-full p-6 text-left shadow-2xl border border-slate-100 my-8">
                 <div class="flex items-center justify-between pb-3 border-b border-slate-100">
                     <h3 class="text-base font-bold text-slate-900">Edit Informasi Pengguna</h3>
@@ -335,7 +345,7 @@
     <!-- MODAL 3: UBAH PERAN -->
     <div x-show="activeUserModal === 'modal-change-role'" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
         <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
-            <div class="fixed inset-0 bg-slate-900/70 backdrop-blur-xs transition-opacity" @click="activeUserModal = null"></div>
+            <div class="fixed inset-0 bg-[#142B4A]/30 backdrop-blur-xs transition-opacity" @click="activeUserModal = null"></div>
             <div class="relative bg-white rounded-2xl max-w-md w-full p-6 text-left shadow-2xl border border-slate-100 my-8">
                 <div class="flex items-center justify-between pb-3 border-b border-slate-100">
                     <h3 class="text-base font-bold text-slate-900">Ubah Peran Akses</h3>
@@ -366,7 +376,7 @@
     <!-- MODAL 4: RESET PASSWORD -->
     <div x-show="activeUserModal === 'modal-reset-password'" class="fixed inset-0 z-50 overflow-y-auto" x-cloak>
         <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
-            <div class="fixed inset-0 bg-slate-900/70 backdrop-blur-xs transition-opacity" @click="activeUserModal = null"></div>
+            <div class="fixed inset-0 bg-[#142B4A]/30 backdrop-blur-xs transition-opacity" @click="activeUserModal = null"></div>
             <div class="relative bg-white rounded-2xl max-w-md w-full p-6 text-left shadow-2xl border border-slate-100 my-8">
                 <div class="flex items-center justify-between pb-3 border-b border-slate-100">
                     <h3 class="text-base font-bold text-slate-900">Reset Password Pengguna</h3>

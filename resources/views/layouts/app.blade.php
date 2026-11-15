@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="id" class="h-full bg-slate-50">
+<html lang="id" class="h-full bg-[#F5F7FA]">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,18 +13,30 @@
 
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    {{-- Livewire already ships and starts Alpine. Loading a second CDN instance
-         breaks x-data/@click bindings in the worksheet after hydration. --}}
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     colors: {
+                        primary: '#315E91',
+                        'primary-hover': '#254B75',
+                        secondary: '#638FC2',
+                        'secondary-hover': '#4E78A8',
+                        'soft-blue': '#EAF2FC',
+                        'page-bg': '#F4F7FB',
+                        surface: '#FFFFFF',
+                        'border-soft': '#E2EAF3',
+                        'text-main': '#263445',
+                        'text-muted': '#7B8794',
+                        'badge-success': '#DCFCE7',
+                        'badge-warning': '#FEF3C7',
+                        'badge-danger': '#FEE2E2',
                         navy: {
-                            950: '#060e1b',
-                            900: '#0A192F',
-                            800: '#112240',
-                            700: '#1D3557',
+                            950: '#0B1728',
+                            900: '#142B4A',
+                            800: '#1A3459',
+                            700: '#20406C',
+                            600: '#315E91',
                         },
                         aquablue: {
                             50: '#f0f9ff',
@@ -37,19 +49,137 @@
                     fontFamily: {
                         sans: ['Inter', 'sans-serif'],
                         mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    boxShadow: {
+                        'card': '0 1px 3px rgba(49, 94, 145, 0.04), 0 1px 2px rgba(49, 94, 145, 0.02)',
+                        'card-hover': '0 8px 20px rgba(49, 94, 145, 0.09), 0 2px 6px rgba(49, 94, 145, 0.04)',
                     }
                 }
             }
         }
     </script>
 
-
-    <!-- Custom CSS for Page Transitions, Scroll Reveal & Spreadsheet -->
+    <!-- Custom CSS for Design System, Gradients, Cards & Micro-interactions -->
     <style>
         [x-cloak] { display: none !important; }
         .tabular-nums { font-variant-numeric: tabular-nums; }
         
-        /* Smooth Page Transition (180ms ease-out) */
+        body {
+            background: linear-gradient(135deg, #F4F7FB 0%, #EEF4FA 45%, #EAF2FC 100%);
+            background-attachment: fixed;
+            color: #263445;
+            min-height: 100vh;
+        }
+
+        /* Sidebar: Navy blue with gentle gradient */
+        .sidebar-navy-gradient {
+            background: linear-gradient(180deg, #142B4A 0%, #173052 40%, #1D3A63 100%);
+        }
+
+        /* Navbar: White with subtle blue tint */
+        .navbar-glass {
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(246, 250, 255, 0.96) 100%);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid #E2EAF3;
+        }
+
+        /* Clean SaaS Card with soft gradient nuance */
+        .card-clean {
+            background: linear-gradient(180deg, #FFFFFF 0%, #FAFDFE 100%);
+            border: 1px solid #E2EAF3;
+            border-radius: 14px;
+            box-shadow: 0 1px 3px rgba(49, 94, 145, 0.04), 0 1px 2px rgba(49, 94, 145, 0.02);
+            transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 220ms cubic-bezier(0.16, 1, 0.3, 1), border-color 220ms ease;
+        }
+        .card-clean:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(49, 94, 145, 0.09), 0 2px 6px rgba(49, 94, 145, 0.04);
+            border-color: rgba(49, 94, 145, 0.3);
+        }
+
+        /* Archived Card Disabled State */
+        .card-archived-disabled {
+            cursor: not-allowed !important;
+            user-select: none;
+            opacity: 0.72;
+            background: #F4F7FB !important;
+            border-color: #E2EAF3 !important;
+        }
+        .card-archived-disabled:hover {
+            transform: none !important;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03) !important;
+            border-color: #E2EAF3 !important;
+        }
+
+        /* BUTTON GRADIENT INTERACTION SYSTEM (200-300ms) */
+        .btn-interactive, .btn-primary-gradient {
+            background: linear-gradient(135deg, #315E91 0%, #264D7A 100%);
+            color: #FFFFFF;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 2px 4px rgba(49, 94, 145, 0.18);
+            transition: all 250ms cubic-bezier(0.16, 1, 0.3, 1);
+            font-weight: 600;
+        }
+        .btn-interactive:hover, .btn-primary-gradient:hover {
+            background: linear-gradient(135deg, #3B6EA8 0%, #315E91 50%, #21436B 100%);
+            box-shadow: 0 6px 16px rgba(49, 94, 145, 0.32);
+            transform: translateY(-1.5px);
+            color: #FFFFFF;
+        }
+        .btn-interactive:active, .btn-primary-gradient:active {
+            background: linear-gradient(135deg, #264D7A 0%, #1D3B5C 100%);
+            transform: scale(0.98);
+            box-shadow: 0 1px 3px rgba(49, 94, 145, 0.2);
+        }
+        .btn-interactive:focus-visible, .btn-primary-gradient:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(49, 94, 145, 0.35);
+        }
+
+        .btn-secondary-gradient {
+            background: linear-gradient(135deg, #FFFFFF 0%, #F4F7FB 100%);
+            color: #263445;
+            border: 1px solid #E2EAF3;
+            box-shadow: 0 1px 2px rgba(49, 94, 145, 0.04);
+            transition: all 250ms cubic-bezier(0.16, 1, 0.3, 1);
+            font-weight: 600;
+        }
+        .btn-secondary-gradient:hover {
+            background: linear-gradient(135deg, #EAF2FC 0%, #DBEAFE 100%);
+            border-color: #638FC2;
+            color: #315E91;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(49, 94, 145, 0.12);
+        }
+        .btn-secondary-gradient:active {
+            transform: scale(0.98);
+            background: #EAF2FC;
+            box-shadow: 0 1px 2px rgba(49, 94, 145, 0.08);
+        }
+        .btn-secondary-gradient:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(99, 143, 194, 0.35);
+        }
+
+        .btn-danger {
+            background: #DC2626;
+            color: #FFFFFF;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            box-shadow: 0 1px 2px rgba(220, 38, 38, 0.2);
+            transition: all 200ms ease;
+            font-weight: 600;
+        }
+        .btn-danger:hover {
+            background: #B91C1C;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 10px rgba(220, 38, 38, 0.25);
+        }
+        .btn-danger:active {
+            transform: scale(0.98);
+            background: #991B1B;
+        }
+
+        /* Smooth Page Transition (Fade-in with subtle slide-up 200ms) */
         @keyframes pageFadeIn {
             from {
                 opacity: 0;
@@ -61,14 +191,29 @@
             }
         }
         .page-transition {
-            animation: pageFadeIn 180ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            animation: pageFadeIn 200ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        /* Modal Scale-in & Fade-in */
+        @keyframes modalScaleIn {
+            from {
+                opacity: 0;
+                transform: scale(0.96) translateY(4px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+        .modal-enter {
+            animation: modalScaleIn 180ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
 
         /* Scroll Reveal Effect for Cards & Content */
         .reveal-on-scroll {
             opacity: 0;
-            transform: translateY(12px);
-            transition: opacity 250ms cubic-bezier(0.16, 1, 0.3, 1), transform 250ms cubic-bezier(0.16, 1, 0.3, 1);
+            transform: translateY(10px);
+            transition: opacity 220ms cubic-bezier(0.16, 1, 0.3, 1), transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
             will-change: opacity, transform;
         }
         .reveal-on-scroll.is-revealed {
@@ -428,22 +573,22 @@
          class="fixed inset-0 bg-slate-900/80 z-40 lg:hidden"
          @click="mobileSidebarOpen = false" x-cloak></div>
 
-    <!-- SIDEBAR KIRI (Dark Navy #0A192F) -->
+    <!-- SIDEBAR KIRI (Navy Blue with Gentle Gradient) -->
     <aside :class="mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'" 
-           class="fixed inset-y-0 left-0 z-50 w-72 bg-[#0A192F] text-slate-200 transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 flex flex-col border-r border-slate-800 shadow-2xl">
+           class="fixed inset-y-0 left-0 z-50 w-72 sidebar-navy-gradient text-white transition-transform duration-250 ease-in-out lg:static lg:translate-x-0 flex flex-col border-r border-[#1D3A63] shadow-md">
         
-        <!-- Header Brand (Tersusun horizontal, bebas tulisan Sheets) -->
-        <div class="h-20 flex items-center px-6 gap-3.5 border-b border-slate-800/80 bg-[#060e1b]/40">
-            <div class="w-11 h-11 rounded-xl bg-gradient-to-tr from-sky-500 to-emerald-400 flex items-center justify-center shadow-lg shadow-sky-500/20 text-white font-black text-xl tracking-wider ring-2 ring-white/10 shrink-0">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <!-- Header Brand -->
+        <div class="h-20 flex items-center px-6 gap-3.5 border-b border-white/10 bg-white/5">
+            <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-[#315E91] to-[#173052] border border-white/20 flex items-center justify-center shadow-xs text-white font-black text-xl tracking-wider shrink-0">
+                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
                 </svg>
             </div>
             <div class="min-w-0 flex-1">
-                <span class="text-lg font-bold text-white tracking-tight block whitespace-nowrap overflow-hidden text-ellipsis">
+                <span class="text-base font-bold text-white tracking-tight block whitespace-nowrap overflow-hidden text-ellipsis">
                     Dadhen Mandiri
                 </span>
-                <p class="text-xs text-slate-400 font-medium whitespace-nowrap">Spreadsheet Kolaboratif</p>
+                <p class="text-xs text-sky-200/80 font-medium whitespace-nowrap">Spreadsheet Kolaboratif</p>
             </div>
         </div>
 
@@ -451,11 +596,11 @@
         <div class="flex-1 overflow-y-auto px-4 py-5 space-y-6">
             <!-- Navigation Links -->
             <div>
-                <p class="px-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Navigasi Utama</p>
+                <p class="px-3 text-[11px] font-bold text-sky-200/70 uppercase tracking-wider mb-2">Navigasi Utama</p>
                 <nav class="space-y-1">
                     <a href="{{ route('dashboard') }}" 
-                       class="flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all {{ request()->routeIs('dashboard') ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30' : 'text-slate-300 hover:bg-slate-800/60 hover:text-white' }}">
-                        <svg class="w-5 h-5 {{ request()->routeIs('dashboard') ? 'text-sky-400' : 'text-slate-400' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                       class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 {{ request()->routeIs('dashboard') ? 'bg-[#315E91] text-white shadow-xs' : 'text-slate-300 hover:bg-white/10 hover:text-white' }}">
+                        <svg class="w-5 h-5 {{ request()->routeIs('dashboard') ? 'text-white' : 'text-slate-400' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
                         </svg>
                         Beranda / Ringkasan
@@ -463,24 +608,24 @@
 
                     @if(Auth::user()?->isOwner())
                         <a href="{{ route('company.analytics') }}" 
-                           class="flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all {{ request()->routeIs('company.analytics*') || request()->routeIs('company.yearly-comparison*') ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30' : 'text-slate-300 hover:bg-slate-800/60 hover:text-white' }}">
-                            <svg class="w-5 h-5 {{ request()->routeIs('company.analytics*') ? 'text-sky-400' : 'text-slate-400' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                           class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 {{ request()->routeIs('company.analytics*') || request()->routeIs('company.yearly-comparison*') ? 'bg-[#315E91] text-white shadow-xs' : 'text-slate-300 hover:bg-white/10 hover:text-white' }}">
+                            <svg class="w-5 h-5 {{ request()->routeIs('company.analytics*') ? 'text-white' : 'text-slate-400' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
                             </svg>
                             Company Analytics
                         </a>
 
                         <a href="{{ route('company.users.index') }}" 
-                           class="flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all {{ request()->routeIs('company.users*') ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30' : 'text-slate-300 hover:bg-slate-800/60 hover:text-white' }}">
-                            <svg class="w-5 h-5 {{ request()->routeIs('company.users*') ? 'text-sky-400' : 'text-slate-400' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                           class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 {{ request()->routeIs('company.users*') ? 'bg-[#315E91] text-white shadow-xs' : 'text-slate-300 hover:bg-white/10 hover:text-white' }}">
+                            <svg class="w-5 h-5 {{ request()->routeIs('company.users*') ? 'text-white' : 'text-slate-400' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
                             </svg>
                             Manajemen User
                         </a>
 
                         <a href="{{ route('company.activity-logs.index') }}" 
-                           class="flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all {{ request()->routeIs('company.activity-logs*') ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30' : 'text-slate-300 hover:bg-slate-800/60 hover:text-white' }}">
-                            <svg class="w-5 h-5 {{ request()->routeIs('company.activity-logs*') ? 'text-sky-400' : 'text-slate-400' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                           class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 {{ request()->routeIs('company.activity-logs*') ? 'bg-[#315E91] text-white shadow-xs' : 'text-slate-300 hover:bg-white/10 hover:text-white' }}">
+                            <svg class="w-5 h-5 {{ request()->routeIs('company.activity-logs*') ? 'text-white' : 'text-slate-400' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                             </svg>
                             Activity Logs
@@ -488,7 +633,7 @@
                     @endif
 
                     <button @click="activeModal = 'modal-friend'"
-                            class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800/60 hover:text-white transition-all text-left">
+                            class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition-all duration-200 text-left">
                         <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
                         </svg>
@@ -504,19 +649,19 @@
             @endphp
             <div x-data="{ openYear: {{ $currentGroupYearId ? $currentGroupYearId : ($sidebarYears->first()?->id ?? 'null') }} }">
                 <div class="px-3 mb-2 flex items-center justify-between">
-                    <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Tahun Operasional</p>
-                    <span class="text-[10px] font-mono text-sky-400 bg-sky-950/80 px-1.5 py-0.5 rounded border border-sky-800/60">Perusahaan</span>
+                    <p class="text-[11px] font-bold text-sky-200/70 uppercase tracking-wider">Tahun Operasional</p>
+                    <span class="text-[10px] font-mono text-sky-200 bg-white/10 px-2 py-0.5 rounded-full border border-white/10 font-semibold">Perusahaan</span>
                 </div>
 
                 <div class="space-y-2 max-h-72 overflow-y-auto pr-1">
                     @forelse($sidebarYears as $opYear)
-                        <div class="rounded-lg bg-slate-900/60 border border-slate-800/80 overflow-hidden">
+                        <div class="rounded-xl bg-white/5 border border-white/10 overflow-hidden transition-all duration-200">
                             <!-- Year Toggle Button -->
                             <button @click="openYear = (openYear === {{ $opYear->id }} ? null : {{ $opYear->id }})" 
                                     class="w-full flex items-center justify-between px-3 py-2 text-xs font-bold transition-colors text-left"
-                                    :class="openYear === {{ $opYear->id }} ? 'text-sky-300 bg-slate-800/70' : 'text-slate-300 hover:text-white hover:bg-slate-800/40'">
+                                    :class="openYear === {{ $opYear->id }} ? 'text-white bg-white/10 border-b border-white/10' : 'text-slate-300 hover:text-white hover:bg-white/10'">
                                 <div class="flex items-center gap-2">
-                                    <svg class="w-3.5 h-3.5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg class="w-3.5 h-3.5 text-sky-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                                     </svg>
                                     <span>Tahun {{ $opYear->year }}</span>
@@ -524,7 +669,7 @@
                                 <div class="flex items-center gap-1.5">
                                     <span class="text-[10px] text-slate-400 font-normal">12 Bulan</span>
                                     <svg class="w-3.5 h-3.5 transition-transform duration-200" 
-                                         :class="openYear === {{ $opYear->id }} ? 'rotate-180 text-sky-400' : 'text-slate-500'" 
+                                         :class="openYear === {{ $opYear->id }} ? 'rotate-180 text-white' : 'text-slate-400'" 
                                          fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                                     </svg>
@@ -532,7 +677,7 @@
                             </button>
 
                             <!-- Months Grid -->
-                            <div x-show="openYear === {{ $opYear->id }}" x-collapse class="p-2 grid grid-cols-3 gap-1 bg-[#060e1b]/40 border-t border-slate-800/50">
+                            <div x-show="openYear === {{ $opYear->id }}" x-collapse class="p-2 grid grid-cols-3 gap-1.5 bg-[#0f223a]/80">
                                 @foreach($opYear->monthlyWorkspaces as $mWork)
                                     @php
                                         $isActiveMonth = isset($group) && $group->id === $mWork->group_id;
@@ -540,13 +685,13 @@
                                     @if(Auth::user()->isOwner() || !$opYear->is_archived)
                                         <a href="{{ route('group.workspace', $mWork->group_id) }}"
                                            title="{{ $mWork->name }} {{ $opYear->year }}"
-                                           class="px-2 py-1.5 text-center rounded text-[11px] font-medium transition-all truncate {{ $isActiveMonth ? 'bg-sky-500 text-white font-bold shadow-xs shadow-sky-500/30' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
+                                           class="px-2 py-1.5 text-center rounded-lg text-[11px] font-semibold transition-all duration-150 truncate {{ $isActiveMonth ? 'bg-[#315E91] text-white shadow-xs' : 'text-slate-300 bg-white/5 hover:bg-white/15 hover:text-white' }}">
                                             {{ substr($mWork->name, 0, 3) }}@if($opYear->is_archived) 🔒@endif
                                         </a>
                                     @else
                                         <span title="🔒 Archived — hanya Owner yang dapat membuka"
                                               aria-disabled="true"
-                                              class="px-2 py-1.5 text-center rounded text-[11px] font-medium truncate text-slate-500 opacity-60 cursor-not-allowed">
+                                              class="px-2 py-1.5 text-center rounded-lg text-[11px] font-medium truncate text-slate-500 bg-white/5 opacity-50 cursor-not-allowed">
                                             {{ substr($mWork->name, 0, 3) }} 🔒
                                         </span>
                                     @endif
@@ -554,7 +699,7 @@
                             </div>
                         </div>
                     @empty
-                        <p class="text-xs text-slate-500 px-3 py-2">Belum ada tahun operasional.</p>
+                        <p class="text-xs text-slate-400 px-3 py-2">Belum ada tahun operasional.</p>
                     @endforelse
                 </div>
 
@@ -565,16 +710,16 @@
                 @if($legacyGroups->isNotEmpty())
                     <div x-data="{ openLegacy: false }" class="mt-3">
                         <button @click="openLegacy = !openLegacy" 
-                                class="w-full flex items-center justify-between px-3 py-1.5 rounded text-[11px] font-semibold text-slate-400 hover:text-slate-200 transition-colors">
+                                class="w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-[11px] font-semibold text-sky-200/70 hover:text-white transition-colors">
                             <span>Workspace Arsip ({{ $legacyGroups->count() }})</span>
-                            <svg class="w-3.5 h-3.5 transition-transform" :class="openLegacy ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                            <svg class="w-3.5 h-3.5 transition-transform duration-200" :class="openLegacy ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                         </button>
                         <div x-show="openLegacy" x-collapse class="mt-1 space-y-1 pl-1">
                             @foreach($legacyGroups as $g)
                                 @if(Auth::user()->isOwner() || !$g->isArchived())
                                     <a href="{{ route('group.workspace', $g->id) }}"
-                                       class="flex items-center gap-2 px-2.5 py-1.5 rounded text-xs transition-colors {{ isset($group) && $group->id === $g->id ? 'bg-slate-800 text-sky-300' : 'text-slate-400 hover:text-white hover:bg-slate-800/40' }}">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
+                                       class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-colors {{ isset($group) && $group->id === $g->id ? 'bg-[#315E91] text-white' : 'text-slate-300 hover:text-white hover:bg-white/10' }}">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
                                         <span class="truncate">
                                             {{ $g->name }}
                                             @if($g->isArchived()) 🔒 Archived @endif
@@ -582,7 +727,7 @@
                                     </a>
                                 @else
                                     <span aria-disabled="true" title="🔒 Archived — hanya Owner yang dapat membuka"
-                                          class="flex items-center gap-2 px-2.5 py-1.5 rounded text-xs text-slate-500 opacity-60 cursor-not-allowed">
+                                          class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-slate-500 opacity-60 cursor-not-allowed">
                                         <span>🔒</span><span class="truncate">{{ $g->name }} — Archived</span>
                                     </span>
                                 @endif
@@ -594,20 +739,20 @@
         </div>
 
         <!-- Profil Ringkas & Logout di Bagian Bawah -->
-        <div class="p-4 border-t border-slate-800 bg-[#060e1b]/60 flex items-center justify-between">
-            <div class="flex items-center gap-3 overflow-hidden cursor-pointer hover:opacity-85 transition-opacity" 
+        <div class="p-4 border-t border-white/10 bg-white/5 flex items-center justify-between">
+            <div class="flex items-center gap-3 overflow-hidden cursor-pointer hover:opacity-90 transition-opacity" 
                  @click="openUserProfile({{ Auth::id() }})" 
                  title="Lihat profil saya">
-                <img class="w-9 h-9 rounded-full object-cover ring-2 ring-sky-500/40" src="{{ Auth::user()->avatar_url }}" alt="{{ Auth::user()->name }}">
+                <img class="w-9 h-9 rounded-full object-cover ring-2 ring-white/20" src="{{ Auth::user()->avatar_url }}" alt="{{ Auth::user()->name }}">
                 <div class="truncate">
-                    <p class="text-xs font-semibold text-white truncate hover:underline">{{ Auth::user()->name }}</p>
-                    <p class="text-[11px] text-sky-400 truncate capitalize font-mono">{{ Auth::user()->display_role }}</p>
+                    <p class="text-xs font-bold text-white truncate hover:text-sky-200">{{ Auth::user()->name }}</p>
+                    <p class="text-[11px] text-sky-200/80 truncate capitalize font-mono">{{ Auth::user()->display_role }}</p>
                 </div>
             </div>
             <form action="{{ route('logout') }}" method="POST">
                 @csrf
                 <button type="submit" title="Keluar / Logout"
-                        class="p-2 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition-colors">
+                        class="p-2 text-slate-300 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition-colors">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
                     </svg>
@@ -617,36 +762,36 @@
     </aside>
 
     <!-- CONTENT WRAPPER -->
-    <div class="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden bg-slate-50 page-transition">
+    <div class="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden bg-transparent page-transition">
         
         <!-- TOPBAR -->
-        <header class="h-16 bg-white border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between shadow-xs sticky top-0 z-[100] shrink-0">
+        <header class="h-16 navbar-glass px-4 sm:px-6 flex items-center justify-between sticky top-0 z-[100] shrink-0">
             <div class="flex items-center gap-3">
                 <!-- Mobile sidebar toggle -->
-                <button @click="mobileSidebarOpen = !mobileSidebarOpen" class="lg:hidden p-2 rounded-md text-slate-600 hover:bg-slate-100">
+                <button @click="mobileSidebarOpen = !mobileSidebarOpen" class="lg:hidden p-2 rounded-xl text-[#526780] hover:bg-[#F5F7FA]">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
                 </button>
 
                 <!-- Breadcrumb / Active Workspace Indicator -->
                 <div class="flex items-center gap-2 text-xs sm:text-sm">
-                    <span class="text-slate-400 font-medium hidden sm:inline">Workspace:</span>
+                    <span class="text-[#7B8794] font-medium hidden sm:inline">Workspace:</span>
                     @if(isset($group))
-                        <div class="flex items-center gap-2 bg-sky-50 text-sky-800 border border-sky-200 px-2.5 py-1 rounded-full font-semibold">
-                            <span class="w-2 h-2 rounded-full bg-sky-500 animate-pulse"></span>
+                        <div class="flex items-center gap-2 bg-[#F5F7FA] text-[#142B4A] border border-[#E5EAF0] px-3 py-1 rounded-full font-bold">
+                            <span class="w-2 h-2 rounded-full bg-[#142B4A] animate-pulse"></span>
                             <span>{{ $group->name }}</span>
                         </div>
                     @else
-                        <span class="font-semibold text-slate-700">Dashboard Dokumen & Spreadsheet</span>
+                        <span class="font-bold text-[#263445]">Dashboard Dokumen &amp; Spreadsheet</span>
                     @endif
                 </div>
             </div>
 
             <div class="flex items-center gap-3 sm:gap-4" x-data="{ notifDropdownOpen: false }">
-                <!-- Status Badge: Kolaborasi Aktif -->
-                <div class="hidden md:flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold">
+                <!-- Status Badge: Kolaborasi Aktif (Soft Green #DCFCE7) -->
+                <div class="hidden md:flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#DCFCE7] border border-emerald-200 text-[#15803d] text-xs font-semibold">
                     <span class="relative flex h-2 w-2">
                         <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                        <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-600"></span>
                     </span>
                     Kolaborasi Aktif
                 </div>
@@ -658,7 +803,7 @@
                         $notifs = Auth::user()->notifications()->take(5)->get();
                     @endphp
                     <button @click="notifDropdownOpen = !notifDropdownOpen" 
-                            class="relative p-2 rounded-full text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors focus:outline-none">
+                            class="relative p-2 rounded-xl text-[#526780] hover:text-[#142B4A] hover:bg-[#F5F7FA] transition-colors focus:outline-none">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
                         </svg>
@@ -672,44 +817,44 @@
                     <!-- Dropdown List -->
                     <div x-show="notifDropdownOpen" 
                          @click.away="notifDropdownOpen = false"
-                         x-transition:enter="transition ease-out duration-150"
-                         x-transition:enter-start="opacity-0 scale-95"
-                         x-transition:enter-end="opacity-100 scale-100"
-                         x-transition:leave="transition ease-in duration-100"
-                         x-transition:leave-start="opacity-100 scale-100"
-                         x-transition:leave-end="opacity-0 scale-95"
-                         class="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-50" x-cloak>
+                         x-transition:enter="transition ease-out duration-180"
+                         x-transition:enter-start="opacity-0 translate-y-1 scale-98"
+                         x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                         x-transition:leave="transition ease-in duration-120"
+                         x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+                         x-transition:leave-end="opacity-0 translate-y-1 scale-98"
+                         class="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-[#E5EAF0] py-2 z-50" x-cloak>
                         
-                        <div class="px-4 py-2 border-b border-slate-100 flex items-center justify-between">
-                            <span class="text-xs font-bold text-slate-800">Notifikasi</span>
+                        <div class="px-4 py-2 border-b border-[#E5EAF0] flex items-center justify-between">
+                            <span class="text-xs font-bold text-[#263445]">Notifikasi</span>
                             <form action="{{ route('notifications.read-all') }}" method="POST">
                                 @csrf
-                                <button type="submit" class="text-[11px] text-sky-600 hover:text-sky-800 font-medium">Tandai Dibaca</button>
+                                <button type="submit" class="text-[11px] text-[#142B4A] hover:underline font-bold">Tandai Dibaca</button>
                             </form>
                         </div>
 
-                        <div class="max-h-72 overflow-y-auto divide-y divide-slate-100">
+                        <div class="max-h-72 overflow-y-auto divide-y divide-[#E5EAF0]">
                             @forelse($notifs as $n)
-                                <div class="p-3 text-xs hover:bg-slate-50 transition-colors {{ !$n->is_read ? 'bg-sky-50/50' : '' }}">
-                                    <p class="font-semibold text-slate-800">{{ $n->title }}</p>
-                                    <p class="text-slate-600 text-[11px] mt-0.5 line-clamp-2">{{ $n->description }}</p>
-                                    <span class="text-[9px] text-slate-400 mt-1 inline-block">{{ $n->created_at->diffForHumans() }}</span>
+                                <div class="p-3 text-xs hover:bg-[#F5F7FA] transition-colors {{ !$n->is_read ? 'bg-sky-50/40' : '' }}">
+                                    <p class="font-bold text-[#263445]">{{ $n->title }}</p>
+                                    <p class="text-[#526780] text-[11px] mt-0.5 line-clamp-2">{{ $n->description }}</p>
+                                    <span class="text-[9px] text-[#7B8794] mt-1 inline-block">{{ $n->created_at->diffForHumans() }}</span>
                                 </div>
                             @empty
-                                <div class="p-4 text-center text-xs text-slate-400">Tidak ada notifikasi baru</div>
+                                <div class="p-4 text-center text-xs text-[#7B8794]">Tidak ada notifikasi baru</div>
                             @endforelse
                         </div>
                     </div>
                 </div>
 
                 <!-- User Avatar & Role Badge (Clickable to view Profile) -->
-                <div class="flex items-center gap-2 pl-2 border-l border-slate-200 cursor-pointer hover:opacity-85 transition-opacity" 
+                <div class="flex items-center gap-2 pl-2 border-l border-[#E5EAF0] cursor-pointer hover:opacity-90 transition-opacity" 
                      @click="openUserProfile({{ Auth::id() }})" 
                      title="Lihat profil saya">
-                    <img class="w-8 h-8 rounded-full object-cover ring-1 ring-slate-300" src="{{ Auth::user()->avatar_url }}" alt="{{ Auth::user()->name }}">
+                    <img class="w-8 h-8 rounded-full object-cover ring-1 ring-[#E5EAF0]" src="{{ Auth::user()->avatar_url }}" alt="{{ Auth::user()->name }}">
                     <div class="hidden sm:block text-left">
-                        <span class="text-xs font-semibold text-slate-700 block leading-tight hover:text-sky-600 underline decoration-slate-300">{{ Auth::user()->name }}</span>
-                        <span class="text-[10px] text-slate-400 font-mono capitalize">{{ Auth::user()->display_role }}</span>
+                        <span class="text-xs font-bold text-[#263445] block leading-tight hover:text-[#142B4A]">{{ Auth::user()->name }}</span>
+                        <span class="text-[10px] text-[#7B8794] font-mono capitalize">{{ Auth::user()->display_role }}</span>
                     </div>
                 </div>
             </div>

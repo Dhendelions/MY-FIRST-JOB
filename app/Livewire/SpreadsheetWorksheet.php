@@ -72,6 +72,9 @@ class SpreadsheetWorksheet extends Component
     // Auto-save badge indicator
     public string $saveStatus = 'Tersimpan';
 
+    // Strict Archive Protection indicator
+    public bool $isArchivedBlocked = false;
+
     // Undo / Redo history stacks
     public array $undoStack = [];
     public array $redoStack = [];
@@ -90,10 +93,93 @@ class SpreadsheetWorksheet extends Component
         'redoTriggered' => 'redo',
     ];
 
-    public function mount(SpreadsheetSheet $sheet)
+    /**
+     * Livewire lifecycle hook executed on EVERY request (initial load & subsequent actions).
+     * Enforces dynamic, immediate protection if workspace becomes archived while Admin is in spreadsheet.
+     */
+    public function boot(): void
     {
-        $this->sheetId = $sheet->id;
-        $this->sheet = $sheet;
+        $user = Auth::user();
+        if ($user && $user->isAdmin()) {
+            if ($this->ensureWorkspaceNotArchived()) {
+                return;
+            }
+        }
+    }
+
+    /**
+     * Direct database check for workspace archive status.
+     * If workspace is archived and user is Admin:
+     * 1. Stops access.
+     * 2. Clears sensitive spreadsheet data from component state.
+     * 3. Sets flash notification.
+     * 4. Dispatches client-side event and redirects to dashboard.
+     */
+    public function ensureWorkspaceNotArchived(): bool
+    {
+        $user = Auth::user();
+        if (!$user || !$user->isAdmin()) {
+            return false;
+        }
+
+        $sheetId = $this->sheetId ?? $this->sheet?->id;
+        if (!$sheetId) {
+            return false;
+        }
+
+        if (\App\Services\WorkspaceSecurityService::isSheetArchived($sheetId)) {
+            $this->isArchivedBlocked = true;
+            $this->columns = [];
+            $this->rows = [];
+            $this->gridColumns = [];
+            $this->gridRows = [];
+            $this->cellsData = [];
+            $this->cellsDisplay = [];
+            $this->cellsFormula = [];
+            $this->cellsFormat = [];
+            $this->cellsVersions = [];
+            $this->cellsStyleCss = [];
+            $this->mergedCells = [];
+            $this->mergedCoveredCells = [];
+
+            session()->flash('error', 'Workspace ini telah diarsipkan dan tidak lagi dapat diakses.');
+            $this->dispatch('workspace-archived-blocked', [
+                'redirect' => route('dashboard'),
+                'message' => 'Workspace ini telah diarsipkan dan tidak lagi dapat diakses.'
+            ]);
+            $this->redirect(route('dashboard'));
+
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Periodic status check called via Livewire polling.
+     */
+    public function checkWorkspaceStatus(): void
+    {
+        $this->ensureWorkspaceNotArchived();
+    }
+
+    public function mount(SpreadsheetSheet|int|null $sheet = null, ?int $sheetId = null)
+    {
+        if ($sheet instanceof SpreadsheetSheet) {
+            $this->sheet = $sheet;
+            $this->sheetId = $sheet->id;
+        } elseif (is_numeric($sheet)) {
+            $this->sheetId = (int) $sheet;
+            $this->sheet = SpreadsheetSheet::find($this->sheetId);
+        } elseif (is_numeric($sheetId)) {
+            $this->sheetId = (int) $sheetId;
+            $this->sheet = SpreadsheetSheet::find($this->sheetId);
+        }
+
+        if ($this->ensureWorkspaceNotArchived()) {
+            return;
+        }
+
         $this->loadSheetData();
     }
 
@@ -130,8 +216,9 @@ class SpreadsheetWorksheet extends Component
             abort(403, 'Akses ditolak: Anda tidak memiliki wewenang pada workspace ini.');
         }
 
-        if ($user->isAdmin() && $this->sheet->group->isArchived()) {
-            abort(403, 'Workspace ini telah diarsipkan dan tidak dapat diakses oleh Admin.');
+        if ($user->isAdmin() && (\App\Services\WorkspaceSecurityService::isSheetArchived($this->sheetId) || $this->sheet->group->isArchived())) {
+            $this->ensureWorkspaceNotArchived();
+            abort(403, 'Workspace ini telah diarsipkan dan tidak lagi dapat diakses.');
         }
 
         if ($this->sheet->isRestrictedForRole($userRole)) {
@@ -149,9 +236,13 @@ class SpreadsheetWorksheet extends Component
      */
     protected function authorizeModification(): void
     {
+        if ($this->ensureWorkspaceNotArchived()) {
+            abort(403, 'Workspace ini telah diarsipkan dan tidak lagi dapat diakses.');
+        }
+
         $this->authorizeAccess();
 
-        if ($this->sheet && $this->sheet->isArchived()) {
+        if ($this->sheet && ($this->sheet->isArchived() || \App\Services\WorkspaceSecurityService::isSheetArchived($this->sheetId))) {
             abort(403, 'Tahun operasional ini telah diarsipkan. Lembar kerja bersifat read-only.');
         }
     }

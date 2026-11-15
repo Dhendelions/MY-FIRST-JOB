@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="id" class="h-full bg-slate-900">
+<html lang="id" class="h-full bg-[#F5F7FA]">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -15,11 +15,19 @@
             theme: {
                 extend: {
                     colors: {
+                        primary: '#142B4A',
+                        'primary-hover': '#1B355A',
+                        secondary: '#526780',
+                        'page-bg': '#F5F7FA',
+                        surface: '#FFFFFF',
+                        'border-soft': '#E5EAF0',
+                        'text-main': '#263445',
+                        'text-muted': '#7B8794',
                         navy: {
                             950: '#060e1b',
-                            900: '#0A192F',
-                            800: '#112240',
-                            700: '#1D3557',
+                            900: '#142B4A',
+                            800: '#1B355A',
+                            700: '#234472',
                         }
                     },
                     fontFamily: {
@@ -32,6 +40,11 @@
     </script>
 
     <style>
+        body {
+            background-color: #F5F7FA;
+            color: #263445;
+        }
+
         @keyframes pageFadeIn {
             from {
                 opacity: 0;
@@ -54,7 +67,7 @@
         }
     </style>
 </head>
-<body class="h-full antialiased font-sans flex page-transition">
+<body class="h-full antialiased font-sans flex page-transition bg-[#F5F7FA]">
     @yield('content')
 </body>
 </html>

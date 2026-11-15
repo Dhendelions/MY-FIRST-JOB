@@ -40,7 +40,7 @@ class GroupController extends Controller
             abort(403, 'Akses ditolak: Anda bukan anggota resmi dari workspace ini.');
         }
 
-        if ($user->isAdmin() && $group->isArchived()) {
+        if ($user->isAdmin() && (\App\Services\WorkspaceSecurityService::isGroupArchived($group) || $group->isArchived())) {
             abort(403, 'Workspace ini telah diarsipkan dan tidak dapat diakses oleh Admin.');
         }
 
@@ -136,7 +136,7 @@ class GroupController extends Controller
         $operationalYear = \App\Models\OperationalYear::where('year', $year)->firstOrFail();
         $user = Auth::user();
 
-        if ($user && $user->isAdmin() && $operationalYear->isArchived()) {
+        if ($user && $user->isAdmin() && (\App\Services\WorkspaceSecurityService::isYearArchived($year) || $operationalYear->isArchived())) {
             abort(403, 'Workspace tahun ini telah diarsipkan dan tidak dapat diakses oleh Admin.');
         }
 
@@ -157,7 +157,7 @@ class GroupController extends Controller
     public function unlock(Request $request, FisheriesGroup $group)
     {
         abort_unless($group->isMember(Auth::id()), 403);
-        abort_if(Auth::user()->isAdmin() && $group->isArchived(), 403, 'Workspace ini telah diarsipkan dan tidak dapat diakses oleh Admin.');
+        abort_if(Auth::user()->isAdmin() && (\App\Services\WorkspaceSecurityService::isGroupArchived($group) || $group->isArchived()), 403, 'Workspace ini telah diarsipkan dan tidak dapat diakses oleh Admin.');
 
         $validated = $request->validate([
             'password' => ['required', 'string', 'max:100'],
@@ -538,6 +538,10 @@ class GroupController extends Controller
         $user = Auth::user();
         if (!$group->isMember($user->id)) {
             abort(403, 'Akses ditolak: Anda bukan anggota resmi dari workspace ini.');
+        }
+
+        if ($user->isAdmin() && (\App\Services\WorkspaceSecurityService::isGroupArchived($group) || $group->isArchived())) {
+            abort(403, 'Workspace ini telah diarsipkan dan tidak dapat diakses oleh Admin.');
         }
 
         $userRole = $group->getMemberRole($user->id);

@@ -61,6 +61,9 @@ class WorkspaceActivityHistory extends Component
             abort(403, 'Akses ditolak.');
         }
 
+        // Strict security: Admin is strictly prohibited from accessing archived workspace history
+        \App\Services\WorkspaceSecurityService::validateAdminWorkspaceAccess($user, $group);
+
         $userRole = $group->getMemberRole($user->id);
 
         $query = SpreadsheetActivity::with(['user', 'sheet'])

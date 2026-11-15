@@ -133,6 +133,14 @@ class SpreadsheetSheet extends Model
     }
 
     /**
+     * Cells belonging to this spreadsheet sheet through rows.
+     */
+    public function cells(): HasManyThrough
+    {
+        return $this->hasManyThrough(SpreadsheetCell::class, SpreadsheetRow::class, 'sheet_id', 'row_id');
+    }
+
+    /**
      * Initialize initial blank grid with A-F columns and 12 empty rows (No default names, purely Excel-style blank).
      */
     public function initializeBlankGrid(int $rowCount = 12, int $colCount = 6): void

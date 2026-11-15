@@ -184,6 +184,31 @@ class CompanyUserManagementAndActivityLogsTest extends TestCase
         $this->assertStringNotContainsString('brandnewpassword123', json_encode($log->properties));
     }
 
+    public function test_owner_can_delete_user_without_destroying_shared_workspace_data(): void
+    {
+        $owner = User::create(['name' => 'Boss Owner', 'email' => 'boss@example.test', 'password' => 'password', 'role' => 'owner', 'is_active' => true]);
+        $target = User::create(['name' => 'Worker A', 'email' => 'workerA@example.test', 'password' => 'password', 'role' => 'admin', 'is_active' => true]);
+        $otherMember = User::create(['name' => 'Worker B', 'email' => 'workerB@example.test', 'password' => 'password', 'role' => 'admin', 'is_active' => true]);
+
+        $group = \App\Models\FisheriesGroup::create([
+            'name' => 'Workspace Shared',
+            'invite_code' => 'WS-SHARED-01',
+            'created_by' => $target->id,
+        ]);
+
+        \App\Models\GroupMember::create(['group_id' => $group->id, 'user_id' => $target->id, 'role' => 'leader', 'status' => 'Aktif']);
+        \App\Models\GroupMember::create(['group_id' => $group->id, 'user_id' => $otherMember->id, 'role' => 'admin', 'status' => 'Aktif']);
+
+        $this->actingAs($owner)
+            ->delete(route('company.users.destroy', $target))
+            ->assertRedirect(route('company.users.index'));
+
+        $this->assertDatabaseMissing('users', ['id' => $target->id]);
+        $this->assertDatabaseMissing('group_members', ['group_id' => $group->id, 'user_id' => $target->id]);
+        $this->assertDatabaseHas('group_members', ['group_id' => $group->id, 'user_id' => $otherMember->id]);
+        $this->assertDatabaseHas('fisheries_groups', ['id' => $group->id, 'created_by' => null]);
+    }
+
     public function test_owner_can_view_and_filter_activity_logs(): void
     {
         $owner = User::create(['name' => 'Boss Owner', 'email' => 'boss@example.test', 'password' => 'password', 'role' => 'owner', 'is_active' => true]);

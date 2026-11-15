@@ -403,7 +403,7 @@ class SpreadsheetController extends Controller
             abort(403, 'Akses ditolak: Anda tidak memiliki wewenang untuk membaca atau mengubah lembar kerja ini.');
         }
 
-        if ($user->isAdmin() && $group->isArchived()) {
+        if ($user->isAdmin() && (\App\Services\WorkspaceSecurityService::isSheetArchived($sheet) || $group->isArchived())) {
             abort(403, 'Workspace ini telah diarsipkan dan tidak dapat diakses oleh Admin.');
         }
 
@@ -425,7 +425,7 @@ class SpreadsheetController extends Controller
     {
         $this->authorizeSheetAccess($sheet);
 
-        if ($sheet->isArchived()) {
+        if ($sheet->isArchived() || \App\Services\WorkspaceSecurityService::isSheetArchived($sheet)) {
             abort(403, 'Tahun operasional ini telah diarsipkan. Lembar kerja bersifat read-only.');
         }
     }

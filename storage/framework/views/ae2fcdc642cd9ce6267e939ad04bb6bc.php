@@ -27,8 +27,8 @@
                     $firstMw = $selectedYear->monthlyWorkspaces->first();
                 ?>
                 <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($firstMw): ?>
-                    <a href="<?php echo e(route('group.workspace', $firstMw->group_id)); ?>" class="px-4 py-2 rounded-xl bg-navy-900 hover:bg-navy-800 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5">
-                        <svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                    <a href="<?php echo e(route('group.workspace', $firstMw->group_id)); ?>" class="px-4 py-2 rounded-xl bg-[#142B4A] hover:bg-[#1B355A] text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 hover:-translate-y-0.5">
+                        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                         <span>Buka Workspace <?php echo e($selectedYear->year); ?></span>
                     </a>
                 <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
@@ -37,27 +37,27 @@
     </div>
 
     <!-- 2. Sub-Module Navigation Tabs -->
-    <div class="flex items-center gap-2 border-b border-slate-200 overflow-x-auto pb-px">
+    <div class="flex items-center gap-2 border-b border-[#E5EAF0] overflow-x-auto pb-px">
         <a href="<?php echo e(route('company.analytics', ['tab' => 'overview', 'year' => $selectedYear?->year])); ?>"
-           class="px-4 py-2.5 font-bold text-xs rounded-t-xl transition-all flex items-center gap-2 border-b-2 <?php echo e($activeTab === 'overview' ? 'border-sky-600 text-sky-600 bg-sky-50/50' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'); ?>">
+           class="px-4 py-2.5 font-bold text-xs rounded-t-xl transition-all flex items-center gap-2 border-b-2 <?php echo e($activeTab === 'overview' ? 'border-[#142B4A] text-[#142B4A] bg-[#F5F7FA]' : 'border-transparent text-[#526780] hover:text-[#263445] hover:bg-[#F5F7FA]'); ?>">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
             <span>1. Overview</span>
         </a>
 
         <a href="<?php echo e(route('company.analytics', ['tab' => 'financial', 'year' => $selectedYear?->year])); ?>"
-           class="px-4 py-2.5 font-bold text-xs rounded-t-xl transition-all flex items-center gap-2 border-b-2 <?php echo e($activeTab === 'financial' ? 'border-sky-600 text-sky-600 bg-sky-50/50' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'); ?>">
+           class="px-4 py-2.5 font-bold text-xs rounded-t-xl transition-all flex items-center gap-2 border-b-2 <?php echo e($activeTab === 'financial' ? 'border-[#142B4A] text-[#142B4A] bg-[#F5F7FA]' : 'border-transparent text-[#526780] hover:text-[#263445] hover:bg-[#F5F7FA]'); ?>">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             <span>2. Financial Analytics</span>
         </a>
 
         <a href="<?php echo e(route('company.analytics', ['tab' => 'operational', 'year' => $selectedYear?->year])); ?>"
-           class="px-4 py-2.5 font-bold text-xs rounded-t-xl transition-all flex items-center gap-2 border-b-2 <?php echo e($activeTab === 'operational' ? 'border-sky-600 text-sky-600 bg-sky-50/50' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'); ?>">
+           class="px-4 py-2.5 font-bold text-xs rounded-t-xl transition-all flex items-center gap-2 border-b-2 <?php echo e($activeTab === 'operational' ? 'border-[#142B4A] text-[#142B4A] bg-[#F5F7FA]' : 'border-transparent text-[#526780] hover:text-[#263445] hover:bg-[#F5F7FA]'); ?>">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
             <span>3. Operational Analytics</span>
         </a>
 
         <a href="<?php echo e(route('company.analytics', ['tab' => 'comparison', 'year' => $selectedYear?->year])); ?>"
-           class="px-4 py-2.5 font-bold text-xs rounded-t-xl transition-all flex items-center gap-2 border-b-2 <?php echo e($activeTab === 'comparison' ? 'border-sky-600 text-sky-600 bg-sky-50/50' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'); ?>">
+           class="px-4 py-2.5 font-bold text-xs rounded-t-xl transition-all flex items-center gap-2 border-b-2 <?php echo e($activeTab === 'comparison' ? 'border-[#142B4A] text-[#142B4A] bg-[#F5F7FA]' : 'border-transparent text-[#526780] hover:text-[#263445] hover:bg-[#F5F7FA]'); ?>">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
             <span>4. Yearly Comparison</span>
         </a>
@@ -65,15 +65,15 @@
 
     <!-- 3. Database-Driven Year Selector Bar (Unless on Comparison Tab) -->
     <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($activeTab !== 'comparison'): ?>
-        <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-wrap items-center justify-between gap-4">
+        <div class="bg-white p-4 rounded-2xl border border-[#E5EAF0] shadow-xs flex flex-wrap items-center justify-between gap-4">
             <div class="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
-                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider mr-1">Tahun Operasional:</span>
+                <span class="text-xs font-bold text-[#7B8794] uppercase tracking-wider mr-1">Tahun Operasional:</span>
                 <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php $__currentLoopData = $allYears; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $y): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                     <a href="<?php echo e(route('company.analytics', ['tab' => $activeTab, 'year' => $y->year])); ?>"
-                       class="px-3.5 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 <?php echo e(($selectedYear && $selectedYear->id === $y->id) ? 'bg-[#0A192F] text-sky-400 shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'); ?>">
+                       class="px-3.5 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 <?php echo e(($selectedYear && $selectedYear->id === $y->id) ? 'bg-[#142B4A] text-white shadow-xs' : 'bg-[#F5F7FA] text-[#526780] hover:bg-[#E5EAF0] hover:text-[#142B4A]'); ?>">
                         <span><?php echo e($y->year); ?></span>
                         <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($y->is_archived): ?>
-                            <span class="text-[9px] px-1 py-0.2 rounded font-normal <?php echo e(($selectedYear && $selectedYear->id === $y->id) ? 'bg-amber-400/20 text-amber-300' : 'bg-amber-100 text-amber-700'); ?>">Arsip</span>
+                            <span class="text-[9px] px-1 py-0.2 rounded font-normal <?php echo e(($selectedYear && $selectedYear->id === $y->id) ? 'bg-amber-400/20 text-amber-200' : 'bg-amber-100 text-amber-700'); ?>">Arsip</span>
                         <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
                     </a>
                 <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
