@@ -151,30 +151,25 @@ class YearBasedWorkspaceArchitectureTest extends TestCase
         $this->actingAs($this->adminA);
         $this->year2026->unlockForUser($this->adminA->id);
 
-        $january = $this->year2026->monthlyWorkspaces()->where('month', 1)->firstOrFail()->group;
+        // When year is unlocked, Admin can access January without password re-prompt or 403
         $janResponse = $this->get(route('company.workspace', [2026, 1]));
         $janResponse->assertStatus(200);
-        $janResponse->assertViewHas('requiresPasswordUnlock', true);
+        $janResponse->assertViewHas('requiresPasswordUnlock', false);
 
-        $this->post(route('groups.unlock', $january), [
-            'password' => 'Year2026Pass',
-        ])->assertRedirect();
+        // Accessing a sheet in January is authorized
         $this->get(route('company.workspace', [2026, 1, 'Cost']))
             ->assertOk()
             ->assertViewHas('requiresPasswordUnlock', false);
 
-        // A different month is a different workspace and requires verification.
+        // Navigating to February in the same year stays unlocked without re-prompt or 403
         $febResponse = $this->get(route('company.workspace', [2026, 2]));
         $febResponse->assertStatus(200);
-        $febResponse->assertViewHas('requiresPasswordUnlock', true);
+        $febResponse->assertViewHas('requiresPasswordUnlock', false);
 
-        $february = $this->year2026->monthlyWorkspaces()->where('month', 2)->firstOrFail()->group;
-        $this->post(route('groups.unlock', $february), [
-            'password' => 'Year2026Pass',
-        ])->assertRedirect();
+        // Navigating to December in the same year also stays unlocked
         $decResponse = $this->get(route('company.workspace', [2026, 12]));
         $decResponse->assertStatus(200);
-        $decResponse->assertViewHas('requiresPasswordUnlock', true);
+        $decResponse->assertViewHas('requiresPasswordUnlock', false);
     }
 
     public function test_switching_sheets_in_one_month_does_not_reprompt(): void
@@ -228,10 +223,9 @@ class YearBasedWorkspaceArchitectureTest extends TestCase
         $year2025Response->assertSee('Masukkan Password Workspace 2025');
         $year2025Response->assertDontSee('Daftar Bulan Operasional');
 
-        // A direct URL to a month displays its own workspace-password screen.
+        // A direct URL to a month redirects to the canonical password gate.
         $direct2025 = $this->get(route('company.workspace', [2025, 1]));
-        $direct2025->assertOk();
-        $direct2025->assertViewHas('requiresPasswordUnlock', true);
+        $direct2025->assertRedirect(route('company.year', 2025));
     }
 
     public function test_admin_a_unlocking_year_does_not_unlock_for_admin_b(): void
@@ -318,13 +312,8 @@ class YearBasedWorkspaceArchitectureTest extends TestCase
         $response = $this->get(route('spreadsheet.export', $analisaSheet->id));
         $response->assertStatus(403);
 
-        // 2. Unlocking the year overview alone does not unlock a monthly workspace.
+        // 2. Unlocking the operational year unlocks the workspaces and permits export.
         $this->year2026->unlockForUser($this->adminA->id);
-        $this->get(route('spreadsheet.export', $analisaSheet->id))->assertStatus(403);
-
-        $this->post(route('groups.unlock', $monthlyWorkspace->group), [
-            'password' => 'Year2026Pass',
-        ])->assertRedirect();
         $exportSuccess = $this->get(route('spreadsheet.export', $analisaSheet->id));
         $exportSuccess->assertStatus(200);
     }

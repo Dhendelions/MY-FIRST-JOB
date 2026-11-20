@@ -96,7 +96,7 @@ class CompanyYearController extends Controller
             ]);
         }
 
-        return back()->with('success', "Tahun operasional {$year->year} berhasil diarsipkan. Semua lembar kerja di tahun ini kini bersifat read-only.");
+        return back()->with('success', "Tahun operasional {$year->year} berhasil diarsipkan. Semua lembar kerja di tahun ini kini bersifat hanya baca (read-only).");
     }
 
     /**
@@ -242,8 +242,9 @@ class CompanyYearController extends Controller
         $user = Auth::user();
         abort_if($user->isAdmin() && (\App\Services\WorkspaceSecurityService::isYearArchived($year) || $operationalYear->isArchived()), 403, 'Workspace tahun ini telah diarsipkan dan tidak dapat diakses oleh Admin.');
         $isUnlocked = $operationalYear->isUnlockedForUser($user?->id);
+        $requiresPasswordConfiguration = false;
 
-        return view('company.year', compact('operationalYear', 'isUnlocked', 'user'));
+        return view('company.year', compact('operationalYear', 'isUnlocked', 'user', 'requiresPasswordConfiguration'));
     }
 
     /**
@@ -256,6 +257,14 @@ class CompanyYearController extends Controller
 
         abort_if($user->isAdmin() && (\App\Services\WorkspaceSecurityService::isYearArchived($year) || $operationalYear->isArchived()), 403, 'Workspace tahun ini telah diarsipkan dan tidak dapat diakses oleh Admin.');
 
+        if ($user->isAdmin() && !$operationalYear->hasPassword()) {
+            $message = 'Password ruang kerja belum dikonfigurasi oleh Owner. Admin belum dapat membuka workspace ini.';
+            if ($request->expectsJson()) {
+                return response()->json(['status' => 'configuration_required', 'message' => $message], 409);
+            }
+            return back()->with('error', $message);
+        }
+
         $validated = $request->validate([
             'password' => ['required', 'string'],
         ], [
@@ -263,11 +272,24 @@ class CompanyYearController extends Controller
         ]);
 
         if (!$operationalYear->verifyPassword($validated['password'])) {
-            $errorMsg = 'Password workspace tahun ' . $year . ' salah. Silakan coba lagi.';
+            $errorMsg = 'Password ruang kerja tahun ' . $year . ' salah. Silakan coba lagi.';
             if ($request->wantsJson()) {
                 return response()->json(['status' => 'error', 'message' => $errorMsg], 422);
             }
             return back()->with('error', $errorMsg);
+        }
+
+        // When switching to a new year, terminate previous year workspace session context
+        if ($user->isAdmin()) {
+            $session = $request->hasSession() ? $request->session() : session();
+            if ($session) {
+                $session->forget(['admin_authenticated_years', 'admin_year_auth', 'admin_workspace_auth']);
+                foreach (array_keys($session->all()) as $key) {
+                    if (str_starts_with($key, 'year_unlocked_') || str_starts_with($key, 'admin_year_auth_') || str_starts_with($key, 'workspace_unlocked_')) {
+                        $session->forget($key);
+                    }
+                }
+            }
         }
 
         $operationalYear->unlockForUser($user->id);
@@ -275,12 +297,39 @@ class CompanyYearController extends Controller
         if ($request->wantsJson()) {
             return response()->json([
                 'status' => 'success',
-                'message' => 'Workspace tahun ' . $year . ' berhasil dibuka.',
-                'redirect' => route('company.year', $year),
+                'message' => 'Ruang kerja tahun ' . $year . ' berhasil dibuka.',
+                'redirect' => $this->safeWorkspaceRedirect($request, $operationalYear),
             ]);
         }
 
-        return redirect()->route('company.year', $year)->with('success', 'Workspace tahun ' . $year . ' berhasil dibuka.');
+        return redirect()->to($this->safeWorkspaceRedirect($request, $operationalYear))->with('success', 'Ruang kerja tahun ' . $year . ' berhasil dibuka.');
+    }
+
+    /** Only allow a same-origin company or group workspace route as post-unlock destination. */
+    private function safeWorkspaceRedirect(Request $request, OperationalYear $year): string
+    {
+        $fallback = route('company.year', $year->year);
+        $candidate = (string) $request->input('redirect_to', '');
+        $path = parse_url($candidate, PHP_URL_PATH);
+        if (!is_string($path)) {
+            return $fallback;
+        }
+
+        $expectedPrefix = '/company/workspace/' . $year->year . '/';
+        if (str_starts_with($path, $expectedPrefix)) {
+            return url($path) . (parse_url($candidate, PHP_URL_QUERY) ? '?' . parse_url($candidate, PHP_URL_QUERY) : '');
+        }
+
+        // Support /groups/{group}/workspace redirect when group belongs to this operational year
+        if (preg_match('#^/groups/(\d+)/workspace#', $path, $matches)) {
+            $groupId = (int) $matches[1];
+            $group = \App\Models\FisheriesGroup::find($groupId);
+            if ($group && (int) $group->operationalYear() === (int) $year->year) {
+                return url($path) . (parse_url($candidate, PHP_URL_QUERY) ? '?' . parse_url($candidate, PHP_URL_QUERY) : '');
+            }
+        }
+
+        return $fallback;
     }
 
     /**

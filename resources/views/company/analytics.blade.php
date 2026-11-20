@@ -1,4 +1,4 @@
-@extends('layouts.app', ['title' => 'Company Analytics — PT Dadhen Mandiri'])
+@extends('layouts.app', ['title' => 'Analitik Perusahaan — PT Dadhen Mandiri'])
 
 @section('content')
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
@@ -8,12 +8,12 @@
         <div>
             <div class="flex items-center gap-2">
                 <span class="px-2.5 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200 font-bold text-xs uppercase tracking-wider">
-                    Executive Portal
+                    Portal Eksekutif
                 </span>
                 <span class="text-xs text-slate-400">•</span>
                 <span class="text-xs font-semibold text-slate-500">PT Dadhen Mandiri</span>
             </div>
-            <h1 class="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight mt-1">Company Analytics</h1>
+            <h1 class="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight mt-1">Analitik Perusahaan</h1>
             <p class="text-xs sm:text-sm text-slate-500 mt-1">
                 Modul analisis terpusat untuk memantau performa keuangan, operasional, dan komparasi lintas tahun operasional.
             </p>
@@ -22,7 +22,7 @@
         <div class="flex items-center gap-2.5">
             <a href="{{ route('dashboard') }}" class="px-3.5 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5">
                 <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-                <span>Dashboard</span>
+                <span>Dasbor</span>
             </a>
             @if($selectedYear)
                 @php
@@ -31,7 +31,7 @@
                 @if($firstMw)
                     <a href="{{ route('group.workspace', $firstMw->group_id) }}" class="px-4 py-2 rounded-xl bg-[#142B4A] hover:bg-[#1B355A] text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 hover:-translate-y-0.5">
                         <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                        <span>Buka Workspace {{ $selectedYear->year }}</span>
+                        <span>Buka Ruang Kerja {{ $selectedYear->year }}</span>
                     </a>
                 @endif
             @endif
@@ -43,25 +43,25 @@
         <a href="{{ route('company.analytics', ['tab' => 'overview', 'year' => $selectedYear?->year]) }}"
            class="px-4 py-2.5 font-bold text-xs rounded-t-xl transition-all flex items-center gap-2 border-b-2 {{ $activeTab === 'overview' ? 'border-[#142B4A] text-[#142B4A] bg-[#F5F7FA]' : 'border-transparent text-[#526780] hover:text-[#263445] hover:bg-[#F5F7FA]' }}">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
-            <span>1. Overview</span>
+            <span>1. Ringkasan</span>
         </a>
 
         <a href="{{ route('company.analytics', ['tab' => 'financial', 'year' => $selectedYear?->year]) }}"
            class="px-4 py-2.5 font-bold text-xs rounded-t-xl transition-all flex items-center gap-2 border-b-2 {{ $activeTab === 'financial' ? 'border-[#142B4A] text-[#142B4A] bg-[#F5F7FA]' : 'border-transparent text-[#526780] hover:text-[#263445] hover:bg-[#F5F7FA]' }}">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-            <span>2. Financial Analytics</span>
+            <span>2. Analitik Keuangan</span>
         </a>
 
         <a href="{{ route('company.analytics', ['tab' => 'operational', 'year' => $selectedYear?->year]) }}"
            class="px-4 py-2.5 font-bold text-xs rounded-t-xl transition-all flex items-center gap-2 border-b-2 {{ $activeTab === 'operational' ? 'border-[#142B4A] text-[#142B4A] bg-[#F5F7FA]' : 'border-transparent text-[#526780] hover:text-[#263445] hover:bg-[#F5F7FA]' }}">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
-            <span>3. Operational Analytics</span>
+            <span>3. Analitik Operasional</span>
         </a>
 
         <a href="{{ route('company.analytics', ['tab' => 'comparison', 'year' => $selectedYear?->year]) }}"
            class="px-4 py-2.5 font-bold text-xs rounded-t-xl transition-all flex items-center gap-2 border-b-2 {{ $activeTab === 'comparison' ? 'border-[#142B4A] text-[#142B4A] bg-[#F5F7FA]' : 'border-transparent text-[#526780] hover:text-[#263445] hover:bg-[#F5F7FA]' }}">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-            <span>4. Yearly Comparison</span>
+            <span>4. Komparasi Tahunan</span>
         </a>
     </div>
 
@@ -85,7 +85,7 @@
                 <div class="flex items-center gap-2 text-xs">
                     <span class="text-slate-400">Status:</span>
                     <span class="px-2.5 py-0.5 rounded-full font-bold uppercase text-[10px] {{ $selectedYear->is_archived ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800' }}">
-                        {{ $selectedYear->is_archived ? 'Diarsipkan (Read-Only)' : 'Aktif' }}
+                        {{ $selectedYear->is_archived ? 'Diarsipkan (Hanya Baca)' : 'Aktif' }}
                     </span>
                     <span class="text-slate-300">•</span>
                     <span class="text-slate-500 font-mono">12 Bulan / 60 Sheet</span>

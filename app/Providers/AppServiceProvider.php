@@ -24,6 +24,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        \Carbon\Carbon::setLocale('id');
         Gate::policy(FisheriesGroup::class, WorkspacePolicy::class);
         Gate::policy(SpreadsheetSheet::class, SpreadsheetPolicy::class);
     }

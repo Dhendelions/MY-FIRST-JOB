@@ -104,9 +104,12 @@ class GroupController extends Controller
         $userGroups = $user->groups()->with('sheets')->get();
 
         // 6. Dynamic Year & Month Company Hierarchy from Database
-        $operationalYears = \App\Models\OperationalYear::with(['monthlyWorkspaces.group.sheets'])
-            ->orderBy('year', 'desc')
-            ->get();
+        $operationalYearsQuery = \App\Models\OperationalYear::with(['monthlyWorkspaces.group.sheets'])
+            ->orderBy('year', 'desc');
+        if ($user->isAdmin()) {
+            $operationalYearsQuery->where('is_archived', false);
+        }
+        $operationalYears = $operationalYearsQuery->get();
         $currentMonthlyWorkspace = $group->monthlyWorkspace()->with('year')->first();
 
         return view('groups.workspace', compact(
@@ -194,7 +197,11 @@ class GroupController extends Controller
             return back()->with('error', $errorMsg);
         }
 
-        if ($user->isAdmin() && $group->hasPassword()) {
+        if ($opYear = $group->operationalYearModel()) {
+            $opYear->unlockForUser($user->id);
+        } elseif ($user->isAdmin() && $group->hasPassword()) {
+            // Legacy workspaces retain their own session key. Centralised
+            // workspaces use admin_year_auth exclusively.
             $context = [
                 'user_id' => $user->id,
                 'group_id' => $group->id,
@@ -204,16 +211,15 @@ class GroupController extends Controller
         } else {
             $request->session()->put('workspace_unlocked_' . $group->id, true);
             $request->session()->put('sheet_unlocked_' . $sheet->id, true);
-
-            if ($opYear = $group->operationalYearModel()) {
-                $opYear->unlockForUser($user->id);
-            }
         }
 
         // Commit session state immediately
         $request->session()->save();
 
-        $redirectUrl = route('group.workspace', [$group->id, $sheet->id]);
+        $monthlyWorkspace = $group->monthlyWorkspace()->with('year')->first();
+        $redirectUrl = $monthlyWorkspace
+            ? route('company.workspace', [$monthlyWorkspace->year->year, $monthlyWorkspace->month, $sheet->name])
+            : route('group.workspace', [$group->id, $sheet->id]);
         if ($request->expectsJson()) {
             return response()->json([
                 'success' => true,
@@ -229,9 +235,30 @@ class GroupController extends Controller
     /** Invalidate the current Admin workspace authorization before leaving. */
     public function leaveWorkspace(Request $request, FisheriesGroup $group)
     {
+        $user = Auth::user();
+
         $validated = $request->validate([
             'destination' => ['required', 'string', 'max:2048'],
+            'password' => ['required', 'string'],
+        ], [
+            'destination.required' => 'Tujuan navigasi wajib diisi.',
+            'password.required' => 'Password akun Admin wajib diisi.',
         ]);
+
+        // When user is Admin, verify against user's account password using Hash::check
+        if ($user && $user->isAdmin()) {
+            if (!\Illuminate\Support\Facades\Hash::check($validated['password'], $user->password)) {
+                $errorMsg = 'Password akun Admin salah. Silakan coba lagi.';
+                if ($request->expectsJson() || $request->wantsJson()) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => $errorMsg,
+                        'errors' => ['password' => [$errorMsg]],
+                    ], 422);
+                }
+                return back()->with('error', $errorMsg);
+            }
+        }
 
         $destination = $validated['destination'];
         $isLogout = $destination === 'logout';
@@ -239,11 +266,16 @@ class GroupController extends Controller
         $decodedPath = is_array($parsedDestination)
             ? rawurldecode($parsedDestination['path'] ?? '')
             : '';
+
+        $isSameHost = false;
+        if (is_array($parsedDestination) && isset($parsedDestination['host'])) {
+            $isSameHost = strtolower($parsedDestination['host']) === strtolower($request->getHost());
+        }
+
         abort_unless(
-            $isLogout || (
+            $isLogout || $destination === 'friends' || (
                 is_array($parsedDestination)
-                && !isset($parsedDestination['scheme'])
-                && !isset($parsedDestination['host'])
+                && (!isset($parsedDestination['host']) || $isSameHost)
                 && str_starts_with($decodedPath, '/')
                 && !str_starts_with($decodedPath, '//')
                 && !str_contains($decodedPath, '\\')
@@ -253,9 +285,12 @@ class GroupController extends Controller
             'Tujuan navigasi tidak valid.'
         );
 
+        // Terminate all workspace authorizations
         $request->session()->forget([
+            'admin_authenticated_years',
+            'admin_year_auth',
             'admin_workspace_auth',
-            $group->adminVerificationSessionKey(Auth::id()),
+            $group->adminVerificationSessionKey($user->id),
             'admin_workspace_context',
             'workspace_exit_context',
             'workspace_exit_target',
@@ -264,24 +299,39 @@ class GroupController extends Controller
         foreach ($group->sheets()->pluck('id') as $sheetId) {
             $request->session()->forget('sheet_unlocked_' . $sheetId);
         }
+        foreach (array_keys($request->session()->all()) as $key) {
+            if (
+                str_starts_with($key, 'year_unlocked_') ||
+                str_starts_with($key, 'year_unlocked_version_') ||
+                str_starts_with($key, 'admin_year_auth_') ||
+                str_starts_with($key, 'workspace_unlocked_')
+            ) {
+                $request->session()->forget($key);
+            }
+        }
+        $request->session()->save();
 
         if ($isLogout) {
             Auth::logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();
 
-            if ($request->expectsJson()) {
-                return response()->json(['redirect' => route('login')]);
+            if ($request->expectsJson() || $request->wantsJson()) {
+                return response()->json(['status' => 'success', 'redirect' => route('login')]);
             }
 
             return redirect()->route('login');
         }
 
-        if ($request->expectsJson()) {
-            return response()->json(['redirect' => $destination]);
+        $targetUrl = $destination === 'friends'
+            ? route('dashboard', ['open' => 'friends'])
+            : $destination;
+
+        if ($request->expectsJson() || $request->wantsJson()) {
+            return response()->json(['status' => 'success', 'redirect' => $targetUrl]);
         }
 
-        return redirect()->to($destination);
+        return redirect()->to($targetUrl);
     }
 
     /**

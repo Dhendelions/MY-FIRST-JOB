@@ -21,6 +21,29 @@ class DashboardController extends Controller
     {
         $user = Auth::user();
 
+        // Admin workspace re-authentication safety: returning to dashboard clears all active workspace unlocks
+        if ($user && $user->isAdmin()) {
+            request()->session()->forget([
+                'admin_authenticated_years',
+                'admin_year_auth',
+                'admin_workspace_auth',
+                'admin_workspace_context',
+                'workspace_exit_context',
+                'workspace_exit_target',
+            ]);
+            foreach (array_keys(request()->session()->all()) as $key) {
+                if (
+                    str_starts_with($key, 'year_unlocked_') ||
+                    str_starts_with($key, 'workspace_unlocked_') ||
+                    str_starts_with($key, 'sheet_unlocked_') ||
+                    str_starts_with($key, 'admin_year_auth_')
+                ) {
+                    request()->session()->forget($key);
+                }
+            }
+            request()->session()->save();
+        }
+
         $userGroupIds = $user->groups()->pluck('fisheries_groups.id');
 
         // 2. Real-Time KPI Statistics (Purely based on user's actual database records)

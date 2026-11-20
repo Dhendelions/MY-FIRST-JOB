@@ -1,4 +1,4 @@
-@extends('layouts.app', ['title' => 'Yearly Comparison — PT Dadhen Mandiri'])
+@extends('layouts.app', ['title' => 'Komparasi Tahunan — PT Dadhen Mandiri'])
 
 @section('content')
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -12,7 +12,7 @@
                 <span class="text-xs text-slate-400">•</span>
                 <span class="text-xs font-semibold text-slate-500">PT Dadhen Mandiri</span>
             </div>
-            <h1 class="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight mt-1">Yearly Comparison</h1>
+            <h1 class="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight mt-1">Komparasi Tahunan</h1>
             <p class="text-xs sm:text-sm text-slate-500 mt-1">
                 Perbandingan kinerja keuangan dan operasional lintas seluruh tahun operasional terdaftar (termasuk tahun yang diarsipkan).
             </p>
@@ -21,10 +21,10 @@
         <div class="flex items-center gap-3">
             <a href="{{ route('company.analytics') }}" class="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1.5">
                 <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"/></svg>
-                <span>Company Analytics</span>
+                <span>Analitik Perusahaan</span>
             </a>
             <a href="{{ route('dashboard') }}" class="px-4 py-2 bg-[#142B4A] hover:bg-[#1B355A] text-white text-xs font-bold rounded-xl transition-all shadow-xs hover:-translate-y-0.5">
-                Kembali ke Dashboard
+                Kembali ke Dasbor
             </a>
         </div>
     </div>

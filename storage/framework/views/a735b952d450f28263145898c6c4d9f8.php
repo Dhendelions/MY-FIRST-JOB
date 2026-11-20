@@ -172,62 +172,6 @@
             </div>
         </div>
 
-        <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(isset($operationalYears) && $operationalYears->isNotEmpty()): ?>
-            <!-- Dynamic Year & Month Hierarchy Navigator -->
-            <div class="mt-3 pt-3 border-t border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
-                <!-- Year Selector Pills -->
-                <div class="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0">
-                    <span class="text-slate-400 font-semibold uppercase tracking-wider text-[10px] shrink-0">Tahun:</span>
-                    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php $__currentLoopData = $operationalYears; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $opY): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                        <?php
-                            $isCurrentYear = $currentMonthlyWorkspace && $currentMonthlyWorkspace->year_id === $opY->id;
-                            $targetMonthNum = $currentMonthlyWorkspace ? $currentMonthlyWorkspace->month : 10;
-                            $targetMw = $opY->monthlyWorkspaces->firstWhere("month", $targetMonthNum) ?? $opY->monthlyWorkspaces->first();
-                        ?>
-                        <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($targetMw): ?>
-                            <a href="<?php echo e(route("group.workspace", $targetMw->group_id)); ?>" 
-                               class="px-2.5 py-1 rounded-lg font-bold transition-all shrink-0 flex items-center gap-1 <?php echo e($isCurrentYear ? "bg-[#142B4A] text-white shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200"); ?>">
-                                <span><?php echo e($opY->year); ?></span>
-                                <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($opY->is_archived): ?>
-                                    <span class="text-[9px] px-1 py-0.2 rounded font-normal <?php echo e($isCurrentYear ? "bg-amber-400/20 text-amber-300" : "bg-amber-100 text-amber-700"); ?>">Arsip</span>
-                                <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
-                            </a>
-                        <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
-                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
-
-                    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(Auth::user()->isOwner()): ?>
-                        <button type="button" 
-                                @click="workspaceModal = 'modal-add-year'"
-                                class="px-2.5 py-1 rounded-lg font-bold text-xs bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-200 transition-all shrink-0 flex items-center gap-1 shadow-xs ml-1"
-                                title="Tambah Tahun Operasional Baru">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                            <span>+ Add Year</span>
-                        </button>
-                    <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
-                </div>
-
-                <!-- Month Selector Pills for Current Year -->
-                <?php
-                    $activeYearModel = $currentMonthlyWorkspace ? $currentMonthlyWorkspace->year : $operationalYears->first();
-                ?>
-                <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($activeYearModel): ?>
-                    <div class="flex items-center gap-1 overflow-x-auto pb-1 md:pb-0">
-                        <span class="text-slate-400 font-semibold uppercase tracking-wider text-[10px] shrink-0 mr-1">Bulan:</span>
-                        <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php $__currentLoopData = $activeYearModel->monthlyWorkspaces; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $mWork): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                            <?php
-                                $isCurrentMonth = $group->id === $mWork->group_id;
-                            ?>
-                            <a href="<?php echo e(route("group.workspace", $mWork->group_id)); ?>" 
-                               title="<?php echo e($mWork->name); ?> <?php echo e($activeYearModel->year); ?>"
-                               class="px-2 py-1 rounded-md text-[11px] font-semibold transition-all shrink-0 <?php echo e($isCurrentMonth ? "bg-[#142B4A] text-white shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900"); ?>">
-                                <?php echo e(substr($mWork->name, 0, 3)); ?>
-
-                            </a>
-                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
-                    </div>
-                <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
-            </div>
-        <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
     </div>
     </div>
 
@@ -791,7 +735,7 @@ if (isset($__slots)) unset($__slots);
                         </div>
                         <div>
                             <p class="text-[11px] font-bold uppercase tracking-widest text-rose-600">Tindakan permanen</p>
-                            <h3 id="delete-workspace-title" class="mt-1 text-lg font-bold text-slate-900">Hapus workspace ini?</h3>
+                            <h3 id="delete-workspace-title" class="mt-1 text-lg font-bold text-slate-900">Hapus ruang kerja ini?</h3>
                             <p class="mt-2 text-sm leading-6 text-slate-600">Semua lembar kerja, data sel, dan riwayat yang ada di <strong class="font-semibold text-slate-900"><?php echo e($group->name); ?></strong> akan dihapus dan tidak dapat dipulihkan.</p>
                         </div>
                     </div>
@@ -804,7 +748,7 @@ if (isset($__slots)) unset($__slots);
                         <?php echo csrf_field(); ?>
                         <?php echo method_field('DELETE'); ?>
                         <button type="button" @click="workspaceModal = 'modal-group-settings'" class="rounded-xl px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100">Batal</button>
-                        <button type="submit" class="rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm shadow-rose-600/30 transition hover:bg-rose-700">Ya, hapus workspace</button>
+                        <button type="submit" class="rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm shadow-rose-600/30 transition hover:bg-rose-700">Ya, hapus ruang kerja</button>
                     </form>
                 </div>
             </div>
@@ -915,32 +859,24 @@ if (isset($__slots)) unset($__slots);
     <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
 
     <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($requiresPasswordUnlock && $group->hasPassword()): ?>
+        <span class="sr-only">Masukkan Password Workspace</span>
         <div x-init="
             if (!workspaceIsUnlocked) {
-                workspaceModal = 'modal-password-unlock';
-                $nextTick(() => $refs.unlockPassword && $refs.unlockPassword.focus());
+                $dispatch('open-workspace-unlock', {
+                    groupId: <?php echo e($group->id); ?>,
+                    title: '<?php echo e(addslashes($group->name)); ?>',
+                    <?php if($group->operationalYearModel()): ?>
+                        year: <?php echo e($group->operationalYearModel()->year); ?>,
+                        actionUrl: '<?php echo e(route('company.year.unlock', $group->operationalYearModel()->year)); ?>',
+                        redirectTo: '<?php echo e(route('company.workspace', [$group->operationalYearModel()->year, $group->monthlyWorkspace()->value('month'), $activeSheet?->name])); ?>',
+                    <?php else: ?>
+                        actionUrl: '<?php echo e(route('groups.unlock', $group->id)); ?>',
+                    <?php endif; ?>
+                    sheetId: <?php echo e($activeSheet?->id ?? 'null'); ?>
+
+                });
             }
         "></div>
-        <div x-show="workspaceModal === 'modal-password-unlock'" x-transition.opacity class="fixed inset-0 z-[60] overflow-y-auto" x-cloak role="dialog" aria-modal="true" aria-labelledby="password-unlock-title" @keydown.escape.prevent @wheel.prevent @touchmove.prevent>
-            <div class="flex items-center justify-center min-h-screen px-4 py-8">
-                <div class="fixed inset-0 bg-[#142B4A]/30 backdrop-blur-xs" aria-hidden="true"></div>
-                <div x-transition.scale.origin.center x-ref="passwordUnlockDialog" class="relative bg-white rounded-2xl max-w-md w-full p-6 text-left shadow-2xl border border-slate-100">
-                    <h3 id="password-unlock-title" class="text-base font-bold text-slate-900">Masukkan Password Workspace</h3>
-                    <p class="text-xs text-slate-500 mt-1">Password diperlukan setiap kali Anda masuk ke workspace ini.</p>
-                    <form action="<?php echo e(route('groups.unlock', $group->id)); ?>" method="POST" @submit.prevent="submitUnlock($event)" class="mt-5 space-y-4">
-                        <?php echo csrf_field(); ?>
-                        <input type="hidden" name="sheet_id" :value="unlockSheetId">
-                        <input x-ref="unlockPassword" x-init="if (<?php echo e($requiresPasswordUnlock ? 'true' : 'false'); ?>) $nextTick(() => $el.focus())" type="password" name="password" required autocomplete="off" autofocus placeholder="Password workspace"
-                            class="w-full text-sm px-3.5 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#142B4A] focus:outline-none">
-                        <p x-show="workspacePasswordError" x-text="workspacePasswordError" class="text-xs text-rose-600" role="alert"></p>
-                        <button type="submit" :disabled="isSubmittingUnlock" class="w-full px-5 py-2.5 rounded-xl text-xs font-semibold bg-[#142B4A] hover:bg-[#1a3860] disabled:opacity-50 text-white transition-colors flex items-center justify-center gap-2">
-                            <span x-show="isSubmittingUnlock" class="inline-block w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                            <span x-text="isSubmittingUnlock ? 'Memverifikasi...' : 'Masuk ke Workspace'">Masuk ke Workspace</span>
-                        </button>
-                    </form>
-                </div>
-            </div>
-        </div>
     <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
 
     <!-- MODAL 6: Akses Dibatasi Berdasarkan Peran -->
@@ -1015,7 +951,8 @@ if (isset($__slots)) unset($__slots);
                 </div>
 
                 <div class="p-0 flex-1 min-h-0">
-                    <?php
+                    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(!$requiresPasswordUnlock): ?>
+                        <?php
 $__split = function ($name, $params = []) {
     return [$name, $params];
 };
@@ -1036,6 +973,7 @@ unset($__params);
 unset($__split);
 if (isset($__slots)) unset($__slots);
 ?>
+                    <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
                 </div>
             </div>
         </div>

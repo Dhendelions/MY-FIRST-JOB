@@ -78,12 +78,17 @@ class FisheriesGroup extends Model
     public function operationalYearModel(): ?OperationalYear
     {
         if ($this->relationLoaded('monthlyWorkspace') && $this->monthlyWorkspace) {
-            return $this->monthlyWorkspace->year;
+            if ($this->monthlyWorkspace->relationLoaded('year') && $this->monthlyWorkspace->year) {
+                return $this->monthlyWorkspace->year;
+            }
+            if ($this->monthlyWorkspace->year_id) {
+                return OperationalYear::find($this->monthlyWorkspace->year_id);
+            }
         }
 
-        $mw = $this->monthlyWorkspace()->with('year')->first();
-        if ($mw && $mw->year) {
-            return $mw->year;
+        $mw = $this->monthlyWorkspace()->first();
+        if ($mw && $mw->year_id) {
+            return OperationalYear::find($mw->year_id);
         }
 
         if ($this->operational_year !== null) {
@@ -143,35 +148,38 @@ class FisheriesGroup extends Model
             return true;
         }
 
-        if ($user && $user->isAdmin()) {
-            if (!$this->hasPassword()) {
-                return false;
-            }
-
-            $authentication = request()->hasSession()
-                ? request()->session()->get('admin_workspace_auth')
-                : null;
-
-            return is_array($authentication)
-                && (int) ($authentication['user_id'] ?? 0) === (int) $user->id
-                && (int) ($authentication['group_id'] ?? 0) === (int) $this->id;
-        }
-
+        // 1. Centralized Operational Year workspace: centralized password authentication
         $opYear = $this->operationalYearModel();
         if ($opYear) {
             if ($opYear->hasPassword()) {
-                return $opYear->isUnlockedForUser($user?->id);
+                if ($opYear->isUnlockedForUser($user?->id)) {
+                    return true;
+                }
+                return false;
             }
 
-            if (!$this->hasPassword()) {
-                return true;
-            }
+            return true;
         }
 
+        // 2. Standalone / legacy workspace: no password required
         if (!$this->hasPassword()) {
             return true;
         }
 
+        // 3. Standalone / legacy workspace with password: Admin session check
+        if ($user && $user->isAdmin()) {
+            $authentication = request()->hasSession()
+                ? request()->session()->get('admin_workspace_auth')
+                : null;
+
+            if (is_array($authentication)
+                && (int) ($authentication['user_id'] ?? 0) === (int) $user->id
+                && (int) ($authentication['group_id'] ?? 0) === (int) $this->id) {
+                return true;
+            }
+        }
+
+        // 4. Session flags for legacy/standalone
         $session = request()->hasSession() ? request()->session() : null;
         if (!$session) {
             return false;

@@ -40,14 +40,14 @@
                     <div class="w-8 h-8 rounded-lg bg-sky-400/20 text-sky-300 flex items-center justify-center font-bold mb-2">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                     </div>
-                    <h2 class="text-xs font-bold text-white">Multi-Sheet Workspace</h2>
+                    <h2 class="text-xs font-bold text-white">Ruang Kerja Multi-Sheet</h2>
                     <p class="text-[11px] text-slate-300 mt-1">Struktur dokumen terorganisir dengan formula dan kustomisasi kolom.</p>
                 </div>
                 <div class="p-4 rounded-xl bg-white/5 border border-white/10">
                     <div class="w-8 h-8 rounded-lg bg-emerald-400/20 text-emerald-300 flex items-center justify-center font-bold mb-2">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                     </div>
-                    <h2 class="text-xs font-bold text-white">Multi-Cell Excel Paste</h2>
+                    <h2 class="text-xs font-bold text-white">Tempel Sel Excel (Multi-Cell)</h2>
                     <p class="text-[11px] text-slate-300 mt-1">Copy-paste langsung tabel dari Microsoft Excel atau Google Sheets.</p>
                 </div>
             </div>
@@ -68,7 +68,7 @@
             
             <div class="mb-6">
                 <h2 class="text-2xl font-bold text-[#263445] tracking-tight">Daftar Akun Baru</h2>
-                <p class="text-xs sm:text-sm text-[#7B8794] mt-1">Lengkapi data untuk bergabung ke workspace Dadhen Mandiri</p>
+                <p class="text-xs sm:text-sm text-[#7B8794] mt-1">Lengkapi data untuk bergabung ke ruang kerja Dadhen Mandiri</p>
             </div>
 
             @if ($errors->any())
@@ -97,12 +97,12 @@
                     <div>
                         <label class="block text-xs font-semibold text-[#263445] mb-1.5">Email <span class="text-rose-500">*</span></label>
                         <input type="email" name="email" value="{{ old('email') }}" required placeholder="nama@email.com"
-                               class="w-full text-xs sm:text-sm px-3.5 py-2.5 bg-white border border-[#E5EAF0] rounded-xl text-[#263445] placeholder-[#7B8794] focus:outline-none focus:ring-2 focus:ring-[#142B4A]/10 focus:border-[#142B4A] transition-colors">
+                                class="w-full text-xs sm:text-sm px-3.5 py-2.5 bg-white border border-[#E5EAF0] rounded-xl text-[#263445] placeholder-[#7B8794] focus:outline-none focus:ring-2 focus:ring-[#142B4A]/10 focus:border-[#142B4A] transition-colors">
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-[#263445] mb-1.5">WhatsApp</label>
                         <input type="text" name="whatsapp" value="{{ old('whatsapp') }}" placeholder="cth: 0853 3100 3356"
-                               class="w-full text-xs sm:text-sm px-3.5 py-2.5 bg-white border border-[#E5EAF0] rounded-xl text-[#263445] placeholder-[#7B8794] focus:outline-none focus:ring-2 focus:ring-[#142B4A]/10 focus:border-[#142B4A] transition-colors">
+                                class="w-full text-xs sm:text-sm px-3.5 py-2.5 bg-white border border-[#E5EAF0] rounded-xl text-[#263445] placeholder-[#7B8794] focus:outline-none focus:ring-2 focus:ring-[#142B4A]/10 focus:border-[#142B4A] transition-colors">
                     </div>
                 </div>
 
@@ -111,19 +111,19 @@
                     <div>
                         <label class="block text-xs font-semibold text-[#263445] mb-1.5">Password <span class="text-rose-500">*</span></label>
                         <input type="password" name="password" required placeholder="••••••••"
-                               class="w-full text-xs sm:text-sm px-3.5 py-2.5 bg-white border border-[#E5EAF0] rounded-xl text-[#263445] placeholder-[#7B8794] focus:outline-none focus:ring-2 focus:ring-[#142B4A]/10 focus:border-[#142B4A] transition-colors">
+                                class="w-full text-xs sm:text-sm px-3.5 py-2.5 bg-white border border-[#E5EAF0] rounded-xl text-[#263445] placeholder-[#7B8794] focus:outline-none focus:ring-2 focus:ring-[#142B4A]/10 focus:border-[#142B4A] transition-colors">
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-[#263445] mb-1.5">Konfirmasi Password <span class="text-rose-500">*</span></label>
                         <input type="password" name="password_confirmation" required placeholder="••••••••"
-                               class="w-full text-xs sm:text-sm px-3.5 py-2.5 bg-white border border-[#E5EAF0] rounded-xl text-[#263445] placeholder-[#7B8794] focus:outline-none focus:ring-2 focus:ring-[#142B4A]/10 focus:border-[#142B4A] transition-colors">
+                                class="w-full text-xs sm:text-sm px-3.5 py-2.5 bg-white border border-[#E5EAF0] rounded-xl text-[#263445] placeholder-[#7B8794] focus:outline-none focus:ring-2 focus:ring-[#142B4A]/10 focus:border-[#142B4A] transition-colors">
                     </div>
                 </div>
 
                 <div class="pt-2">
                     <button type="submit" 
                             class="w-full py-3 px-4 rounded-xl bg-[#142B4A] hover:bg-[#1B355A] text-white font-bold text-xs sm:text-sm shadow-xs transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0">
-                        Daftar &amp; Masuk ke Dashboard
+                        Daftar &amp; Masuk ke Dasbor
                     </button>
                 </div>
             </form>

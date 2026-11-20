@@ -1,0 +1,26 @@
+<?php
+
+return [
+    'dashboard' => 'Dasbor',
+    'workspace' => 'Ruang Kerja',
+    'active_workspace' => 'Ruang Kerja Aktif',
+    'archived_workspace' => 'Ruang Kerja Diarsipkan',
+    'settings' => 'Pengaturan',
+    'user_management' => 'Manajemen Pengguna',
+    'activity_logs' => 'Riwayat Aktivitas',
+    'analytics' => 'Analitik',
+    'archive' => 'Arsip',
+    'restore' => 'Pulihkan',
+    'save' => 'Simpan',
+    'cancel' => 'Batal',
+    'delete' => 'Hapus',
+    'edit' => 'Ubah',
+    'loading' => 'Memuat',
+    'search' => 'Cari',
+    'submit' => 'Kirim',
+    'success' => 'Berhasil',
+    'failed' => 'Gagal',
+    'access_denied' => 'Akses Ditolak',
+    'confirmation' => 'Konfirmasi',
+    'no_data_available' => 'Tidak Ada Data',
+];

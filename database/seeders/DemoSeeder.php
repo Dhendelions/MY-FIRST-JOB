@@ -20,7 +20,7 @@ class DemoSeeder extends Seeder
     /**
      * Seed realistic general-purpose collaborative workspace demo data.
      * Idempotent: checks for existing demo accounts by email before creating.
-     * Uses roles: leader, admin, karyawan.
+     * Uses roles: leader, admin.
      */
     public function run(): void
     {
@@ -164,18 +164,18 @@ class DemoSeeder extends Seeder
         [$wsProyek, $wsFinansial, $wsLogistik] = $workspaces;
 
         // ─────────────────────────────────────────────
-        // 3. WORKSPACE MEMBERS — Roles: leader, admin, karyawan
+        // 3. WORKSPACE MEMBERS — Roles: leader, admin
         // ─────────────────────────────────────────────
         $memberships = [
-            ['group' => $wsProyek, 'user' => $siti,  'role' => 'admin',    'days_ago' => 25],
-            ['group' => $wsProyek, 'user' => $ahmad, 'role' => 'admin',    'days_ago' => 20],
-            ['group' => $wsProyek, 'user' => $dewi,  'role' => 'karyawan', 'days_ago' => 15],
+            ['group' => $wsProyek, 'user' => $siti,  'role' => 'admin', 'days_ago' => 25],
+            ['group' => $wsProyek, 'user' => $ahmad, 'role' => 'admin', 'days_ago' => 20],
+            ['group' => $wsProyek, 'user' => $dewi,  'role' => 'admin', 'days_ago' => 15],
 
-            ['group' => $wsFinansial, 'user' => $siti,  'role' => 'admin',    'days_ago' => 18],
-            ['group' => $wsFinansial, 'user' => $ahmad, 'role' => 'karyawan', 'days_ago' => 12],
+            ['group' => $wsFinansial, 'user' => $siti,  'role' => 'admin', 'days_ago' => 18],
+            ['group' => $wsFinansial, 'user' => $ahmad, 'role' => 'admin', 'days_ago' => 12],
 
-            ['group' => $wsLogistik, 'user' => $hendra, 'role' => 'karyawan', 'days_ago' => 10],
-            ['group' => $wsLogistik, 'user' => $dewi,   'role' => 'karyawan', 'days_ago' => 7],
+            ['group' => $wsLogistik, 'user' => $hendra, 'role' => 'admin', 'days_ago' => 10],
+            ['group' => $wsLogistik, 'user' => $dewi,   'role' => 'admin', 'days_ago' => 7],
         ];
 
         foreach ($memberships as $m) {
@@ -184,7 +184,7 @@ class DemoSeeder extends Seeder
                 ['role' => $m['role'], 'status' => 'Aktif', 'joined_at' => now()->subDays($m['days_ago'])]
             );
         }
-        $this->command->info('  ✅ Keanggotaan peran leader/admin/karyawan ditetapkan.');
+        $this->command->info('  ✅ Keanggotaan peran leader/admin ditetapkan.');
 
         // ─────────────────────────────────────────────
         // 4. SPREADSHEET DATA — Populate with general-purpose data & formulas

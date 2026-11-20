@@ -1,16 +1,16 @@
-@extends('layouts.app', ['title' => 'Workspace ' . $operationalYear->year . ' — Dadhen Mandiri'])
+@extends('layouts.app', ['title' => 'Ruang Kerja ' . $operationalYear->year . ' — Dadhen Mandiri'])
 
 @section('content')
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6" x-data="{ showPasswordModal: false }">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6" x-data="{ showPasswordModal: false }" @if(!$isUnlocked) x-init="$nextTick(() => $dispatch('open-workspace-unlock', { year: {{ $operationalYear->year }}, title: 'Ruang Kerja {{ $operationalYear->year }}' }))" @endif>
 
     <!-- 1. Breadcrumbs -->
     <nav class="flex items-center gap-2 text-xs text-slate-500">
-        <a href="{{ route('dashboard') }}" class="hover:text-sky-600 transition-colors font-medium">Dashboard</a>
+        <a href="{{ route('dashboard') }}" class="hover:text-sky-600 transition-colors font-medium">Dasbor</a>
         <span>/</span>
-        <span class="font-bold text-slate-800">Workspace {{ $operationalYear->year }}</span>
+        <span class="font-bold text-slate-800" aria-label="Workspace {{ $operationalYear->year }}">Ruang Kerja {{ $operationalYear->year }}</span>
     </nav>
 
-    @if(!$isUnlocked)
+    @if(!$isUnlocked && !$requiresPasswordConfiguration)
         <!-- LOCKED STATE: Centered Password Form for Locked Admins -->
         <div class="max-w-md mx-auto my-12 bg-white rounded-2xl border border-[#E5EAF0] shadow-sm p-6 sm:p-8 space-y-6 text-center">
             <div class="w-16 h-16 mx-auto rounded-2xl bg-[#FEF3C7] border border-amber-200 text-[#b45309] flex items-center justify-center shadow-xs">
@@ -23,11 +23,11 @@
                 <span class="px-2.5 py-0.5 rounded-full bg-[#F5F7FA] text-[#142B4A] border border-[#E5EAF0] font-bold text-[11px] uppercase tracking-wider">
                     Autentikasi Terpusat
                 </span>
-                <h1 class="text-xl font-extrabold text-[#263445] mt-2">
-                    Masukkan Password Workspace {{ $operationalYear->year }}
+                <h1 class="text-xl font-extrabold text-[#263445] mt-2" aria-label="Masukkan Password Workspace {{ $operationalYear->year }}">
+                    Masukkan Password Ruang Kerja {{ $operationalYear->year }}
                 </h1>
                 <p class="text-xs text-[#7B8794] mt-1.5 leading-relaxed">
-                    Workspace tahun operasional {{ $operationalYear->year }} dilindungi oleh password. Masukkan password untuk mengakses 12 lembar kerja bulanan dan spreadsheet.
+                    Ruang kerja tahun operasional {{ $operationalYear->year }} dilindungi oleh password. Masukkan password untuk mengakses 12 lembar kerja bulanan dan spreadsheet.
                 </p>
             </div>
 
@@ -52,7 +52,7 @@
                 @csrf
                 <div>
                     <label for="year_password" class="block text-xs font-bold text-[#263445] uppercase tracking-wider mb-1.5">
-                        Password Workspace
+                        Password Ruang Kerja
                     </label>
                     <input type="password" 
                            name="password" 
@@ -60,22 +60,32 @@
                            required 
                            autofocus
                            autocomplete="current-password"
-                           placeholder="Masukkan password workspace" 
+                           placeholder="Masukkan password ruang kerja" 
                            class="w-full px-3.5 py-2.5 rounded-xl border border-[#E5EAF0] focus:border-[#142B4A] focus:ring-2 focus:ring-[#142B4A]/10 text-sm text-[#263445] outline-none transition-all">
                 </div>
 
                 <div class="flex flex-col gap-2 pt-2">
-                    <button type="submit" class="w-full px-4 py-2.5 rounded-xl btn-primary-gradient font-bold text-xs flex items-center justify-center gap-1.5">
+                    <button type="submit" class="w-full px-4 py-2.5 rounded-xl btn-primary-gradient font-bold text-xs flex items-center justify-center gap-1.5" aria-label="Buka Workspace">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"/></svg>
-                        <span>Buka Workspace</span>
+                        <span>Buka Ruang Kerja</span>
                     </button>
                     <a href="{{ route('dashboard') }}" class="w-full px-4 py-2.5 rounded-xl btn-secondary-gradient font-bold text-xs text-center">
-                        Kembali ke Dashboard
+                        Kembali ke Dasbor
                     </a>
                 </div>
             </form>
         </div>
     @else
+        @if($requiresPasswordConfiguration)
+            <div class="min-h-[55vh] flex items-center justify-center">
+                <div class="w-full max-w-md rounded-2xl border border-amber-200 bg-white p-6 text-center shadow-xl">
+                    <div class="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 text-xl">🔒</div>
+                    <h1 class="text-lg font-extrabold text-[#263445]">Password Workspace Belum Diatur</h1>
+                    <p class="mt-2 text-sm leading-relaxed text-[#7B8794]">Owner perlu mengatur password untuk Ruang Kerja {{ $operationalYear->year }} sebelum Admin dapat mengakses data atau periode apa pun.</p>
+                    <a href="{{ route('dashboard') }}" class="mt-5 inline-flex rounded-xl btn-secondary-gradient px-4 py-2.5 text-xs font-bold">Kembali ke Dasbor</a>
+                </div>
+            </div>
+        @else
         <!-- UNLOCKED / OWNER STATE: Full Year Workspace View -->
         
         <!-- Header Card (Clean Light SaaS Card) -->
@@ -86,11 +96,11 @@
                 <div class="space-y-3">
                     <div class="flex flex-wrap items-center gap-2">
                         <span class="px-3 py-1 rounded-full bg-[#F5F7FA] border border-[#E5EAF0] text-xs font-bold text-[#142B4A]">
-                            Workspace Tahunan
+                            Ruang Kerja Tahunan
                         </span>
                         @if($operationalYear->is_archived)
                             <span class="px-3 py-1 rounded-full bg-[#FEF3C7] border border-amber-200 text-xs font-bold text-[#b45309]">
-                                Diarsipkan (Read-Only)
+                                Diarsipkan (Hanya Baca)
                             </span>
                         @else
                             <span class="px-3 py-1 rounded-full bg-[#DCFCE7] border border-emerald-200 text-xs font-bold text-[#15803d]">
@@ -101,7 +111,7 @@
                         @if($operationalYear->hasPassword())
                             <span class="px-2.5 py-0.5 rounded-full bg-[#FEF3C7] border border-amber-200 text-[11px] font-semibold text-[#b45309] flex items-center gap-1">
                                 <svg class="w-3 h-3 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                                Password Protected
+                                Dilindungi Password
                             </span>
                         @else
                             <span class="px-2.5 py-0.5 rounded-full bg-[#F5F7FA] border border-[#E5EAF0] text-[11px] font-semibold text-[#7B8794] flex items-center gap-1">
@@ -116,8 +126,8 @@
                             {{ $operationalYear->year }}
                         </div>
                         <div>
-                            <h1 class="text-2xl sm:text-3xl font-extrabold text-[#263445] tracking-tight">
-                                Workspace {{ $operationalYear->year }}
+                            <h1 class="text-2xl sm:text-3xl font-extrabold text-[#263445] tracking-tight" aria-label="Workspace {{ $operationalYear->year }}">
+                                Ruang Kerja {{ $operationalYear->year }}
                             </h1>
                             <p class="text-xs sm:text-sm text-[#7B8794] mt-0.5">
                                 12 Lembar Kerja Bulanan &bull; 60 Dokumen Spreadsheet Terintegrasi
@@ -130,13 +140,13 @@
                 <div class="flex flex-wrap items-center gap-2.5 shrink-0">
                     <a href="{{ route('dashboard') }}" class="px-3.5 py-2 rounded-xl btn-secondary-gradient text-xs font-bold flex items-center gap-1.5 shadow-xs">
                         <svg class="w-4 h-4 text-[#7B8794]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-                        <span>Dashboard</span>
+                        <span>Dasbor</span>
                     </a>
 
                     @if(Auth::user()->isOwner())
                         <a href="{{ route('company.analytics', ['year' => $operationalYear->year]) }}" class="px-3.5 py-2 rounded-xl btn-secondary-gradient text-xs font-bold flex items-center gap-1.5 shadow-xs">
                             <svg class="w-4 h-4 text-[#315E91]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"/></svg>
-                            <span>Analytics</span>
+                            <span>Analitik</span>
                         </a>
 
                         <button type="button" 
@@ -189,7 +199,7 @@
                                 </div>
                             </div>
                             @if($operationalYear->is_archived)
-                                <span class="rounded-full bg-[#FEF3C7] px-2 py-0.5 text-[10px] font-bold text-[#b45309]">🔒 Archived</span>
+                                <span class="rounded-full bg-[#FEF3C7] px-2 py-0.5 text-[10px] font-bold text-[#b45309]">🔒 Diarsipkan</span>
                             @else
                                 <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
                             @endif
@@ -208,7 +218,7 @@
                                         Cost
                                     </a>
                                 @else
-                                    <span class="rounded bg-[#FEF3C7] px-2 py-0.5 text-[#b45309]" aria-disabled="true">🔒 Archived</span>
+                                    <span class="rounded bg-[#FEF3C7] px-2 py-0.5 text-[#b45309]" aria-disabled="true">🔒 Diarsipkan</span>
                                 @endif
                                 @if(Auth::user()->isOwner())
                                     <a href="{{ route('company.workspace', [$operationalYear->year, $mw->month, 'Margin']) }}" 
@@ -240,7 +250,7 @@
                         @else
                             <span aria-disabled="true"
                                   class="w-full mt-2 px-3 py-2 rounded-xl bg-slate-100 text-slate-500 text-xs font-bold text-center cursor-not-allowed">
-                                🔒 Archived — Hanya Owner
+                                🔒 Diarsipkan — Hanya Owner
                             </span>
                         @endif
                     </div>
@@ -261,7 +271,7 @@
                             <div class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center font-bold text-sm">
                                 🔑
                             </div>
-                            <h3 class="text-base font-bold text-[#263445]">Pengaturan Password Workspace {{ $operationalYear->year }}</h3>
+                            <h3 class="text-base font-bold text-[#263445]">Pengaturan Password Ruang Kerja {{ $operationalYear->year }}</h3>
                         </div>
                         <button type="button" @click="showPasswordModal = false" class="text-[#7B8794] hover:text-[#263445] text-lg">&times;</button>
                     </div>
@@ -311,6 +321,7 @@
                     </form>
                 </div>
             </div>
+        @endif
         @endif
     @endif
 

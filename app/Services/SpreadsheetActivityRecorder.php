@@ -13,7 +13,7 @@ class SpreadsheetActivityRecorder
     /** Call inside the same transaction as the committed spreadsheet mutation. */
     public function record(User $user, SpreadsheetSheet $sheet, string $action, ?string $range = null, mixed $old = null, mixed $new = null, array $details = []): SpreadsheetActivity
     {
-        $role = $sheet->group ? $sheet->group->getMemberRole($user->id) : 'anggota';
+        $role = $sheet->group ? $sheet->group->getMemberRole($user->id) : 'admin';
         $details['user_role'] = $details['user_role'] ?? $role;
         $details['user_name'] = $details['user_name'] ?? $user->name;
         $details['sheet_name'] = $details['sheet_name'] ?? $sheet->name;
@@ -35,7 +35,7 @@ class SpreadsheetActivityRecorder
     /** Record workspace-level activities (membership, settings, sheets, etc.) */
     public function recordWorkspace(User $user, FisheriesGroup $group, string $action, mixed $old = null, mixed $new = null, array $details = []): SpreadsheetActivity
     {
-        $role = $group->getMemberRole($user->id) ?? 'anggota';
+        $role = $group->getMemberRole($user->id) ?? 'admin';
         $details['user_role'] = $details['user_role'] ?? $role;
         $details['user_name'] = $details['user_name'] ?? $user->name;
 

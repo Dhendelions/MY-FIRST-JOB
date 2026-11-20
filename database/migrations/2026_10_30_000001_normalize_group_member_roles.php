@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Normalize group_members.role to canonical values: leader, admin, karyawan.
+ * Normalize group_members.role to canonical values: leader, admin.
  *
  * This migration:
  * 1. Normalizes all existing legacy role strings to the canonical set.
@@ -36,10 +36,10 @@ return new class extends Migration
                 'staff keuangan'        => 'admin',
                 'administrator'         => 'admin',
                 'manager'               => 'admin',
-                'anggota'               => 'karyawan',
-                'pegawai'               => 'karyawan',
-                'staff'                 => 'karyawan',
-                'member'                => 'karyawan',
+                'anggota'               => 'admin',
+                'pegawai'               => 'admin',
+                'staff'                 => 'admin',
+                'member'                => 'admin',
             ];
 
             foreach ($legacyToCanonical as $legacy => $canonical) {
@@ -48,10 +48,10 @@ return new class extends Migration
                     ->update(['role' => $canonical]);
             }
 
-            // Normalize any remaining non-canonical roles to 'karyawan'
+            // Normalize any remaining non-canonical roles to 'admin'
             DB::table('group_members')
-                ->whereNotIn(DB::raw('LOWER(TRIM(role))'), ['leader', 'admin', 'karyawan'])
-                ->update(['role' => 'karyawan']);
+                ->whereNotIn(DB::raw('LOWER(TRIM(role))'), ['leader', 'admin'])
+                ->update(['role' => 'admin']);
 
             // ── 2. Ensure workspace creator has exactly one leader member row ─
             $groups = DB::table('fisheries_groups')->get(['id', 'created_by']);

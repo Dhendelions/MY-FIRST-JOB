@@ -142,10 +142,10 @@ class SpreadsheetWorksheet extends Component
             $this->mergedCells = [];
             $this->mergedCoveredCells = [];
 
-            session()->flash('error', 'Workspace ini telah diarsipkan dan tidak lagi dapat diakses.');
+            session()->flash('error', 'Ruang kerja ini telah diarsipkan dan tidak lagi dapat diakses.');
             $this->dispatch('workspace-archived-blocked', [
                 'redirect' => route('dashboard'),
-                'message' => 'Workspace ini telah diarsipkan dan tidak lagi dapat diakses.'
+                'message' => 'Ruang kerja ini telah diarsipkan dan tidak lagi dapat diakses.'
             ]);
             $this->redirect(route('dashboard'));
 
@@ -213,12 +213,12 @@ class SpreadsheetWorksheet extends Component
         $userRole = $this->_cachedMemberRole;
 
         if (!$userRole) {
-            abort(403, 'Akses ditolak: Anda tidak memiliki wewenang pada workspace ini.');
+            abort(403, 'Akses ditolak: Anda tidak memiliki wewenang pada ruang kerja ini.');
         }
 
         if ($user->isAdmin() && (\App\Services\WorkspaceSecurityService::isSheetArchived($this->sheetId) || $this->sheet->group->isArchived())) {
             $this->ensureWorkspaceNotArchived();
-            abort(403, 'Workspace ini telah diarsipkan dan tidak lagi dapat diakses.');
+            abort(403, 'Ruang kerja ini telah diarsipkan dan tidak lagi dapat diakses.');
         }
 
         if ($this->sheet->isRestrictedForRole($userRole)) {
@@ -226,7 +226,7 @@ class SpreadsheetWorksheet extends Component
         }
 
         if (!$this->sheet->group->isUnlockedForSession()) {
-            abort(403, 'Lembar kerja ini harus dibuka dengan password workspace terlebih dahulu.');
+            abort(403, 'Lembar kerja ini harus dibuka dengan password ruang kerja terlebih dahulu.');
         }
     }
 
@@ -237,13 +237,13 @@ class SpreadsheetWorksheet extends Component
     protected function authorizeModification(): void
     {
         if ($this->ensureWorkspaceNotArchived()) {
-            abort(403, 'Workspace ini telah diarsipkan dan tidak lagi dapat diakses.');
+            abort(403, 'Ruang kerja ini telah diarsipkan dan tidak lagi dapat diakses.');
         }
 
         $this->authorizeAccess();
 
         if ($this->sheet && ($this->sheet->isArchived() || \App\Services\WorkspaceSecurityService::isSheetArchived($this->sheetId))) {
-            abort(403, 'Tahun operasional ini telah diarsipkan. Lembar kerja bersifat read-only.');
+            abort(403, 'Tahun operasional ini telah diarsipkan. Lembar kerja bersifat hanya baca (read-only).');
         }
     }
 
@@ -887,7 +887,7 @@ class SpreadsheetWorksheet extends Component
     {
         $this->authorizeModification();
         if (empty($this->undoStack)) {
-            $this->dispatch('toast', message: 'Tidak ada tindakan untuk di-undo', type: 'info');
+            $this->dispatch('toast', message: 'Tidak ada tindakan untuk dibatalkan (Undo)', type: 'info');
             return;
         }
 
@@ -930,7 +930,7 @@ class SpreadsheetWorksheet extends Component
     {
         $this->authorizeModification();
         if (empty($this->redoStack)) {
-            $this->dispatch('toast', message: 'Tidak ada tindakan untuk di-redo', type: 'info');
+            $this->dispatch('toast', message: 'Tidak ada tindakan untuk diulangi (Redo)', type: 'info');
             return;
         }
 

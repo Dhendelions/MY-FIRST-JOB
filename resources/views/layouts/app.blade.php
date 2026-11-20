@@ -327,22 +327,37 @@
     </script>
 
     @livewireStyles
+    @php
+        $appOperationalYears = \App\Models\OperationalYear::with(['monthlyWorkspaces.group'])->orderBy('year', 'desc')->get();
+        $currentGroupYear = isset($group) ? $group->operationalYearModel() : null;
+    @endphp
 </head>
 <body class="h-full flex text-slate-800 antialiased font-sans" x-data="{ 
     mobileSidebarOpen: false,
     activeModal: @js(session('workspace_exit_target') ? 'modal-exit-verification' : (request()->query('open') === 'friends' ? 'modal-friend' : null)),
     workspaceExitGroupId: @js(
-        isset($group, $userRole)
-            && $userRole === 'admin'
-            && (int) session('admin_workspace_context.user_id', session('workspace_exit_context.user_id')) === (int) Auth::id()
-            && (int) session('admin_workspace_context.group_id', session('workspace_exit_context.group_id')) === (int) $group->id
-                ? $group->id
-                : null
+        isset($group, $userRole) && $userRole === 'admin'
+            ? $group->id
+            : null
     ),
+    currentWorkspaceYear: @js($currentGroupYear ? (int)$currentGroupYear->year : null),
+    groupYearMap: {
+        @foreach($appOperationalYears as $sy)
+            @foreach($sy->monthlyWorkspaces as $smw)
+                {{ (int)$smw->group_id }}: {{ (int)$sy->year }},
+            @endforeach
+        @endforeach
+    },
+    yearHasPasswordMap: {
+        @foreach($appOperationalYears as $sy)
+            {{ (int)$sy->year }}: {{ $sy->hasPassword() ? 'true' : 'false' }},
+        @endforeach
+    },
     get adminWorkspaceGroupId() {
         return this.workspaceExitGroupId;
     },
     workspaceExitTarget: @js(session('workspace_exit_target', '')),
+    workspaceExitDestinationLabel: 'Dasbor',
     get adminExitTarget() {
         return this.workspaceExitTarget;
     },
@@ -359,31 +374,104 @@
     showToast: false,
     guardWorkspaceNavigation(event) {
         if (!this.workspaceExitGroupId) return;
-        const link = event.target.closest('a[href]');
+        const link = event.target.closest('a[href], button[data-exit-target], form button[type=\'submit\']');
         if (!link || link.target === '_blank' || event.defaultPrevented) return;
 
-        const destination = new URL(link.href, window.location.href);
+        // Check if clicking a logout form
+        const logoutForm = link.closest('form[action*=\'logout\']');
+        if (logoutForm) {
+            event.preventDefault();
+            this.requestWorkspaceExit('logout', 'Keluar Akun');
+            return;
+        }
+
+        const href = link.getAttribute('href') || link.getAttribute('data-href');
+        if (!href || href === '#' || href.startsWith('javascript:')) return;
+
+        const destination = new URL(href, window.location.href);
         if (destination.origin !== window.location.origin) return;
 
-        const workspacePath = `/groups/${this.workspaceExitGroupId}/workspace`;
-        if (destination.pathname === workspacePath || destination.pathname.startsWith(workspacePath + '/')) return;
+        // 1. Moving within sheet tabs of the same monthly workspace
+        const currentWsPath = `/groups/${this.workspaceExitGroupId}/workspace`;
+        if (destination.pathname === currentWsPath || destination.pathname.startsWith(currentWsPath + '/')) {
+            return;
+        }
 
+        // 2. Identify target operational year
+        let targetYear = null;
+        const groupMatch = destination.pathname.match(/^\/groups\/(\d+)\/workspace/);
+        if (groupMatch) {
+            const targetGroupId = parseInt(groupMatch[1]);
+            targetYear = this.groupYearMap[targetGroupId] || null;
+        } else {
+            const companyWsMatch = destination.pathname.match(/^\/company\/workspace\/(\d+)/);
+            if (companyWsMatch) {
+                targetYear = parseInt(companyWsMatch[1]);
+            } else {
+                const companyYearMatch = destination.pathname.match(/^\/company\/year\/(\d+)/);
+                if (companyYearMatch) {
+                    targetYear = parseInt(companyYearMatch[1]);
+                }
+            }
+        }
+
+        // Case A: Moving between months within the SAME operational year
+        // -> NO password required! Let navigation proceed seamlessly.
+        if (targetYear && this.currentWorkspaceYear && targetYear === this.currentWorkspaceYear) {
+            return;
+        }
+
+        // Case B: Switching to a DIFFERENT operational year
+        // -> Requires target workspace password (Workspace Password, NOT account password!)
+        if (targetYear && (!this.currentWorkspaceYear || targetYear !== this.currentWorkspaceYear)) {
+            event.preventDefault();
+            // Check if Owner has configured a password for target year
+            if (this.yearHasPasswordMap[targetYear] === false) {
+                this.openGlobalNoPasswordModal({
+                    year: targetYear,
+                    title: `Ruang Kerja ${targetYear}`
+                });
+                return;
+            }
+
+            this.openGlobalUnlockModal({
+                year: targetYear,
+                title: `Ruang Kerja ${targetYear}`,
+                actionUrl: `/company/year/${targetYear}/unlock`,
+                redirectTo: destination.href
+            });
+            return;
+        }
+
+        // Case C: Leaving workspace to outside pages (Dashboard, Friends, Profile, etc.)
+        // -> Requires Admin ACCOUNT Password!
         event.preventDefault();
-        this.requestWorkspaceExit(destination.pathname + destination.search + destination.hash);
+        let destLabel = 'Dasbor';
+        if (destination.pathname.includes('friends') || destination.search.includes('friends')) {
+            destLabel = 'Jaringan Rekan Tim';
+        } else if (destination.pathname.includes('profile')) {
+            destLabel = 'Profil Pengguna';
+        }
+        this.requestWorkspaceExit(destination.pathname + destination.search + destination.hash, destLabel);
     },
-    requestWorkspaceExit(destination) {
+    requestWorkspaceExit(destination, label = 'halaman luar') {
         if (!this.workspaceExitGroupId) {
-            if (destination.includes('open=friends')) {
+            if (destination.includes('open=friends') || destination === 'friends') {
                 this.activeModal = 'modal-friend';
             }
             return;
         }
         this.workspaceExitTarget = destination;
+        this.workspaceExitDestinationLabel = label;
         this.exitPasswordInput = '';
         this.showExitPassword = false;
         this.isSubmittingExit = false;
         this.exitErrorMessage = '';
         this.activeModal = 'modal-exit-verification';
+        this.$nextTick(() => {
+            const input = document.getElementById('admin_account_exit_password');
+            if (input) input.focus();
+        });
     },
     requestAdminExit(destination) {
         this.requestWorkspaceExit(destination);
@@ -416,7 +504,7 @@
         .then(async response => {
             const data = await response.json().catch(() => ({}));
             if (!response.ok) {
-                const errorMsg = data.message || Object.values(data.errors || {}).flat()[0] || 'Password akun salah. Silakan coba lagi.';
+                const errorMsg = data.message || Object.values(data.errors || {}).flat()[0] || 'Password akun Admin salah. Silakan coba lagi.';
                 throw new Error(errorMsg);
             }
             return data;
@@ -435,7 +523,7 @@
         .catch(err => {
             this.isSubmittingExit = false;
             this.exitPasswordInput = '';
-            this.exitErrorMessage = err.message || 'Verifikasi password gagal. Silakan coba lagi.';
+            this.exitErrorMessage = err.message || 'Verifikasi password akun Admin gagal. Silakan coba lagi.';
         });
     },
     initWorkspaceHistory() {
@@ -444,7 +532,7 @@
             window.addEventListener('popstate', (e) => {
                 if (this.workspaceExitGroupId) {
                     window.history.pushState({ inWorkspace: true, groupId: this.workspaceExitGroupId }, '');
-                    this.requestWorkspaceExit('{{ route('dashboard') }}');
+                    this.requestWorkspaceExit('{{ route('dashboard') }}', 'Dasbor');
                 }
             });
         }
@@ -542,10 +630,91 @@
             this.viewProfileLoading = false;
             this.viewProfileError = err.message || 'Gagal memuat profil.';
         });
+    },
+    globalUnlockModal: {
+        show: false,
+        year: null,
+        groupId: null,
+        sheetId: null,
+        redirectTo: '',
+        actionUrl: '',
+        title: '',
+        subtitle: '',
+        error: '',
+        isSubmitting: false,
+    },
+    openGlobalUnlockModal(detail = {}) {
+        this.globalUnlockModal.year = detail.year || null;
+        this.globalUnlockModal.groupId = detail.groupId || null;
+        this.globalUnlockModal.sheetId = detail.sheetId || null;
+        this.globalUnlockModal.redirectTo = detail.redirectTo || '';
+        let action = detail.actionUrl || (detail.year ? `/company/year/${detail.year}/unlock` : (detail.groupId ? `/groups/${detail.groupId}/unlock` : ''));
+        // Clean duplicate slashes while preserving protocol
+        this.globalUnlockModal.actionUrl = action ? action.replace(/([^:]\/)\/+/g, '$1') : '';
+        this.globalUnlockModal.title = detail.title || (detail.year ? `Workspace ${detail.year}` : 'Workspace');
+        this.globalUnlockModal.subtitle = detail.subtitle || 'Masukkan kata sandi workspace untuk membuka seluruh data dan lembar kerja operasional.';
+        this.globalUnlockModal.error = detail.error || '';
+        this.globalUnlockModal.isSubmitting = false;
+        this.globalUnlockModal.show = true;
+        this.$nextTick(() => {
+            const el = document.getElementById('global_unlock_password_input');
+            if (el) el.focus();
+        });
+    },
+    closeGlobalUnlockModal() {
+        this.globalUnlockModal.show = false;
+        this.globalUnlockModal.error = '';
+        this.globalUnlockModal.isSubmitting = false;
+    },
+    globalInitiateModal: {
+        show: false,
+        isSubmitting: false,
+        error: '',
+    },
+    openGlobalInitiateModal() {
+        this.globalInitiateModal.show = true;
+        this.globalInitiateModal.isSubmitting = false;
+        this.globalInitiateModal.error = '';
+        this.$nextTick(() => {
+            const el = document.getElementById('global_initiate_year_input');
+            if (el) el.focus();
+        });
+    },
+    closeGlobalInitiateModal() {
+        this.globalInitiateModal.show = false;
+        this.globalInitiateModal.error = '';
+    },
+    globalConfirmModal: { show: false, action: '', title: '', message: '', submitLabel: 'Konfirmasi' },
+    openGlobalConfirmModal(detail = {}) {
+        this.globalConfirmModal = { show: true, action: detail.action || '', title: detail.title || 'Konfirmasi tindakan', message: detail.message || '', submitLabel: detail.submitLabel || 'Konfirmasi' };
+    },
+    closeGlobalConfirmModal() {
+        this.globalConfirmModal.show = false;
+        this.globalInitiateModal.isSubmitting = false;
+    },
+    globalNoPasswordModal: {
+        show: false,
+        year: null,
+        title: '',
+    },
+    openGlobalNoPasswordModal(detail = {}) {
+        this.globalNoPasswordModal.year = detail.year || null;
+        this.globalNoPasswordModal.title = detail.title || (detail.year ? `Ruang Kerja ${detail.year}` : 'Ruang Kerja');
+        this.globalNoPasswordModal.show = true;
+    },
+    closeGlobalNoPasswordModal() {
+        this.globalNoPasswordModal.show = false;
     }
 }" @toast.window="triggerToast($event.detail.message, $event.detail.type || 'info')"
    @if(isset($group, $userRole) && $userRole === 'admin') @click.capture="guardWorkspaceNavigation($event)" @endif
    @open-user-profile.window="openUserProfile($event.detail.userId)"
+   @open-workspace-unlock.window="openGlobalUnlockModal($event.detail)"
+   @close-workspace-unlock.window="closeGlobalUnlockModal()"
+   @open-workspace-no-password.window="openGlobalNoPasswordModal($event.detail)"
+   @close-workspace-no-password.window="closeGlobalNoPasswordModal()"
+   @open-initiate-workspace.window="openGlobalInitiateModal()"
+   @close-initiate-workspace.window="closeGlobalInitiateModal()"
+   @open-global-confirm.window="openGlobalConfirmModal($event.detail)"
    x-init="
        @if(session('error')) exitErrorMessage = @js(session('error')); @endif
        initWorkspaceHistory();
@@ -603,7 +772,7 @@
                         <svg class="w-5 h-5 {{ request()->routeIs('dashboard') ? 'text-white' : 'text-slate-400' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
                         </svg>
-                        Beranda / Ringkasan
+                        Dasbor Utama
                     </a>
 
                     @if(Auth::user()?->isOwner())
@@ -612,7 +781,7 @@
                             <svg class="w-5 h-5 {{ request()->routeIs('company.analytics*') ? 'text-white' : 'text-slate-400' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
                             </svg>
-                            Company Analytics
+                            Analitik Perusahaan
                         </a>
 
                         <a href="{{ route('company.users.index') }}" 
@@ -620,7 +789,7 @@
                             <svg class="w-5 h-5 {{ request()->routeIs('company.users*') ? 'text-white' : 'text-slate-400' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
                             </svg>
-                            Manajemen User
+                            Manajemen Pengguna
                         </a>
 
                         <a href="{{ route('company.activity-logs.index') }}" 
@@ -628,7 +797,7 @@
                             <svg class="w-5 h-5 {{ request()->routeIs('company.activity-logs*') ? 'text-white' : 'text-slate-400' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                             </svg>
-                            Activity Logs
+                            Riwayat Aktivitas
                         </a>
                     @endif
 
@@ -644,7 +813,11 @@
 
             <!-- Dynamic Year & Month Company Workspace Navigation -->
             @php
-                $sidebarYears = $operationalYears ?? \App\Models\OperationalYear::with(['monthlyWorkspaces.group'])->orderBy('year', 'desc')->get();
+                $sidebarYearsQuery = \App\Models\OperationalYear::with(['monthlyWorkspaces.group'])->orderBy('year', 'desc');
+                if (Auth::user()?->isAdmin()) {
+                    $sidebarYearsQuery->where('is_archived', false);
+                }
+                $sidebarYears = $sidebarYearsQuery->get();
                 $currentGroupYearId = isset($group) && $group->monthlyWorkspace ? $group->monthlyWorkspace->year_id : null;
             @endphp
             <div x-data="{ openYear: {{ $currentGroupYearId ? $currentGroupYearId : ($sidebarYears->first()?->id ?? 'null') }} }">
@@ -656,25 +829,29 @@
                 <div class="space-y-2 max-h-72 overflow-y-auto pr-1">
                     @forelse($sidebarYears as $opYear)
                         <div class="rounded-xl bg-white/5 border border-white/10 overflow-hidden transition-all duration-200">
-                            <!-- Year Toggle Button -->
-                            <button @click="openYear = (openYear === {{ $opYear->id }} ? null : {{ $opYear->id }})" 
-                                    class="w-full flex items-center justify-between px-3 py-2 text-xs font-bold transition-colors text-left"
-                                    :class="openYear === {{ $opYear->id }} ? 'text-white bg-white/10 border-b border-white/10' : 'text-slate-300 hover:text-white hover:bg-white/10'">
-                                <div class="flex items-center gap-2">
-                                    <svg class="w-3.5 h-3.5 text-sky-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <!-- Year Toggle / Navigation Header -->
+                            <div class="w-full flex items-center justify-between px-3 py-2 text-xs font-bold transition-colors"
+                                 :class="openYear === {{ $opYear->id }} ? 'text-white bg-white/10 border-b border-white/10' : 'text-slate-300 hover:text-white hover:bg-white/10'">
+                                <a href="{{ route('company.year', $opYear->year) }}" 
+                                   class="flex items-center gap-2 hover:text-sky-300 transition-colors flex-1"
+                                   title="Buka Ruang Kerja Tahun {{ $opYear->year }}">
+                                    <svg class="w-3.5 h-3.5 text-sky-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                                     </svg>
                                     <span>Tahun {{ $opYear->year }}</span>
-                                </div>
-                                <div class="flex items-center gap-1.5">
+                                </a>
+                                <button type="button" 
+                                        @click="openYear = (openYear === {{ $opYear->id }} ? null : {{ $opYear->id }})" 
+                                        class="flex items-center gap-1.5 text-slate-400 hover:text-white p-1 rounded transition-colors"
+                                        title="Buka / Tutup Daftar Bulan">
                                     <span class="text-[10px] text-slate-400 font-normal">12 Bulan</span>
                                     <svg class="w-3.5 h-3.5 transition-transform duration-200" 
                                          :class="openYear === {{ $opYear->id }} ? 'rotate-180 text-white' : 'text-slate-400'" 
                                          fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                                     </svg>
-                                </div>
-                            </button>
+                                </button>
+                            </div>
 
                             <!-- Months Grid -->
                             <div x-show="openYear === {{ $opYear->id }}" x-collapse class="p-2 grid grid-cols-3 gap-1.5 bg-[#0f223a]/80">
@@ -722,13 +899,13 @@
                                         <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
                                         <span class="truncate">
                                             {{ $g->name }}
-                                            @if($g->isArchived()) 🔒 Archived @endif
+                                            @if($g->isArchived()) 🔒 Diarsipkan @endif
                                         </span>
                                     </a>
                                 @else
-                                    <span aria-disabled="true" title="🔒 Archived — hanya Owner yang dapat membuka"
+                                    <span aria-disabled="true" title="🔒 Diarsipkan — hanya Owner yang dapat membuka"
                                           class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-slate-500 opacity-60 cursor-not-allowed">
-                                        <span>🔒</span><span class="truncate">{{ $g->name }} — Archived</span>
+                                        <span>🔒</span><span class="truncate">{{ $g->name }} — Diarsipkan</span>
                                     </span>
                                 @endif
                             @endforeach
@@ -751,7 +928,7 @@
             </div>
             <form action="{{ route('logout') }}" method="POST">
                 @csrf
-                <button type="submit" title="Keluar / Logout"
+                <button type="submit" title="Keluar"
                         class="p-2 text-slate-300 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition-colors">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
@@ -774,14 +951,14 @@
 
                 <!-- Breadcrumb / Active Workspace Indicator -->
                 <div class="flex items-center gap-2 text-xs sm:text-sm">
-                    <span class="text-[#7B8794] font-medium hidden sm:inline">Workspace:</span>
+                    <span class="text-[#7B8794] font-medium hidden sm:inline">Ruang Kerja:</span>
                     @if(isset($group))
                         <div class="flex items-center gap-2 bg-[#F5F7FA] text-[#142B4A] border border-[#E5EAF0] px-3 py-1 rounded-full font-bold">
                             <span class="w-2 h-2 rounded-full bg-[#142B4A] animate-pulse"></span>
                             <span>{{ $group->name }}</span>
                         </div>
                     @else
-                        <span class="font-bold text-[#263445]">Dashboard Dokumen &amp; Spreadsheet</span>
+                        <span class="font-bold text-[#263445]">Dasbor Dokumen &amp; Spreadsheet</span>
                     @endif
                 </div>
             </div>
@@ -868,32 +1045,33 @@
     </div>
 
     @if(isset($group, $userRole) && $userRole === 'admin')
+        <!-- GLOBAL FULLSCREEN ADMIN ACCOUNT PASSWORD VERIFICATION MODAL -->
         <div x-show="activeModal === 'modal-exit-verification' || activeModal === 'modal-admin-exit'" x-transition.opacity
              class="fixed inset-0 z-[1100] overflow-y-auto" x-cloak role="dialog" aria-modal="true"
              aria-labelledby="exit-verification-title" @keydown.escape.window="cancelExit()">
-            <div class="flex min-h-screen items-center justify-center px-4 py-8">
-                <div class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm" @click="cancelExit()"></div>
-                <div class="relative w-full max-w-md rounded-2xl bg-white p-6 text-left shadow-2xl">
+            <div class="flex min-h-screen items-center justify-center p-4">
+                <div class="fixed inset-0 bg-[#142B4A]/60 backdrop-blur-md" @click="cancelExit()"></div>
+                <div class="relative w-full max-w-md rounded-2xl bg-white p-6 sm:p-7 text-left shadow-2xl border border-slate-100 z-10 space-y-4">
                     <div class="flex items-center justify-between pb-3 border-b border-slate-100">
-                        <div class="flex items-center gap-2.5">
-                            <div class="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center border border-amber-200/60 shadow-xs shrink-0">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
                             </div>
                             <div>
-                                <h2 id="exit-verification-title" class="text-base font-bold text-slate-900">Verifikasi Password</h2>
-                                <p class="text-xs text-slate-500">Otentikasi keamanan keluar workspace</p>
+                                <h2 id="exit-verification-title" class="text-base font-bold text-[#263445]">Verifikasi Password Akun Admin</h2>
+                                <p class="text-[11px] text-[#7B8794]">Autentikasi akun keluar dari ruang kerja</p>
                             </div>
                         </div>
-                        <button type="button" @click="cancelExit()" class="text-slate-400 hover:text-slate-600 p-1" title="Tutup">
+                        <button type="button" @click="cancelExit()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg" title="Tutup">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                         </button>
                     </div>
 
-                    <p class="mt-3 text-sm leading-6 text-slate-600">
-                        Masukkan password workspace untuk melanjutkan navigasi keluar dari workspace <strong>{{ $group->name }}</strong>.
+                    <p class="text-xs text-[#526780] leading-relaxed">
+                        Anda sedang meninggalkan ruang kerja untuk menuju <strong x-text="workspaceExitDestinationLabel || 'halaman luar'"></strong>. Masukkan <strong class="text-[#142B4A]">Password Akun Login Anda</strong> untuk melanjutkan.
                     </p>
 
-                    <form action="{{ route('groups.leave', $group->id) }}" method="POST" @submit.prevent="submitExitVerification($event)" class="mt-4 space-y-4">
+                    <form action="{{ route('groups.leave', $group->id) }}" method="POST" @submit.prevent="submitExitVerification($event)" class="space-y-4">
                         @csrf
                         <input type="hidden" name="destination" x-model="workspaceExitTarget">
                         
@@ -904,19 +1082,20 @@
                         </div>
 
                         <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1.5">
-                                Password Workspace
+                            <label for="admin_account_exit_password" class="block text-xs font-bold text-[#263445] uppercase tracking-wider mb-1.5">
+                                Password Akun Admin
                             </label>
                             <div class="relative">
                                 <input :type="showExitPassword ? 'text' : 'password'" 
                                        name="password" 
+                                       id="admin_account_exit_password"
                                        x-model="exitPasswordInput"
                                        required 
-                                       autocomplete="off" 
+                                       autocomplete="current-password" 
                                        autofocus
-                                       placeholder="Masukkan password workspace..."
+                                       placeholder="Masukkan kata sandi akun login..."
                                        :disabled="isSubmittingExit"
-                                       class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:bg-slate-50 disabled:text-slate-400">
+                                       class="w-full px-3.5 py-2.5 pr-10 rounded-xl border border-[#E5EAF0] focus:border-[#142B4A] focus:ring-2 focus:ring-[#142B4A]/10 text-sm text-[#263445] outline-none transition-all disabled:bg-slate-50 disabled:text-slate-400">
                                 <button type="button" 
                                         @click="showExitPassword = !showExitPassword"
                                         class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none"
@@ -928,19 +1107,16 @@
                             </div>
                         </div>
 
-                        <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end pt-2">
+                        <div class="flex items-center justify-end gap-3 pt-3 border-t border-[#E5EAF0]">
                             <button type="button" @click="cancelExit()"
                                     :disabled="isSubmittingExit"
-                                    class="rounded-xl px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-50">
+                                    class="px-4 py-2.5 rounded-xl btn-secondary-gradient font-bold text-xs disabled:opacity-50">
                                 Batal
                             </button>
                             <button type="submit"
                                     :disabled="isSubmittingExit"
-                                    class="rounded-xl bg-sky-600 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-sky-700 disabled:bg-sky-400 flex items-center justify-center gap-2">
-                                <svg x-show="isSubmittingExit" class="w-3.5 h-3.5 animate-spin text-white" fill="none" viewBox="0 0 24 24">
-                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
+                                    class="px-5 py-2.5 rounded-xl btn-primary-gradient font-bold text-xs flex items-center justify-center gap-2 disabled:opacity-60 shadow-xs">
+                                <span x-show="isSubmittingExit" class="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
                                 <span x-text="isSubmittingExit ? 'Memverifikasi...' : 'Verifikasi dan Lanjutkan'"></span>
                             </button>
                         </div>
@@ -949,6 +1125,41 @@
             </div>
         </div>
     @endif
+
+    <!-- GLOBAL FULLSCREEN NO PASSWORD MODAL -->
+    <div x-show="globalNoPasswordModal.show" 
+         class="fixed inset-0 z-[1200] overflow-y-auto" 
+         x-cloak 
+         role="dialog" 
+         aria-modal="true"
+         @keydown.escape.window="closeGlobalNoPasswordModal()">
+        <div class="flex min-h-screen items-center justify-center p-4">
+            <div class="fixed inset-0 bg-[#142B4A]/60 backdrop-blur-md" @click="closeGlobalNoPasswordModal()"></div>
+            <div class="relative w-full max-w-md rounded-2xl bg-white p-6 sm:p-7 text-center shadow-2xl border border-slate-100 z-10 space-y-5">
+                <div class="w-14 h-14 mx-auto rounded-2xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center text-2xl shadow-xs">
+                    🔒
+                </div>
+                <div>
+                    <span class="px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 font-bold text-[10px] uppercase tracking-wider">
+                        Konfigurasi Diperlukan
+                    </span>
+                    <h3 class="text-base font-bold text-[#263445] mt-2" x-text="'Password ' + (globalNoPasswordModal.title || 'Ruang Kerja') + ' Belum Diatur'">
+                        Password Ruang Kerja Belum Diatur
+                    </h3>
+                    <p class="text-xs text-[#7B8794] mt-2 leading-relaxed">
+                        Owner perlu mengatur kata sandi untuk ruang kerja ini sebelum Admin dapat membuka atau mengakses lembar kerja operasional. Silakan hubungi Owner untuk mengonfigurasinya.
+                    </p>
+                </div>
+                <div class="pt-2">
+                    <button type="button" 
+                            @click="closeGlobalNoPasswordModal()" 
+                            class="w-full px-4 py-2.5 rounded-xl btn-primary-gradient font-bold text-xs shadow-xs">
+                        Mengerti
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- TOAST NOTIFICATION COMPONENT -->
     <div x-show="showToast" 
@@ -1261,7 +1472,7 @@
                             <span class="font-bold text-slate-800" x-text="viewProfileData ? viewProfileData.joined_since : '-'"></span>
                         </div>
                         <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                            <span class="text-[10px] uppercase font-semibold text-slate-400 block">Workspace</span>
+                            <span class="text-[10px] uppercase font-semibold text-slate-400 block">Ruang Kerja</span>
                             <span class="font-bold text-slate-800"><span x-text="viewProfileData ? viewProfileData.total_workspaces : 0"></span> Aktif</span>
                         </div>
                     </div>
@@ -1309,6 +1520,173 @@
                         Tutup
                     </button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- GLOBAL FULLSCREEN WORKSPACE PASSWORD UNLOCK MODAL -->
+    <div x-show="globalUnlockModal.show" 
+         x-cloak
+         class="fixed inset-0 z-[9999] overflow-y-auto"
+         role="dialog"
+         aria-modal="true"
+         aria-labelledby="global-unlock-title"
+         @keydown.escape.window="closeGlobalUnlockModal()">
+        <div class="fixed inset-0 bg-[#142B4A]/50 backdrop-blur-sm transition-opacity" 
+             @click="closeGlobalUnlockModal()"
+             aria-hidden="true"></div>
+
+        <div class="min-h-full flex items-center justify-center p-4">
+            <div class="relative bg-white w-full max-w-md rounded-2xl border border-[#E5EAF0] shadow-2xl p-6 space-y-5 modal-enter text-left z-10"
+                 @click.stop>
+                <div class="flex items-center justify-between pb-3 border-b border-[#E5EAF0]">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center font-bold text-base shadow-xs shrink-0">
+                            🔒
+                        </div>
+                        <div>
+                            <h3 id="global-unlock-title" class="text-base font-bold text-[#263445]" x-text="'Masukkan Password ' + (globalUnlockModal.title || 'Ruang Kerja')"></h3>
+                            <p class="text-[11px] text-[#7B8794]">Autentikasi Hak Akses Ruang Kerja</p>
+                        </div>
+                    </div>
+                    <button type="button" 
+                            @click="closeGlobalUnlockModal()" 
+                            class="w-8 h-8 rounded-lg flex items-center justify-center text-[#7B8794] hover:text-[#263445] hover:bg-slate-100 transition-colors text-lg"
+                            title="Tutup">
+                        &times;
+                    </button>
+                </div>
+
+                <form :action="globalUnlockModal.actionUrl" method="POST" class="space-y-4" @submit="globalUnlockModal.isSubmitting = true">
+                    @csrf
+                    <template x-if="globalUnlockModal.sheetId">
+                        <input type="hidden" name="sheet_id" :value="globalUnlockModal.sheetId">
+                    </template>
+                    <template x-if="globalUnlockModal.redirectTo">
+                        <input type="hidden" name="redirect_to" :value="globalUnlockModal.redirectTo">
+                    </template>
+
+                    <p class="text-xs text-[#7B8794] leading-relaxed" x-text="globalUnlockModal.subtitle">
+                        Masukkan kata sandi untuk membuka seluruh data dan lembar kerja operasional.
+                    </p>
+
+                    <div x-show="globalUnlockModal.error" x-cloak class="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700">
+                        <span x-text="globalUnlockModal.error"></span>
+                    </div>
+
+                    <div>
+                        <label for="global_unlock_password_input" class="block text-xs font-bold text-[#263445] uppercase tracking-wider mb-1.5">
+                            Password Ruang Kerja
+                        </label>
+                        <input type="password" 
+                               name="password" 
+                               id="global_unlock_password_input" 
+                               required 
+                               autocomplete="current-password"
+                               placeholder="Masukkan kata sandi ruang kerja" 
+                               class="w-full px-3.5 py-2.5 rounded-xl border border-[#E5EAF0] focus:border-[#142B4A] focus:ring-2 focus:ring-[#142B4A]/10 text-sm text-[#263445] outline-none transition-all">
+                    </div>
+
+                    <div class="flex items-center justify-end gap-3 pt-3 border-t border-[#E5EAF0]">
+                        <button type="button" 
+                                @click="closeGlobalUnlockModal()" 
+                                class="px-4 py-2.5 rounded-xl btn-secondary-gradient font-bold text-xs">
+                            Batal
+                        </button>
+                        <button type="submit" 
+                                :disabled="globalUnlockModal.isSubmitting"
+                                class="px-5 py-2.5 rounded-xl btn-primary-gradient font-bold text-xs flex items-center justify-center gap-2 disabled:opacity-60 shadow-xs">
+                            <span x-show="globalUnlockModal.isSubmitting" class="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                            <span x-text="globalUnlockModal.isSubmitting ? 'Memverifikasi...' : 'Masuk ke Ruang Kerja'">Masuk ke Ruang Kerja</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- GLOBAL FULLSCREEN WORKSPACE INITIATION MODAL -->
+    <div x-show="globalInitiateModal.show" 
+         x-cloak
+         class="fixed inset-0 z-[9999] overflow-y-auto"
+         role="dialog"
+         aria-modal="true"
+         aria-labelledby="global-initiate-title"
+         @keydown.escape.window="closeGlobalInitiateModal()">
+        <div class="fixed inset-0 bg-[#142B4A]/50 backdrop-blur-sm transition-opacity" 
+             @click="closeGlobalInitiateModal()"
+             aria-hidden="true"></div>
+
+        <div class="min-h-full flex items-center justify-center p-4">
+            <div class="relative bg-white w-full max-w-md rounded-2xl border border-[#E5EAF0] shadow-2xl p-6 space-y-5 modal-enter text-left z-10"
+                 @click.stop>
+                <div class="flex items-center justify-between pb-3 border-b border-[#E5EAF0]">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-9 h-9 rounded-xl bg-sky-50 text-sky-700 border border-sky-200 flex items-center justify-center font-bold text-base shadow-xs shrink-0">
+                            📅
+                        </div>
+                        <div>
+                            <h3 id="global-initiate-title" class="text-base font-bold text-[#263445]">Inisiasi Tahun Operasional Baru</h3>
+                            <p class="text-[11px] text-[#7B8794]">Pembuatan Otomatis 12 Ruang Kerja & 60 Spreadsheet</p>
+                        </div>
+                    </div>
+                    <button type="button" 
+                            @click="closeGlobalInitiateModal()" 
+                            class="w-8 h-8 rounded-lg flex items-center justify-center text-[#7B8794] hover:text-[#263445] hover:bg-slate-100 transition-colors text-lg"
+                            title="Tutup">
+                        &times;
+                    </button>
+                </div>
+
+                <form action="{{ route('company.years.store') }}" method="POST" class="space-y-4" @submit="globalInitiateModal.isSubmitting = true">
+                    @csrf
+                    <div>
+                        <label for="global_initiate_year_input" class="block text-xs font-bold text-[#263445] uppercase tracking-wider mb-1.5">
+                            Tahun Operasional (4 Digit)
+                        </label>
+                        <input type="number" 
+                               name="year" 
+                               id="global_initiate_year_input" 
+                               required 
+                               min="1000" 
+                               max="9999" 
+                               placeholder="Contoh: {{ date('Y') + 1 }}" 
+                               class="w-full px-3.5 py-2.5 rounded-xl border border-[#E5EAF0] focus:border-[#142B4A] focus:ring-2 focus:ring-[#142B4A]/10 text-sm font-mono text-[#263445] placeholder-[#7B8794] outline-none transition-all">
+                    <p class="text-[11px] text-[#7B8794] mt-1.5 leading-relaxed">
+                        Sistem akan otomatis membuat 12 ruang kerja bulanan (Januari - Desember) dan 60 lembar kerja dengan formula standar operasional.
+                    </p>
+                    </div>
+
+                    <div class="flex items-center justify-end gap-3 pt-3 border-t border-[#E5EAF0]">
+                        <button type="button" 
+                                @click="closeGlobalInitiateModal()" 
+                                class="px-4 py-2.5 rounded-xl btn-secondary-gradient font-bold text-xs">
+                            Batal
+                        </button>
+                        <button type="submit" 
+                                :disabled="globalInitiateModal.isSubmitting"
+                                class="px-5 py-2.5 rounded-xl btn-primary-gradient font-bold text-xs flex items-center justify-center gap-2 disabled:opacity-60 shadow-xs">
+                            <span x-show="globalInitiateModal.isSubmitting" class="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                            <span x-text="globalInitiateModal.isSubmitting ? 'Memproses Inisiasi...' : 'Inisiasi Ruang Kerja'">Inisiasi Ruang Kerja</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- GLOBAL FULLSCREEN CONFIRMATION MODAL -->
+    <div x-show="globalConfirmModal.show" x-cloak class="fixed inset-0 z-[9999] overflow-y-auto" role="dialog" aria-modal="true" @keydown.escape.window="closeGlobalConfirmModal()">
+        <div class="fixed inset-0 bg-[#142B4A]/50 backdrop-blur-sm" @click="closeGlobalConfirmModal()"></div>
+        <div class="min-h-full flex items-center justify-center p-4">
+            <div class="relative z-10 w-full max-w-md rounded-2xl border border-[#E5EAF0] bg-white p-6 shadow-2xl modal-enter" @click.stop>
+                <h3 class="text-base font-bold text-[#263445]" x-text="globalConfirmModal.title"></h3>
+                <p class="mt-2 text-sm leading-relaxed text-[#7B8794]" x-text="globalConfirmModal.message"></p>
+                <form :action="globalConfirmModal.action" method="POST" class="mt-6 flex justify-end gap-3">
+                    @csrf
+                    <button type="button" @click="closeGlobalConfirmModal()" class="px-4 py-2.5 rounded-xl btn-secondary-gradient text-xs font-bold">Batal</button>
+                    <button type="submit" class="px-4 py-2.5 rounded-xl bg-amber-600 text-xs font-bold text-white hover:bg-amber-700" x-text="globalConfirmModal.submitLabel"></button>
+                </form>
             </div>
         </div>
     </div>

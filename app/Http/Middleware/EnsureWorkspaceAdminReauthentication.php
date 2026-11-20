@@ -35,15 +35,68 @@ class EnsureWorkspaceAdminReauthentication
             return $next($request);
         }
 
+        // Returning to dashboard resets all workspace and year session authentications
+        if ($routeName === 'dashboard') {
+            $this->clearAllAuthentication($request);
+            $request->session()->save();
+            return $next($request);
+        }
+
+        // Utility and benign global requests must not disturb active workspace authentication
+        if (in_array($routeName, [
+            'livewire.update',
+            'users.profile',
+            'notifications.read-all',
+            'friends.search',
+            'friends.list',
+            'friends.store',
+            'friends.accept',
+            'friends.remove',
+        ], true)) {
+            return $next($request);
+        }
+
+        $targetYear = $this->resolveTargetYear($request);
+        $targetGroup = $this->resolveTargetGroup($request);
+
+        // 1. Maintain Multi-Year Workspace Authentication
+        $authenticatedYears = $request->session()->get('admin_authenticated_years', []);
+        if (is_array($authenticatedYears) && $user) {
+            $checkYear = $targetYear ?: ($targetGroup ? $targetGroup->operationalYearModel() : null);
+            if ($checkYear) {
+                $yearKey = (int) $checkYear->year;
+                $yearIdKey = (int) $checkYear->id;
+                $stored = $authenticatedYears[$yearKey] ?? $authenticatedYears[$yearIdKey] ?? null;
+
+                if (is_array($stored)) {
+                    // Check if password version or user mismatch
+                    if (
+                        (int) ($stored['user_id'] ?? 0) !== (int) $user->id ||
+                        (int) ($stored['password_version'] ?? 1) !== (int) ($checkYear->password_version ?? 1)
+                    ) {
+                        // Invalidate this specific year
+                        unset($authenticatedYears[$yearKey], $authenticatedYears[$yearIdKey]);
+                        $request->session()->put('admin_authenticated_years', $authenticatedYears);
+                        if ((int) ($request->session()->get('admin_year_auth.year_id') ?? 0) === (int) $checkYear->id) {
+                            $request->session()->forget('admin_year_auth');
+                        }
+                        $request->session()->save();
+                    } else {
+                        // Keep current active context synchronized
+                        $request->session()->put('admin_year_auth', [
+                            'user_id' => $user->id,
+                            'year_id' => $checkYear->id,
+                            'password_version' => (int) ($checkYear->password_version ?? 1),
+                        ]);
+                    }
+                }
+            }
+        }
+
+        // 2. Maintain Standalone Workspace Authentication
         $auth = $request->session()->get('admin_workspace_auth');
         if (is_array($auth) && (int) ($auth['user_id'] ?? 0) === (int) ($user?->id ?? 0)) {
-            if ($routeName === 'livewire.update') {
-                return $next($request);
-            }
-
-            $targetGroup = $this->resolveTargetGroup($request);
             if ($targetGroup && (int) $targetGroup->id === (int) ($auth['group_id'] ?? 0)) {
-                $this->clearYearAuthentication($request);
                 return $next($request);
             }
 
@@ -57,25 +110,29 @@ class EnsureWorkspaceAdminReauthentication
             $this->clearWorkspaceAuthentication($request);
         }
 
-        $yearAuth = $request->session()->get('admin_year_auth');
-        if (is_array($yearAuth) && (int) ($yearAuth['user_id'] ?? 0) === (int) ($user?->id ?? 0)) {
-            $year = $request->route()?->parameter('year');
-            $operationalYear = is_numeric($year)
-                ? OperationalYear::where('year', (int) $year)->first()
-                : null;
+        return $next($request);
+    }
 
-            if (
-                in_array($routeName, ['company.year', 'company.year.unlock'], true)
-                && $operationalYear
-                && (int) $operationalYear->id === (int) ($yearAuth['year_id'] ?? 0)
-            ) {
-                return $next($request);
+    private function resolveTargetYear(Request $request): ?OperationalYear
+    {
+        $route = $request->route();
+        $year = $route?->parameter('year');
+        if ($year instanceof OperationalYear) {
+            return $year;
+        }
+        if (is_numeric($year)) {
+            $opYear = OperationalYear::where('year', (int) $year)->first();
+            if ($opYear) {
+                return $opYear;
             }
         }
 
-        $this->clearYearAuthentication($request);
+        $targetGroup = $this->resolveTargetGroup($request);
+        if ($targetGroup) {
+            return $targetGroup->operationalYearModel();
+        }
 
-        return $next($request);
+        return null;
     }
 
     private function resolveTargetGroup(Request $request): ?FisheriesGroup
@@ -151,16 +208,21 @@ class EnsureWorkspaceAdminReauthentication
                 $request->session()->forget($key);
             }
         }
+        $request->session()->save();
     }
 
     private function clearYearAuthentication(Request $request): void
     {
-        $request->session()->forget('admin_year_auth');
+        $request->session()->forget([
+            'admin_year_auth',
+            'admin_authenticated_years',
+        ]);
 
         foreach (array_keys($request->session()->all()) as $key) {
-            if (str_starts_with($key, 'year_unlocked_')) {
+            if (str_starts_with($key, 'year_unlocked_') || str_starts_with($key, 'admin_year_auth_')) {
                 $request->session()->forget($key);
             }
         }
+        $request->session()->save();
     }
 }

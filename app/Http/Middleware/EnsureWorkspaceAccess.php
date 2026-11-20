@@ -25,7 +25,7 @@ class EnsureWorkspaceAccess
             $yearNum = $yearParam instanceof OperationalYear ? $yearParam->year : (int) $yearParam;
             if ($yearNum > 0 && WorkspaceSecurityService::isYearArchived($yearNum)) {
                 if ($user && $user->isAdmin()) {
-                    abort(403, 'Workspace tahun ini telah diarsipkan dan tidak dapat diakses oleh Admin.');
+                    abort(403, 'Ruang kerja tahun ini telah diarsipkan dan tidak dapat diakses oleh Admin.');
                 }
             }
         }
@@ -38,10 +38,16 @@ class EnsureWorkspaceAccess
 
         // 3. Strict Archive Protection for Admins: All access rejected
         if ($user && $user->isAdmin() && WorkspaceSecurityService::isGroupArchived($group)) {
-            abort(403, 'Workspace ini telah diarsipkan dan tidak lagi dapat diakses.');
+            abort(403, 'Ruang kerja ini telah diarsipkan dan tidak lagi dapat diakses.');
         }
 
-        if (in_array($request->route()?->getName(), ['group.workspace', 'groups.unlock'], true)) {
+        if (in_array($request->route()?->getName(), [
+            'group.workspace',
+            'groups.unlock',
+            'company.year',
+            'company.year.unlock',
+            'groups.leave',
+        ], true)) {
             return $next($request);
         }
 
@@ -54,7 +60,18 @@ class EnsureWorkspaceAccess
         }
 
         if (!$group->isUnlockedForSession()) {
-            abort(403, 'Masukkan password workspace sebelum mengakses datanya.');
+            // A browser request to an annual month is a navigation request,
+            // not a data endpoint. Send it to the canonical year gate so the
+            // global password/configuration modal can be shown. All sheet/API
+            // endpoints remain hard 403 protected below.
+            if ($request->route()?->getName() === 'company.workspace') {
+                $year = $group->operationalYearModel();
+                if ($year) {
+                    return redirect()->route('company.year', $year->year);
+                }
+            }
+
+            abort(403, 'Masukkan password ruang kerja sebelum mengakses datanya.');
         }
 
         return $next($request);
