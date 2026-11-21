@@ -193,7 +193,10 @@ class SpreadsheetWorkflowTest extends TestCase
         $this->assertSame(780, substr_count($component->html(), 'class="grid-cell-td'));
         $component->call('extendGrid', 'row')
             ->assertSet('gridRowLimit', 55)
-            ->call('ensureGridCell', 100, 26);
+            ->call('ensureGridCell', 100, 26)
+            ->assertSet('activeCellCoord', '')
+            ->assertSet('activeRowId', null)
+            ->assertSet('activeColumnId', null);
 
         $row = $sheet->rows()->where('sort_order', 100)->firstOrFail();
         $column = $sheet->columns()->where('letter', 'Z')->firstOrFail();
@@ -358,10 +361,11 @@ class SpreadsheetWorkflowTest extends TestCase
         // Ensure no missing-semicolon CSS syntax error occurred
         $this->assertStringNotContainsString('solid #000000position:sticky', $analisaHtml);
         $this->assertStringNotContainsString('solid #000000 position:sticky', $analisaHtml);
-        // Ensure sticky top and z-index 18 or 26 is rendered on data cells
+        // Frozen intersections remain below row/column headers but above
+        // ordinary scrolling cells in the documented stacking hierarchy.
         $this->assertStringContainsString('position:sticky;top:calc(var(--spreadsheet-column-header-height, 36px)', $analisaHtml);
         $this->assertStringContainsString('z-index:18', $analisaHtml);
-        $this->assertStringContainsString('z-index:26', $analisaHtml);
+        $this->assertStringContainsString('z-index:15', $analisaHtml);
 
         // Test Cost
         $costComp = Livewire::actingAs($user)

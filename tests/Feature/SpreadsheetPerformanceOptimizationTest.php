@@ -11,6 +11,7 @@ use App\Models\SpreadsheetRow;
 use App\Models\User;
 use App\Livewire\SpreadsheetWorksheet;
 use App\Services\SpreadsheetFormulaEngine;
+use App\Services\SpreadsheetWorkbookCalculator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
@@ -231,6 +232,57 @@ class SpreadsheetPerformanceOptimizationTest extends TestCase
 
         $cellC1->refresh();
         $this->assertSame('300', $cellC1->value);
+    }
+
+    public function test_unrelated_cell_edit_skips_the_expensive_workbook_calculation(): void
+    {
+        $row1 = $this->sheet->rows()->where('sort_order', 1)->firstOrFail();
+        $row2 = $this->sheet->rows()->where('sort_order', 2)->firstOrFail();
+        $colA = $this->sheet->columns()->where('sort_order', 1)->firstOrFail();
+        $colC = $this->sheet->columns()->where('sort_order', 3)->firstOrFail();
+
+        SpreadsheetCell::create([
+            'row_id' => $row1->id,
+            'column_id' => $colC->id,
+            'value' => '0',
+            'formula' => '=A1*2',
+        ]);
+
+        $changes = app(SpreadsheetWorkbookCalculator::class)->recalculateForCellChange(
+            $this->group,
+            $this->sheet,
+            $colA->letter . $row2->sort_order,
+        );
+
+        $this->assertSame([], $changes);
+    }
+
+    public function test_cross_sheet_reference_remains_recalculated_after_a_source_edit(): void
+    {
+        $source = $this->group->sheets()->orderBy('id')->firstOrFail();
+        $target = $this->group->sheets()->orderBy('id')->skip(1)->firstOrFail();
+        $source->update(['name' => 'Analisa']);
+        $target->update(['name' => 'Cost']);
+
+        $sourceRow = $source->rows()->where('sort_order', 1)->firstOrFail();
+        $sourceCol = $source->columns()->where('sort_order', 1)->firstOrFail();
+        $targetRow = $target->rows()->where('sort_order', 1)->firstOrFail();
+        $targetCol = $target->columns()->where('sort_order', 1)->firstOrFail();
+
+        SpreadsheetCell::create([
+            'row_id' => $targetRow->id,
+            'column_id' => $targetCol->id,
+            'value' => '0',
+            'formula' => '=Analisa!A1*2',
+        ]);
+
+        Livewire::actingAs($this->user)
+            ->test(SpreadsheetWorksheet::class, ['sheet' => $source])
+            ->call('updateCell', $sourceRow->id, $sourceCol->id, '25', 0);
+
+        $this->assertSame('50', SpreadsheetCell::where('row_id', $targetRow->id)
+            ->where('column_id', $targetCol->id)
+            ->value('value'));
     }
 
     /**

@@ -297,10 +297,22 @@ function evaluateArithmeticString(expr, getCellVal) {
     return String(Math.round(result * 1e8) / 1e8);
 }
 
+// Livewire hooks are global and do not have a component-scoped unsubscribe.
+// Install one stateless relay for the page so opening/switching worksheets
+// cannot retain a full Alpine component closure for every prior instance.
+function installSpreadsheetMorphRelay() {
+    if (typeof window === 'undefined' || typeof Livewire === 'undefined' || window.__spreadsheetMorphRelayInstalled) return;
+
+    window.__spreadsheetMorphRelayInstalled = true;
+    Livewire.hook('morph.updated', ({ el }) => {
+        window.dispatchEvent(new CustomEvent('spreadsheet-grid-morphed', { detail: { el } }));
+    });
+}
+
 window.spreadsheetWorksheet = function($wire) {
     return {
         // Selection and active cell state
-        selectedCell: 'A1',
+        selectedCell: null,
         selectedRowId: null,
         selectedColId: null,
         selectedRowOrder: 1,
@@ -314,7 +326,7 @@ window.spreadsheetWorksheet = function($wire) {
         originalEditValue: '',
 
         // Formula bar state
-        activeCoord: 'A1',
+        activeCoord: '',
         activeFormula: '',
         originalFormulaValue: '',
         isFormulaBarFocused: false,
@@ -329,11 +341,22 @@ window.spreadsheetWorksheet = function($wire) {
 
         // Fast in-memory cell map for zero-latency lookups & calculations
         cellsMap: {},
+        // Reverse dependency index: precedent coordinate -> visible formulas.
+        // Built only when the grid/formulas change, never on each keystroke.
+        formulaDependents: {},
         // Only one request per coordinate may be in flight. A newer local
         // value replaces a queued older value, preventing late responses from
         // writing over the user's most recent edit.
         cellSaveQueues: {},
         failedCellSaves: {},
+        // The transport is serialized across cells. This gives formula edits
+        // a deterministic commit order and prevents an older request from a
+        // different cell racing a newer dependent edit on the server.
+        activeCellSave: null,
+        // Cell commits bypass Livewire's serialized component snapshot. A
+        // Livewire call includes the entire public worksheet state even when
+        // skipRender() is used, which made one edit proportional to grid size.
+        cellSaveEndpoint: '/spreadsheet/cell',
         listenerController: null,
         headerResizeObserver: null,
         currentSheetId: null,
@@ -344,24 +367,25 @@ window.spreadsheetWorksheet = function($wire) {
         sheetScrollPositions: {},
         isSheetSwitching: false,
         gridExtensionPending: { row: false, column: false },
+        scrollExtensionFrame: null,
+        morphRefreshFrame: null,
 
         init() {
             this.listenerController = new AbortController();
             this.currentSheetId = Number(this.$el.dataset.sheetId);
+            installSpreadsheetMorphRelay();
             // Populate in-memory cells map from rendered DOM inputs
             this.initCellsMap();
 
-            const initialCoord = $wire.activeCellCoord || 'A1';
+            const initialCoord = $wire.activeCellCoord || null;
             this.selectedCell = initialCoord;
-            this.activeCoord = initialCoord;
-            this.activeFormula = $wire.formulaValue !== null && $wire.formulaValue !== undefined ? String($wire.formulaValue) : '';
+            this.activeCoord = initialCoord || '';
+            this.activeFormula = initialCoord && $wire.formulaValue !== null && $wire.formulaValue !== undefined ? String($wire.formulaValue) : '';
             this.originalFormulaValue = this.activeFormula;
 
-            // Apply initial selection highlight
+            // Header height is measured only when its own size changes. Do
+            // not create a selection merely by opening a worksheet.
             this.$nextTick(() => {
-                const initialTd = document.getElementById('td-' + initialCoord);
-                if (initialTd) initialTd.classList.add('is-selected');
-
                 const headerRow = this.$el.querySelector('.spreadsheet-table thead tr');
                 if (headerRow && typeof ResizeObserver !== 'undefined') {
                     const updateHeaderHeight = () => {
@@ -383,17 +407,20 @@ window.spreadsheetWorksheet = function($wire) {
 
             // Handle materialized virtual cell event
             window.addEventListener('grid-cell-materialized', (e) => {
-                if (e.detail) {
-                    if (e.detail.coord) {
-                        this.selectedCell = e.detail.coord;
-                        this.activeCoord = e.detail.coord;
-                        const td = document.getElementById('td-' + e.detail.coord);
-                        if (td) td.classList.add('is-selected');
-                    }
-                    if (e.detail.rowId) this.selectedRowId = e.detail.rowId;
-                    if (e.detail.colId) this.selectedColId = e.detail.colId;
-                    this.initCellsMap();
-                }
+                if (!e.detail?.coord) return;
+
+                this.initCellsMap();
+                // A virtual-cell request may complete after the user has
+                // clicked somewhere else. It must never take selection back
+                // to its older coordinate.
+                if (e.detail.coord !== this.selectedCell) return;
+
+                this.selectedRowId = e.detail.rowId || null;
+                this.selectedColId = e.detail.colId || null;
+                this.activeFormula = e.detail.formula !== undefined ? String(e.detail.formula) : this.activeFormula;
+                this.originalFormulaValue = this.activeFormula;
+                const td = document.getElementById('td-' + e.detail.coord);
+                if (td) td.classList.add('is-selected');
             }, { signal: this.listenerController.signal });
 
             // Handle server confirmation of saved cell
@@ -481,47 +508,50 @@ window.spreadsheetWorksheet = function($wire) {
             window.addEventListener('worksheet-sheet-switched', (e) => {
                 const detail = e.detail || {};
                 this.currentSheetId = Number(detail.sheetId);
-                this.selectedCell = detail.coord || 'A1';
-                this.activeCoord = this.selectedCell;
-                this.selectedRowId = detail.rowId || null;
-                this.selectedColId = detail.colId || null;
+                this.selectedCell = null;
+                this.activeCoord = '';
+                this.selectedRowId = null;
+                this.selectedColId = null;
                 this.selectedRowOrder = detail.rowOrder || 1;
                 this.selectedColOrder = detail.colOrder || 1;
                 this.selectedR = 0;
                 this.selectedC = 0;
                 this.editingCell = null;
-                this.activeFormula = detail.formula || '';
+                this.activeFormula = '';
                 this.originalFormulaValue = this.activeFormula;
                 this.isFormulaBarFocused = false;
                 this.cellsMap = {};
                 this.$nextTick(() => {
                     this.initCellsMap();
-                    const selected = document.getElementById('td-' + this.selectedCell);
-                    if (selected) selected.classList.add('is-selected');
                 });
             }, { signal: this.listenerController.signal });
 
-            // Listen for Livewire morph updates to refresh cellsMap after structural changes (addRow, etc.)
-            // We only reinitialize on *structural* DOM changes (rows/columns added or removed).
-            // Simple cell value morphs handled via cell-updated-confirmed event should NOT
-            // trigger a full DOM scan, which is expensive on large sheets.
-            if (typeof Livewire !== 'undefined') {
-                let _prevRowCount = document.querySelectorAll('.grid-data-row').length;
-                let _prevColCount = document.querySelectorAll('col[data-col-index]').length;
-                Livewire.hook('morph.updated', () => {
+            // Refresh after structural Livewire updates without attaching a
+            // global hook per Alpine instance. Coalescing also prevents a
+            // morph that touches many descendants from scheduling repeated
+            // full-grid scans.
+            let previousRowCount = this.$el.querySelectorAll('.grid-data-row').length;
+            let previousColCount = this.$el.querySelectorAll('col[data-col-index]').length;
+            window.addEventListener('spreadsheet-grid-morphed', (event) => {
+                const morphTarget = event.detail?.el;
+                if (!this.$el.isConnected || (morphTarget && morphTarget !== this.$el && !this.$el.contains(morphTarget))) return;
+                if (this.morphRefreshFrame) return;
+
+                this.morphRefreshFrame = requestAnimationFrame(() => {
+                    this.morphRefreshFrame = null;
                     this.$nextTick(() => {
-                        const newRowCount = document.querySelectorAll('.grid-data-row').length;
-                        const newColCount = document.querySelectorAll('col[data-col-index]').length;
-                        if (newRowCount !== _prevRowCount || newColCount !== _prevColCount) {
-                            _prevRowCount = newRowCount;
-                            _prevColCount = newColCount;
+                        const newRowCount = this.$el.querySelectorAll('.grid-data-row').length;
+                        const newColCount = this.$el.querySelectorAll('col[data-col-index]').length;
+                        if (newRowCount !== previousRowCount || newColCount !== previousColCount) {
+                            previousRowCount = newRowCount;
+                            previousColCount = newColCount;
                             this.initCellsMap();
                         }
-                        const activeTd = document.getElementById('td-' + this.selectedCell);
+                        const activeTd = this.selectedCell && document.getElementById('td-' + this.selectedCell);
                         if (activeTd) activeTd.classList.add('is-selected');
                     });
                 });
-            }
+            }, { signal: this.listenerController.signal });
 
             // Global Keyboard Shortcuts
             window.addEventListener('keydown', (e) => {
@@ -575,6 +605,8 @@ window.spreadsheetWorksheet = function($wire) {
         destroy() {
             this.listenerController?.abort();
             this.headerResizeObserver?.disconnect();
+            if (this.scrollExtensionFrame) cancelAnimationFrame(this.scrollExtensionFrame);
+            if (this.morphRefreshFrame) cancelAnimationFrame(this.morphRefreshFrame);
         },
 
         initCellsMap() {
@@ -597,6 +629,22 @@ window.spreadsheetWorksheet = function($wire) {
                     version: input.dataset.version ? parseInt(input.dataset.version, 10) : 0
                 };
             });
+            this.buildFormulaDependencyIndex();
+        },
+
+        buildFormulaDependencyIndex() {
+            const dependents = {};
+            const visibleCoords = Object.keys(this.cellsMap);
+
+            for (const [dependentCoord, cell] of Object.entries(this.cellsMap)) {
+                if (!cell.formula) continue;
+                for (const precedent of visibleCoords) {
+                    if (!this.formulaReferencesCoord(cell.formula, precedent)) continue;
+                    (dependents[precedent] ||= []).push(dependentCoord);
+                }
+            }
+
+            this.formulaDependents = dependents;
         },
 
         getCellVal(coord) {
@@ -783,6 +831,7 @@ window.spreadsheetWorksheet = function($wire) {
                 this.cellsMap[coord] = { coord: coord, rowId: rowId, colId: colId, version: 0 };
             }
             const cell = this.cellsMap[coord];
+            const previousFormula = cell.formula || '';
             cell.formula = formula;
             cell.val = isFormula ? displayVal : newValue;
             cell.display = displayVal;
@@ -809,6 +858,7 @@ window.spreadsheetWorksheet = function($wire) {
                 }
             }
 
+            if (previousFormula !== formula) this.buildFormulaDependencyIndex();
             this.recalculateDependents(coord);
         },
 
@@ -848,20 +898,19 @@ window.spreadsheetWorksheet = function($wire) {
 
             while (queue.length > 0) {
                 const currentCoord = queue.shift();
-                for (const [coord, cell] of Object.entries(this.cellsMap)) {
-                    if (cell.formula && !visited.has(coord)) {
-                        if (this.formulaReferencesCoord(cell.formula, currentCoord)) {
-                            visited.add(coord);
-                            queue.push(coord);
-                            const newCalculated = this.evaluateFormulaLocally(cell.formula);
-                            cell.val = newCalculated;
-                            cell.display = newCalculated;
-                            const depInput = document.getElementById('cell-' + coord);
-                            if (depInput) {
-                                depInput.value = newCalculated;
-                                depInput.dataset.val = newCalculated;
-                            }
-                        }
+                for (const coord of this.formulaDependents[currentCoord] || []) {
+                    if (visited.has(coord)) continue;
+                    const cell = this.cellsMap[coord];
+                    if (!cell) continue;
+                    visited.add(coord);
+                    queue.push(coord);
+                    const newCalculated = this.evaluateFormulaLocally(cell.formula);
+                    cell.val = newCalculated;
+                    cell.display = newCalculated;
+                    const depInput = document.getElementById('cell-' + coord);
+                    if (depInput) {
+                        depInput.value = newCalculated;
+                        depInput.dataset.val = newCalculated;
                     }
                 }
             }
@@ -870,34 +919,49 @@ window.spreadsheetWorksheet = function($wire) {
         saveCellToServer(coord, rowId, colId, rowOrder, colOrder, newValue) {
             this.saveStatus = 'Menyimpan...';
             delete this.failedCellSaves[coord];
-            const queue = this.cellSaveQueues[coord] || { running: false, pending: null, waiters: [] };
+            const queue = this.cellSaveQueues[coord] || { running: false, pending: null, waiters: [], debounceTimer: null };
             // Coalesce rapid commits to the same cell. This mirrors normal
             // spreadsheet behavior: the final committed value is authoritative.
             queue.pending = { rowId, colId, rowOrder, colOrder, newValue };
             this.cellSaveQueues[coord] = queue;
-            this.drainCellSaveQueue(coord);
+            // Blur/Enter commits are already infrequent compared with input
+            // events. A short debounce still coalesces rapid revisits to the
+            // same cell without delaying visible feedback.
+            if (queue.debounceTimer) clearTimeout(queue.debounceTimer);
+            queue.debounceTimer = setTimeout(() => {
+                queue.debounceTimer = null;
+                this.drainCellSaveQueue(coord);
+            }, 120);
         },
 
         drainCellSaveQueue(coord) {
             const queue = this.cellSaveQueues[coord];
-            if (!queue || queue.running || !queue.pending) return;
+            if (!queue || queue.running || !queue.pending || (this.activeCellSave && this.activeCellSave !== coord)) return;
 
             const request = queue.pending;
             queue.pending = null;
             queue.running = true;
+            this.activeCellSave = coord;
 
             const persist = (rowId, colId) => {
                 const cell = this.cellsMap[coord];
                 // Read the version immediately before dispatching, after any
                 // preceding request confirmation has updated the local map.
                 const version = cell ? cell.version : 0;
-                return $wire.updateCell(rowId, colId, request.newValue, version);
+                return this.persistCellRequest(rowId, colId, request.newValue, version)
+                    .then((payload) => {
+                        this.applySavedCellResponse(coord, payload);
+                        return payload;
+                    });
             };
 
             const save = (!request.rowId || !request.colId)
-                ? $wire.ensureGridCell(request.rowOrder, request.colOrder).then(() => {
-                    const freshRowId = $wire.activeRowId;
-                    const freshColId = $wire.activeColumnId;
+                ? $wire.ensureGridCell(request.rowOrder, request.colOrder).then((materialized) => {
+                    const freshRowId = Number(materialized?.rowId || 0);
+                    const freshColId = Number(materialized?.colId || 0);
+                    if (!freshRowId || !freshColId) {
+                        throw new Error('Sel virtual tidak dapat disiapkan untuk disimpan.');
+                    }
                     const cell = this.cellsMap[coord];
                     if (cell) {
                         cell.rowId = freshRowId;
@@ -919,6 +983,7 @@ window.spreadsheetWorksheet = function($wire) {
                 })
                 .finally(() => {
                     queue.running = false;
+                    this.activeCellSave = null;
                     if (queue.pending) {
                         this.drainCellSaveQueue(coord);
                     } else {
@@ -926,10 +991,82 @@ window.spreadsheetWorksheet = function($wire) {
                         delete this.cellSaveQueues[coord];
                         waiters.forEach(resolve => resolve());
                     }
+
+                    // A commit in a different cell may have been deferred
+                    // while this request was in flight. Start exactly one;
+                    // its own completion continues the serialized pipeline.
+                    const nextCoord = Object.keys(this.cellSaveQueues).find((candidate) => {
+                        const candidateQueue = this.cellSaveQueues[candidate];
+                        return candidateQueue && !candidateQueue.running && candidateQueue.pending;
+                    });
+                    if (nextCoord) this.drainCellSaveQueue(nextCoord);
                 });
         },
 
+        async persistCellRequest(rowId, colId, value, expectedVersion) {
+            const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+            const response = await fetch(this.cellSaveEndpoint, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrf || '',
+                },
+                body: JSON.stringify({
+                    row_id: rowId,
+                    column_id: colId,
+                    value,
+                    expected_version: expectedVersion,
+                }),
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                const error = new Error(payload.message || 'Gagal menyimpan perubahan.');
+                error.payload = payload;
+                throw error;
+            }
+            return payload;
+        },
+
+        applySavedCellResponse(coord, payload) {
+            const cell = this.cellsMap[coord];
+            if (cell && payload.cell) {
+                cell.version = Number(payload.cell.version || cell.version);
+                const input = document.getElementById('cell-' + coord);
+                if (input) input.dataset.version = cell.version;
+            }
+
+            // Only server-calculated formula values are patched. This touches
+            // affected inputs directly and never asks Livewire to morph the
+            // table, preserving the active editor and every unrelated row.
+            for (const [changedCoord, changed] of Object.entries(payload.changed_cells || {})) {
+                const target = this.cellsMap[changedCoord];
+                if (!target || changedCoord === this.editingCell || this.cellSaveQueues[changedCoord]?.pending) continue;
+                target.val = String(changed.value ?? '');
+                target.display = target.val;
+                target.formula = changed.formula || target.formula || '';
+                target.version = Number(changed.version || target.version);
+                const input = document.getElementById('cell-' + changedCoord);
+                if (input) {
+                    input.value = target.display;
+                    input.dataset.val = target.val;
+                    input.dataset.formula = target.formula;
+                    input.dataset.version = target.version;
+                }
+            }
+        },
+
         async waitForPendingCellSaves() {
+            // Navigation must flush the small debounce window rather than
+            // leaving an edit unsaved behind a sheet transition.
+            Object.entries(this.cellSaveQueues).forEach(([coord, queue]) => {
+                if (queue.debounceTimer) {
+                    clearTimeout(queue.debounceTimer);
+                    queue.debounceTimer = null;
+                    this.drainCellSaveQueue(coord);
+                }
+            });
             const pendingSaves = Object.entries(this.cellSaveQueues).map(([, queue]) => new Promise(resolve => {
                 queue.waiters.push(resolve);
             }));
@@ -1045,10 +1182,25 @@ window.spreadsheetWorksheet = function($wire) {
             });
         },
 
+        maybeExtendGridForCell(rowId, colId, rowIndex, colIndex) {
+            // Selecting a rendered/persisted cell must remain local. Extend
+            // only when the user deliberately reaches the projected virtual
+            // edge, where there is actually more canvas to reveal.
+            if (rowId && colId) return;
+            const rowCount = this.$el.querySelectorAll('.grid-data-row').length;
+            const colCount = this.$el.querySelectorAll('col[data-col-index]').length;
+            if (!rowId && rowIndex >= rowCount - 5) this.extendGrid('row');
+            if (!colId && colIndex >= colCount - 3) this.extendGrid('column');
+        },
+
         maybeExtendGrid(event) {
+            if (this.scrollExtensionFrame) return;
             const scrollArea = event.currentTarget;
-            if (!scrollArea || scrollArea.scrollHeight - scrollArea.scrollTop - scrollArea.clientHeight > 160) return;
-            this.extendGrid('row');
+            this.scrollExtensionFrame = requestAnimationFrame(() => {
+                this.scrollExtensionFrame = null;
+                if (!scrollArea || scrollArea.scrollHeight - scrollArea.scrollTop - scrollArea.clientHeight > 160) return;
+                this.extendGrid('row');
+            });
         },
 
         startSheetTransition(direction) {
@@ -1081,6 +1233,9 @@ window.spreadsheetWorksheet = function($wire) {
          * Formula Bar: Commit on Enter
          */
         commitFormulaBar() {
+            if (!this.selectedCell || !this.selectedRowId || !this.selectedColId) {
+                return false;
+            }
             const raw = this.activeFormula !== null ? String(this.activeFormula).trim() : '';
             const changed = raw !== this.originalFormulaValue;
 
@@ -1140,6 +1295,9 @@ window.spreadsheetWorksheet = function($wire) {
 
         handleGridNavigation(e) {
             if (this.editingCell || this.isFormulaBarFocused) return;
+            // Arrow/F2/Delete must not manufacture an A1 selection when the
+            // sheet was opened without a user-selected cell.
+            if (!this.selectedCell) return;
 
             const totalRows = document.querySelectorAll('.grid-data-row').length;
             const totalCols = document.querySelectorAll('col[data-col-index]').length;

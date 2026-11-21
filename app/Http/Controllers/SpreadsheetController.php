@@ -216,7 +216,7 @@ class SpreadsheetController extends Controller
             $updateData['format'] = $validated['format'];
         }
 
-        [$cell, $conflict] = DB::transaction(function () use ($validated, $updateData, $row) {
+        [$cell, $conflict] = DB::transaction(function () use ($validated, $updateData, $row, $column) {
             $currentCell = SpreadsheetCell::where('row_id', $validated['row_id'])
                 ->where('column_id', $validated['column_id'])
                 ->lockForUpdate()
@@ -244,7 +244,6 @@ class SpreadsheetController extends Controller
                 ],
                 $updateData + ['version' => $currentVersion + 1]
             );
-            $column = SpreadsheetColumn::findOrFail($validated['column_id']);
             app(SpreadsheetActivityRecorder::class)->record(Auth::user(), $row->sheet, $updateData['formula'] ? 'formula_changed' : 'cell_changed', $column->letter . $row->sort_order, $currentCell?->formula ?: $currentCell?->value, $updateData['formula'] ?: $updateData['value']);
 
             return [$cell, $conflict];
@@ -258,8 +257,44 @@ class SpreadsheetController extends Controller
             ], 409);
         }
 
-        app(\App\Services\SpreadsheetWorkbookCalculator::class)->recalculate($row->sheet->group);
+        // A direct cell save must never rebuild the Livewire worksheet or
+        // blindly calculate an unrelated workbook. The calculator first
+        // checks the dependency graph; it only constructs a workbook when a
+        // formula can actually be affected (or the edited cell is a formula).
+        $formulaChanges = app(\App\Services\SpreadsheetWorkbookCalculator::class)->recalculateForCellChange(
+            $row->sheet->group,
+            $row->sheet,
+            $column->letter . $row->sort_order,
+            $formula !== null,
+        );
         $cell->refresh();
+
+        $changedCells = [];
+        if ($formulaChanges !== []) {
+            $rows = SpreadsheetRow::query()
+                ->whereIn('id', array_column($formulaChanges, 'row_id'))
+                ->pluck('sort_order', 'id');
+            $columns = SpreadsheetColumn::query()
+                ->whereIn('id', array_column($formulaChanges, 'column_id'))
+                ->pluck('letter', 'id');
+            $formulas = SpreadsheetCell::query()
+                ->whereIn('row_id', array_column($formulaChanges, 'row_id'))
+                ->whereIn('column_id', array_column($formulaChanges, 'column_id'))
+                ->get(['row_id', 'column_id', 'formula'])
+                ->keyBy(fn (SpreadsheetCell $changed) => $changed->row_id . '_' . $changed->column_id);
+
+            foreach ($formulaChanges as $change) {
+                $coord = ($columns[$change['column_id']] ?? '') . ($rows[$change['row_id']] ?? '');
+                if ($coord === '') {
+                    continue;
+                }
+                $changedCells[$coord] = [
+                    'value' => $change['value'],
+                    'formula' => $formulas[$change['row_id'] . '_' . $change['column_id']]->formula ?? '',
+                    'version' => $change['version'],
+                ];
+            }
+        }
 
         return response()->json([
             'status' => 'success',
@@ -268,6 +303,7 @@ class SpreadsheetController extends Controller
             'conflict' => $conflict,
             'is_numeric' => $cell->isNumericValue(),
             'numeric_value' => $cell->getNumericValue(),
+            'changed_cells' => $changedCells,
         ]);
     }
 
@@ -412,10 +448,12 @@ class SpreadsheetController extends Controller
             abort(403, 'Akses dibatasi: Hanya Owner yang memiliki izin untuk mengakses lembar kerja ' . $sheet->name . '.');
         }
 
-        // A missing workspace password is a configuration state, never an
-        // implicit grant for Admin API access. This closes direct export/data
-        // endpoints while the Owner has not completed the setup.
-        if ($user->isAdmin() && !$group->hasPassword()) {
+        // The group role, rather than the account-wide role, determines
+        // whether the current member needs the workspace password. A founder
+        // can have an "admin" account role and still be the group's leader;
+        // denying that person here made valid exports fail before a password
+        // was configured.
+        if ($userRole === 'admin' && !$group->hasPassword()) {
             abort(403, 'Password workspace belum dikonfigurasi oleh Owner.');
         }
 

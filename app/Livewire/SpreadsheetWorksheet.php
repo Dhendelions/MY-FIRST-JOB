@@ -44,7 +44,8 @@ class SpreadsheetWorksheet extends Component
     public array $fixedTopRowOffsets = [];
 
     // Active Selection & Formula Bar
-    public string $activeCellCoord = 'A1';
+    /** Empty until the user explicitly selects a cell. */
+    public string $activeCellCoord = '';
     public ?int $activeRowId = null;
     public ?int $activeColumnId = null;
     public int $activeCellVersion = 0;
@@ -310,19 +311,8 @@ class SpreadsheetWorksheet extends Component
 
         $this->loadMergedCells();
 
-        // Set initial active cell
-        if (!empty($this->rows) && !empty($this->columns)) {
-            if (!$this->activeRowId || !$this->activeColumnId) {
-                $firstRow = $this->rows[0];
-                $firstCol = $this->columns[0];
-                $this->activeRowId = $firstRow['id'];
-                $this->activeColumnId = $firstCol['id'];
-                $this->activeCellCoord = $firstCol['letter'] . ($firstRow['sort_order'] ?? 1);
-                $key = $firstRow['id'] . '_' . $firstCol['id'];
-                $this->activeCellVersion = $this->cellsVersions[$key] ?? 0;
-                $this->formulaValue = !empty($this->cellsFormula[$key]) ? $this->cellsFormula[$key] : ($this->cellsData[$key] ?? '');
-            }
-        }
+        // Selection is intentionally client-owned and starts empty. Assigning
+        // A1 here made every newly opened worksheet appear selected.
 
         $this->recalculateSummary();
     }
@@ -337,7 +327,7 @@ class SpreadsheetWorksheet extends Component
 
         $this->sheet = $targetSheet;
         $this->sheetId = $targetSheet->id;
-        $this->activeCellCoord = 'A1';
+        $this->activeCellCoord = '';
         $this->activeRowId = null;
         $this->activeColumnId = null;
         $this->activeCellVersion = 0;
@@ -427,10 +417,10 @@ class SpreadsheetWorksheet extends Component
     }
 
     /** Materialize only the row/column needed for an interaction with a virtual cell. */
-    public function ensureGridCell(int $rowOrder, int $columnOrder): void
+    public function ensureGridCell(int $rowOrder, int $columnOrder): array
     {
         $this->authorizeAccess();
-        if ($rowOrder < 1 || $columnOrder < 1 || $rowOrder > 10000 || $columnOrder > 702) return;
+        if ($rowOrder < 1 || $columnOrder < 1 || $rowOrder > 10000 || $columnOrder > 702) return [];
 
         DB::transaction(function () use ($rowOrder, $columnOrder) {
             $this->ensureRowExists($rowOrder);
@@ -441,13 +431,20 @@ class SpreadsheetWorksheet extends Component
         $this->loadSheetData();
         $row = collect($this->rows)->firstWhere('sort_order', $rowOrder);
         $column = collect($this->columns)->firstWhere('sort_order', $columnOrder);
-        $this->activeRowId = $row['id'] ?? null;
-        $this->activeColumnId = $column['id'] ?? null;
-        $this->activeCellCoord = $coord;
         $key = ($row['id'] ?? '') . '_' . ($column['id'] ?? '');
-        $this->activeCellVersion = $this->cellsVersions[$key] ?? 0;
-        $this->formulaValue = $this->cellsFormula[$key] ?? ($this->cellsData[$key] ?? '');
-        $this->dispatch('grid-cell-materialized', coord: $coord);
+        // Selection is owned by Alpine. Updating the Livewire active-cell
+        // properties here lets a delayed materialization response repaint an
+        // older cell as selected after a rapid click on another cell.
+        $materialized = [
+            'coord' => $coord,
+            'rowId' => $row['id'] ?? null,
+            'colId' => $column['id'] ?? null,
+            'version' => $this->cellsVersions[$key] ?? 0,
+            'formula' => $this->cellsFormula[$key] ?? ($this->cellsData[$key] ?? ''),
+        ];
+        $this->dispatch('grid-cell-materialized', ...$materialized);
+
+        return $materialized;
     }
 
     /** Persist an intentional resize of an empty projected column. */
@@ -501,39 +498,40 @@ class SpreadsheetWorksheet extends Component
     public function evaluateAllFormulas(): void
     {
         $this->authorizeAccess();
+        $this->applyFormulaCalculationChanges(
+            app(\App\Services\SpreadsheetWorkbookCalculator::class)->recalculate($this->sheet->group)
+        );
+    }
 
-        // Skip the expensive PhpSpreadsheet workbook instantiation when there
-        // are no server-side formulas on this sheet. The JS engine already
-        // handles client-side formula display; this path only updates persisted
-        // values for cross-sheet references and XLSX-level calculations.
-        $rowIds = array_column($this->rows, 'id');
-        $hasFormulasOnSheet = !empty($rowIds)
-            && SpreadsheetCell::whereIn('row_id', $rowIds)
-                ->whereNotNull('formula')
-                ->where('formula', '!=', '')
-                ->exists();
-
-        if ($hasFormulasOnSheet) {
-            app(\App\Services\SpreadsheetWorkbookCalculator::class)->recalculate($this->sheet->group);
+    /** Recalculate only when the committed coordinate can affect a formula. */
+    private function evaluateFormulasForCellChange(int $rowId, int $columnId, bool $isFormula): void
+    {
+        $row = collect($this->rows)->firstWhere('id', $rowId);
+        $column = collect($this->columns)->firstWhere('id', $columnId);
+        if (!$row || !$column || !$this->sheet) {
+            return;
         }
 
-        // Refresh in-memory cell state from DB (picks up any updated formula results).
-        if (!empty($rowIds)) {
-            foreach (SpreadsheetCell::whereIn('row_id', $rowIds)
-                ->get(['row_id', 'column_id', 'value', 'formula', 'format', 'version']) as $cell) {
-                $key = $cell->row_id . '_' . $cell->column_id;
-                $this->cellsData[$key] = $cell->value ?? '';
-                $this->cellsFormula[$key] = $cell->formula ?? '';
-                $this->cellsVersions[$key] = (int) ($cell->version ?? 1);
-                // Prefer in-memory format (may include recent formatCell changes not yet fetched).
-                if (!isset($this->cellsFormat[$key])) {
-                    $this->cellsFormat[$key] = $cell->format ?? [];
-                }
-                $this->updateCellPresentation($key, $cell->value ?? '', $this->cellsFormat[$key]);
-                if ($this->activeRowId === $cell->row_id && $this->activeColumnId === $cell->column_id) {
-                    $this->activeCellVersion = (int) ($cell->version ?? 1);
-                    $this->formulaValue = $cell->formula ?: ($cell->value ?? '');
-                }
+        $changes = app(\App\Services\SpreadsheetWorkbookCalculator::class)->recalculateForCellChange(
+            $this->sheet->group,
+            $this->sheet,
+            $column['letter'] . $row['sort_order'],
+            $isFormula,
+        );
+        $this->applyFormulaCalculationChanges($changes);
+    }
+
+    /** Apply only formula values changed by the calculator; do not reload the grid. */
+    private function applyFormulaCalculationChanges(array $changes): void
+    {
+        foreach ($changes as $change) {
+            $key = $change['row_id'] . '_' . $change['column_id'];
+            $this->cellsData[$key] = $change['value'];
+            $this->cellsVersions[$key] = $change['version'];
+            $this->updateCellPresentation($key, $change['value'], $this->cellsFormat[$key] ?? []);
+            if ($this->activeRowId === $change['row_id'] && $this->activeColumnId === $change['column_id']) {
+                $this->activeCellVersion = $change['version'];
+                $this->formulaValue = $this->cellsFormula[$key] ?: $change['value'];
             }
         }
     }
@@ -604,6 +602,11 @@ class SpreadsheetWorksheet extends Component
 
         $key = "{$rowId}_{$colId}";
         $raw = $value !== null ? trim($value) : '';
+        // Rows/columns are already hydrated with this worksheet. Reusing the
+        // metadata avoids four primary-key lookups on every cell autosave.
+        $rowMetadata = collect($this->rows)->firstWhere('id', $rowId);
+        $columnMetadata = collect($this->columns)->firstWhere('id', $colId);
+        $cellCoordinate = ($columnMetadata['letter'] ?? '') . ($rowMetadata['sort_order'] ?? '');
 
         // Validate formula syntax if raw begins with '='
         if (str_starts_with($raw, '=')) {
@@ -616,7 +619,7 @@ class SpreadsheetWorksheet extends Component
         }
 
         $expectedVersion ??= $this->cellsVersions[$key] ?? 0;
-        $saveResult = DB::transaction(function () use ($rowId, $colId, $key, $raw, $expectedVersion) {
+        $saveResult = DB::transaction(function () use ($rowId, $colId, $key, $raw, $expectedVersion, $cellCoordinate) {
             $currentCell = SpreadsheetCell::where('row_id', $rowId)
                 ->where('column_id', $colId)
                 ->lockForUpdate()
@@ -656,13 +659,11 @@ class SpreadsheetWorksheet extends Component
                 ['row_id' => $rowId, 'column_id' => $colId],
                 ['value' => $displayVal, 'formula' => $formula, 'version' => $currentVersion]
             );
-            $row = SpreadsheetRow::findOrFail($rowId);
-            $column = SpreadsheetColumn::findOrFail($colId);
             app(SpreadsheetActivityRecorder::class)->record(
                 Auth::user(),
                 $this->sheet,
                 $formula ? 'formula_changed' : 'cell_changed',
-                $column->letter . $row->sort_order,
+                $cellCoordinate,
                 $oldFormula ?: $oldVal,
                 $raw,
                 [
@@ -729,7 +730,7 @@ class SpreadsheetWorksheet extends Component
         $beforeData = $this->cellsData;
         $beforeDisplay = $this->cellsDisplay;
 
-        $this->evaluateAllFormulas();
+        $this->evaluateFormulasForCellChange($rowId, $colId, $formula !== null);
         $this->recalculateSummary();
         $this->dispatch('refreshActivityHistory');
 
@@ -752,9 +753,7 @@ class SpreadsheetWorksheet extends Component
             }
         }
 
-        $rowObj = SpreadsheetRow::find($rowId);
-        $colObj = SpreadsheetColumn::find($colId);
-        $savedCoord = ($colObj?->letter ?? '') . ($rowObj?->sort_order ?? '');
+        $savedCoord = $cellCoordinate;
         $saveTime = date('H:i:s');
 
         $this->saveStatus = $conflict ? 'Konflik: perubahan terakhir diterapkan' : 'Tersimpan ' . $saveTime;

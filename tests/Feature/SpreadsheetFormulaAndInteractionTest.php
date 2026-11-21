@@ -19,6 +19,27 @@ class SpreadsheetFormulaAndInteractionTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_new_worksheet_has_no_active_cell_until_the_user_selects_one(): void
+    {
+        $user = User::create(['name' => 'Owner', 'email' => 'no-selection@example.test', 'password' => 'password']);
+        $group = FisheriesGroup::create([
+            'name' => 'No Initial Selection',
+            'invite_code' => 'WS-NONE-01',
+            'location' => 'Utama',
+            'created_by' => $user->id,
+        ]);
+        GroupMember::create(['group_id' => $group->id, 'user_id' => $user->id, 'role' => 'leader', 'status' => 'Aktif']);
+        $group->initializeStandardSheets();
+
+        $component = Livewire::actingAs($user)
+            ->test(SpreadsheetWorksheet::class, ['sheet' => $group->sheets()->firstOrFail()]);
+
+        $component->assertSet('activeCellCoord', '')
+            ->assertSet('activeRowId', null)
+            ->assertSet('activeColumnId', null);
+        $this->assertStringNotContainsString('grid-cell-td p-0 relative bg-white select-none outline-none border-b border-r border-slate-200/60 is-selected', $component->html());
+    }
+
     public function test_okt_analisa_formula_displayed_in_formula_bar_on_select(): void
     {
         $user = User::create(['name' => 'Owner', 'email' => 'owner@example.test', 'password' => 'password']);

@@ -50,12 +50,10 @@
         }
         .grid-cell-td.is-selected {
             box-shadow: inset 0 0 0 2px var(--sheet-accent) !important;
-            z-index: 25;
         }
         .grid-cell-td.is-editing {
             box-shadow: inset 0 0 0 2px #0284c7 !important;
             background-color: #ffffff !important;
-            z-index: 30;
         }
         .grid-cell-td.is-search-match {
             background-color: rgba(254, 240, 138, 0.6) !important;
@@ -63,13 +61,24 @@
         .formula-bar-container {
             border-top: 2px solid var(--sheet-accent);
         }
+        /* One stacking context for the grid.  Body content never promotes
+           itself above sticky surfaces: row headers (20), column headers
+           (30), frozen column headers (35), and the corner (40). */
+        .spreadsheet-scroll { isolation: isolate; overscroll-behavior: contain; }
+        .spreadsheet-table { position: relative; z-index: 0; }
+        .spreadsheet-table thead { position: relative; z-index: 30; }
+        .spreadsheet-table th,
+        .spreadsheet-table td { background-clip: padding-box; }
+        .grid-cell-td { z-index: 0; overflow: hidden; }
+        .grid-cell-input { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+        .grid-cell-input:not(.is-wrapped) { white-space: nowrap; }
     </style>
 
     <!-- FORMULA BAR (COORDINATE + FX INPUT) -->
     <div class="h-10 bg-white border-b border-slate-200 px-3 flex items-center gap-2 text-xs shrink-0 shadow-2xs formula-bar-container">
         <!-- Coordinate Box (e.g. A1, B4) -->
         <div class="w-16 h-7 bg-slate-100 border border-slate-300 rounded flex items-center justify-center font-mono font-bold text-slate-800 shadow-inner">
-            <span x-text="activeCoord">A1</span>
+            <span x-text="activeCoord"></span>
         </div>
 
         <!-- Fx Indicator -->
@@ -230,7 +239,7 @@
                                 ? ($frozenRowTopOffsets[$rIdx] ?? 0)
                                 : ($fixedTopRowOffsets[$rIdx] ?? 0);
                         @endphp
-                        <th style="{{ $isFixedRowHeader ? 'position:sticky;top:calc(var(--spreadsheet-column-header-height, 36px) + ' . $rowHeaderTopOffset . 'px);z-index:28;' : 'position:sticky;z-index:16;' }}left:0;"
+                    <th style="{{ $isFixedRowHeader ? 'position:sticky;top:calc(var(--spreadsheet-column-header-height, 36px) + ' . $rowHeaderTopOffset . 'px);z-index:24;' : 'position:sticky;z-index:20;' }}left:0;"
                             class="sticky left-0 w-12 min-w-[48px] bg-slate-100 border-r border-b border-slate-300 p-0 text-center font-mono text-[11px] text-slate-500 font-semibold select-none group/num">
                             <div class="flex items-center justify-center relative" style="height:{{ !empty($row['height']) ? (float) $row['height'] * 1.333333 : $defaultRowHeightPx }}px;">
                                 <span class="group-hover/row:hidden">{{ $row['sort_order'] }}</span>
@@ -283,11 +292,11 @@
 
                                 $stickyStyle = '';
                                 if ($isFixedTopRow && $isFrozenCol) {
-                                    $stickyStyle = 'position:sticky;top:calc(var(--spreadsheet-column-header-height, 36px) + ' . $fixedTopOffset . 'px);left:' . $frozenLeftOffset . 'px;z-index:26;';
+                                    $stickyStyle = 'position:sticky;top:calc(var(--spreadsheet-column-header-height, 36px) + ' . $fixedTopOffset . 'px);left:' . $frozenLeftOffset . 'px;z-index:18;';
                                 } elseif ($isFixedTopRow) {
-                                    $stickyStyle = 'position:sticky;top:calc(var(--spreadsheet-column-header-height, 36px) + ' . $fixedTopOffset . 'px);z-index:18;';
+                                    $stickyStyle = 'position:sticky;top:calc(var(--spreadsheet-column-header-height, 36px) + ' . $fixedTopOffset . 'px);z-index:15;';
                                 } elseif ($isFrozenCol) {
-                                    $stickyStyle = 'position:sticky;left:' . $frozenLeftOffset . 'px;z-index:22;';
+                                    $stickyStyle = 'position:sticky;left:' . $frozenLeftOffset . 'px;z-index:10;';
                                 }
                             @endphp
 
@@ -304,8 +313,8 @@
                                 data-coord="{{ $coord }}"
                                 wire:key="grid-cell-{{ $coord }}"
                                 style="height:{{ !empty($row['height']) ? (float) $row['height'] * 1.333333 : $defaultRowHeightPx }}px; {{ $bgColor ? "background-color: {$bgColor}; " : '' }}{{ $cellsStyleCss[$cellKey] ?? '' }}{{ $stickyStyle }}" 
-                                class="grid-cell-td p-0 relative bg-white select-none outline-none border-b border-r border-slate-200/60 {{ $coord === ($activeCellCoord ?? 'A1') ? 'is-selected' : '' }}"
-                                @click="selectCell({{ \Illuminate\Support\Js::from($coord) }}, {{ $row['id'] ?? 'null' }}, {{ $col['id'] ?? 'null' }}, {{ $rIdx }}, {{ $cIdx }}, {{ $row['sort_order'] }}, {{ $col['sort_order'] }}, {{ \Illuminate\Support\Js::from((string) $formula) }}, {{ \Illuminate\Support\Js::from((string) $val) }}, {{ \Illuminate\Support\Js::from((string) ($cellsDisplay[$cellKey] ?? $val)) }}); if ({{ $rIdx }} >= {{ count($gridRows) - 5 }}) extendGrid('row'); if ({{ $cIdx }} >= {{ count($gridColumns) - 3 }}) extendGrid('column');"
+                                class="grid-cell-td p-0 relative bg-white select-none outline-none border-b border-r border-slate-200/60 {{ $coord === $activeCellCoord && $activeCellCoord !== '' ? 'is-selected' : '' }}"
+                                @click="selectCell({{ \Illuminate\Support\Js::from($coord) }}, {{ $row['id'] ?? 'null' }}, {{ $col['id'] ?? 'null' }}, {{ $rIdx }}, {{ $cIdx }}, {{ $row['sort_order'] }}, {{ $col['sort_order'] }}, {{ \Illuminate\Support\Js::from((string) $formula) }}, {{ \Illuminate\Support\Js::from((string) $val) }}, {{ \Illuminate\Support\Js::from((string) ($cellsDisplay[$cellKey] ?? $val)) }}); maybeExtendGridForCell({{ $row['id'] ?? 'null' }}, {{ $col['id'] ?? 'null' }}, {{ $rIdx }}, {{ $cIdx }});"
                                 @dblclick="startEditCell({{ \Illuminate\Support\Js::from($coord) }}, {{ $row['id'] ?? 'null' }}, {{ $col['id'] ?? 'null' }}, {{ $row['sort_order'] }}, {{ $col['sort_order'] }}, {{ \Illuminate\Support\Js::from((string) ($formula ?: $val)) }})"
                                 @paste="if ({{ !empty($row['id']) && !empty($col['id']) ? 'true' : 'false' }}) handlePaste($event, {{ $row['id'] ?? 0 }}, {{ $col['id'] ?? 0 }})"
                                 title="{{ $hasFormula ? 'Formula: ' . $cellFormula : (!empty($format['external_reference']) ? 'Formula merujuk workbook eksternal; nilai tersimpan tidak dapat dihitung ulang tanpa sumber eksternal.' : '') }}">
