@@ -59,6 +59,7 @@ Route::middleware(['auth', EnsureWorkspaceAdminReauthentication::class, EnsureWo
     Route::post('/company/years', [CompanyYearController::class, 'store'])->name('company.years.store');
     Route::post('/company/years/{year}/archive', [CompanyYearController::class, 'archive'])->name('company.years.archive');
     Route::post('/company/years/{year}/restore', [CompanyYearController::class, 'restore'])->name('company.years.restore');
+    Route::delete('/company/years/{year}', [CompanyYearController::class, 'destroy'])->name('company.years.destroy');
     Route::get('/company/analytics', [CompanyYearController::class, 'analytics'])->name('company.analytics');
     Route::get('/company/yearly-comparison', [CompanyYearController::class, 'yearlyComparison'])->name('company.yearly-comparison');
 

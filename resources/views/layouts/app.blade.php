@@ -63,9 +63,26 @@
     <style>
         [x-cloak] { display: none !important; }
         .tabular-nums { font-variant-numeric: tabular-nums; }
+
+        :root {
+            --dm-navy: #183B63;
+            --dm-deep-blue: #142E50;
+            --dm-blue: #28588A;
+            --dm-blue-light: #EAF3FC;
+            --dm-ice: #F2F7FD;
+            --dm-cyan: #E6F6FA;
+            --dm-indigo: #EEF0FF;
+            --dm-teal: #DDF5F1;
+            --dm-green: #DCFCE7;
+            --dm-amber: #FFF3D6;
+            --dm-gray: #EDF2F7;
+            --dm-border: #CFE0F1;
+            --dm-shadow: 0 8px 24px rgba(24, 59, 99, .08);
+            --dm-transition: 200ms ease-in-out;
+        }
         
         body {
-            background: linear-gradient(135deg, #F4F7FB 0%, #EEF4FA 45%, #EAF2FC 100%);
+            background: linear-gradient(135deg, var(--dm-ice) 0%, #F7FAFE 48%, var(--dm-cyan) 100%);
             background-attachment: fixed;
             color: #263445;
             min-height: 100vh;
@@ -73,24 +90,67 @@
 
         /* Sidebar: Navy blue with gentle gradient */
         .sidebar-navy-gradient {
-            background: linear-gradient(180deg, #142B4A 0%, #173052 40%, #1D3A63 100%);
+            background: linear-gradient(180deg, var(--dm-deep-blue) 0%, #173A63 44%, var(--dm-navy) 100%);
         }
 
         /* Navbar: White with subtle blue tint */
         .navbar-glass {
-            background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(246, 250, 255, 0.96) 100%);
+            background: linear-gradient(135deg, rgba(255, 255, 255, .98) 0%, var(--dm-ice) 100%);
             backdrop-filter: blur(10px);
             border-bottom: 1px solid #E2EAF3;
         }
 
         /* Clean SaaS Card with soft gradient nuance */
         .card-clean {
-            background: linear-gradient(180deg, #FFFFFF 0%, #FAFDFE 100%);
-            border: 1px solid #E2EAF3;
+            background: linear-gradient(135deg, #FFFFFF 0%, var(--dm-ice) 100%);
+            border: 1px solid var(--dm-border);
             border-radius: 14px;
             box-shadow: 0 1px 3px rgba(49, 94, 145, 0.04), 0 1px 2px rgba(49, 94, 145, 0.02);
             transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 220ms cubic-bezier(0.16, 1, 0.3, 1), border-color 220ms ease;
         }
+
+        /* Reusable corporate surfaces: only opt-in semantic classes use these accents. */
+        .dashboard-kpi-card, .company-workspace-card, .monthly-workspace-card, .workspace-overview-panel {
+            border-color: var(--dm-border) !important;
+            box-shadow: var(--dm-shadow);
+            transition: transform var(--dm-transition), box-shadow var(--dm-transition), border-color var(--dm-transition), background var(--dm-transition);
+        }
+        .dashboard-kpi-card { background: linear-gradient(135deg, #fff, var(--dm-blue-light)) !important; }
+        .dashboard-kpi-card:nth-child(2) { background: linear-gradient(135deg, #fff, var(--dm-green)) !important; }
+        .dashboard-kpi-card:nth-child(3) { background: linear-gradient(135deg, #fff, var(--dm-amber)) !important; }
+        .dashboard-kpi-card:nth-child(4) { background: linear-gradient(135deg, #fff, var(--dm-indigo)) !important; }
+        .company-workspace-card { background: linear-gradient(135deg, var(--dm-blue-light), var(--dm-ice) 60%, var(--dm-cyan)) !important; }
+        .company-workspace-card:nth-child(3n + 2) { background: linear-gradient(135deg, var(--dm-cyan), var(--dm-ice)) !important; }
+        .company-workspace-card:nth-child(3n) { background: linear-gradient(135deg, var(--dm-indigo), var(--dm-ice)) !important; }
+        .workspace-overview-panel { background: linear-gradient(135deg, rgba(255,255,255,.92), var(--dm-blue-light)) !important; }
+        .monthly-workspace-card { background: linear-gradient(135deg, var(--dm-ice), var(--dm-blue-light)) !important; }
+        .monthly-workspace-card:nth-child(3n + 2) { background: linear-gradient(135deg, var(--dm-cyan), var(--dm-ice)) !important; }
+        .monthly-workspace-card:nth-child(3n) { background: linear-gradient(135deg, var(--dm-indigo), var(--dm-ice)) !important; }
+        .company-workspace-card:hover, .monthly-workspace-card:hover, .dashboard-kpi-card:hover { border-color: #8FB4D8 !important; box-shadow: 0 12px 28px rgba(24,59,99,.13); transform: translateY(-3px); }
+        .monthly-workspace-number { background: linear-gradient(135deg, #D9ECFC, #F6FBFF); box-shadow: 0 3px 10px rgba(40,88,138,.12); }
+        .monthly-open-button { background: linear-gradient(135deg, #DCEEFF, #EAF3FC) !important; border: 1px solid #BCD7F0; box-shadow: 0 2px 6px rgba(40,88,138,.09); }
+        .monthly-open-button:hover { background: linear-gradient(135deg, var(--dm-navy), var(--dm-blue)) !important; border-color: var(--dm-navy); color: #fff !important; box-shadow: 0 7px 16px rgba(24,59,99,.22); }
+        .monthly-open-button:active { transform: scale(.98); }
+        .company-year-page .grid.grid-cols-1 > div {
+            background: linear-gradient(135deg, var(--dm-ice), var(--dm-blue-light)) !important;
+            border-color: var(--dm-border) !important;
+            box-shadow: 0 5px 16px rgba(24,59,99,.07);
+        }
+        .company-year-page .grid.grid-cols-1 > div:nth-child(3n + 2) { background: linear-gradient(135deg, var(--dm-cyan), var(--dm-ice)) !important; }
+        .company-year-page .grid.grid-cols-1 > div:nth-child(3n) { background: linear-gradient(135deg, var(--dm-indigo), var(--dm-ice)) !important; }
+        .company-year-page .grid.grid-cols-1 > div:hover { border-color: #8FB4D8 !important; box-shadow: 0 11px 24px rgba(24,59,99,.13); transform: translateY(-2px); }
+        .company-year-page .grid.grid-cols-1 > div > div:first-child .w-10.h-10 { background: linear-gradient(135deg, #D9ECFC, #F7FBFF) !important; box-shadow: 0 3px 10px rgba(40,88,138,.12); }
+        .company-year-page .grid.grid-cols-1 > div > a.w-full { background: linear-gradient(135deg, #DCEEFF, #EAF3FC) !important; border: 1px solid #BCD7F0; box-shadow: 0 2px 6px rgba(40,88,138,.09); }
+        .company-year-page .grid.grid-cols-1 > div > a.w-full:hover { background: linear-gradient(135deg, var(--dm-navy), var(--dm-blue)) !important; border-color: var(--dm-navy); color: #fff !important; box-shadow: 0 7px 16px rgba(24,59,99,.22); }
+
+        .workspace-app-header { background: linear-gradient(135deg, #fff, var(--dm-ice)) !important; border-color: var(--dm-border) !important; }
+        .spreadsheet-surface { background: linear-gradient(180deg, var(--dm-ice), #DDE9F4) !important; }
+        .formula-bar-container { background: linear-gradient(135deg, #fff, var(--dm-ice)) !important; border-bottom-color: var(--dm-border) !important; }
+        .bottom-tabs { background: linear-gradient(135deg, var(--dm-ice), var(--dm-blue-light)) !important; border-color: var(--dm-border) !important; }
+        .spreadsheet-table thead { background: #E4F0FB !important; }
+        .spreadsheet-table thead th { background: #E4F0FB !important; color: var(--dm-deep-blue); border-color: #BFD7EC !important; }
+        .spreadsheet-table .grid-cell-td { border-color: #D8E5F0 !important; }
+        .spreadsheet-table .grid-cell-td:hover { background: #F4FAFF !important; }
         .card-clean:hover {
             transform: translateY(-2px);
             box-shadow: 0 8px 20px rgba(49, 94, 145, 0.09), 0 2px 6px rgba(49, 94, 145, 0.04);
@@ -328,7 +388,7 @@
 
     @livewireStyles
     @php
-        $appOperationalYears = \App\Models\OperationalYear::with(['monthlyWorkspaces.group'])->orderBy('year', 'desc')->get();
+        $appOperationalYears = \App\Models\OperationalYear::with('monthlyWorkspaces')->orderBy('year', 'desc')->get();
         $currentGroupYear = isset($group) ? $group->operationalYearModel() : null;
     @endphp
 </head>
@@ -684,9 +744,21 @@
         this.globalInitiateModal.show = false;
         this.globalInitiateModal.error = '';
     },
-    globalConfirmModal: { show: false, action: '', title: '', message: '', submitLabel: 'Konfirmasi' },
+    workspacePasswordModal: { show: false, year: null, actionUrl: '', isSubmitting: false },
+    openWorkspacePasswordModal(detail = {}) {
+        this.workspacePasswordModal.year = detail.year || null;
+        this.workspacePasswordModal.actionUrl = detail.actionUrl || (detail.year ? `/company/year/${detail.year}/password` : '');
+        this.workspacePasswordModal.isSubmitting = false;
+        this.workspacePasswordModal.show = true;
+        this.$nextTick(() => document.getElementById('workspace_password_input')?.focus());
+    },
+    closeWorkspacePasswordModal() {
+        this.workspacePasswordModal.show = false;
+        this.workspacePasswordModal.isSubmitting = false;
+    },
+    globalConfirmModal: { show: false, action: '', method: 'POST', title: '', message: '', submitLabel: 'Konfirmasi', danger: false },
     openGlobalConfirmModal(detail = {}) {
-        this.globalConfirmModal = { show: true, action: detail.action || '', title: detail.title || 'Konfirmasi tindakan', message: detail.message || '', submitLabel: detail.submitLabel || 'Konfirmasi' };
+        this.globalConfirmModal = { show: true, action: detail.action || '', method: detail.method || 'POST', title: detail.title || 'Konfirmasi tindakan', message: detail.message || '', submitLabel: detail.submitLabel || 'Konfirmasi', danger: !!detail.danger };
     },
     closeGlobalConfirmModal() {
         this.globalConfirmModal.show = false;
@@ -710,6 +782,8 @@
    @open-user-profile.window="openUserProfile($event.detail.userId)"
    @open-workspace-unlock.window="openGlobalUnlockModal($event.detail)"
    @close-workspace-unlock.window="closeGlobalUnlockModal()"
+   @open-workspace-password-settings.window="openWorkspacePasswordModal($event.detail)"
+   @close-workspace-password-settings.window="closeWorkspacePasswordModal()"
    @open-workspace-no-password.window="openGlobalNoPasswordModal($event.detail)"
    @close-workspace-no-password.window="closeGlobalNoPasswordModal()"
    @open-initiate-workspace.window="openGlobalInitiateModal()"
@@ -813,7 +887,7 @@
 
             <!-- Dynamic Year & Month Company Workspace Navigation -->
             @php
-                $sidebarYearsQuery = \App\Models\OperationalYear::with(['monthlyWorkspaces.group'])->orderBy('year', 'desc');
+                $sidebarYearsQuery = \App\Models\OperationalYear::with('monthlyWorkspaces')->orderBy('year', 'desc');
                 if (Auth::user()?->isAdmin()) {
                     $sidebarYearsQuery->where('is_archived', false);
                 }
@@ -826,20 +900,18 @@
                     <span class="text-[10px] font-mono text-sky-200 bg-white/10 px-2 py-0.5 rounded-full border border-white/10 font-semibold">Perusahaan</span>
                 </div>
 
-                <div class="space-y-2 max-h-72 overflow-y-auto pr-1">
+                <div class="space-y-2 max-h-72 overflow-y-auto overscroll-contain pr-1" style="scrollbar-gutter: stable;">
                     @forelse($sidebarYears as $opYear)
-                        <div class="rounded-xl bg-white/5 border border-white/10 overflow-hidden transition-all duration-200">
-                            <!-- Year Toggle / Navigation Header -->
+                        <div class="rounded-xl bg-white/5 border border-white/10 overflow-hidden" style="contain: layout paint;">
+                            <!-- The year itself is only a group label. -->
                             <div class="w-full flex items-center justify-between px-3 py-2 text-xs font-bold transition-colors"
                                  :class="openYear === {{ $opYear->id }} ? 'text-white bg-white/10 border-b border-white/10' : 'text-slate-300 hover:text-white hover:bg-white/10'">
-                                <a href="{{ route('company.year', $opYear->year) }}" 
-                                   class="flex items-center gap-2 hover:text-sky-300 transition-colors flex-1"
-                                   title="Buka Ruang Kerja Tahun {{ $opYear->year }}">
+                                <span class="flex items-center gap-2 flex-1 cursor-default select-none" aria-label="Tahun operasional {{ $opYear->year }}">
                                     <svg class="w-3.5 h-3.5 text-sky-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                                     </svg>
                                     <span>Tahun {{ $opYear->year }}</span>
-                                </a>
+                                </span>
                                 <button type="button" 
                                         @click="openYear = (openYear === {{ $opYear->id }} ? null : {{ $opYear->id }})" 
                                         class="flex items-center gap-1.5 text-slate-400 hover:text-white p-1 rounded transition-colors"
@@ -860,11 +932,27 @@
                                         $isActiveMonth = isset($group) && $group->id === $mWork->group_id;
                                     @endphp
                                     @if(Auth::user()->isOwner() || !$opYear->is_archived)
+                                        @if(Auth::user()->isAdmin() && !$opYear->hasPassword())
+                                            <button type="button"
+                                                    @click="$dispatch('open-workspace-no-password', { year: {{ $opYear->year }}, title: 'Ruang Kerja {{ $opYear->year }}' })"
+                                                    title="Password Ruang Kerja {{ $opYear->year }} belum diatur"
+                                                    class="px-2 py-1.5 text-center rounded-lg text-[11px] font-semibold transition-colors truncate text-slate-300 bg-white/5 hover:bg-white/15 hover:text-white">
+                                                {{ substr($mWork->name, 0, 3) }}
+                                            </button>
+                                        @elseif(Auth::user()->isAdmin() && !$opYear->isUnlockedForUser(Auth::id()))
+                                            <button type="button"
+                                                    @click="$dispatch('open-workspace-unlock', { year: {{ $opYear->year }}, title: 'Ruang Kerja {{ $opYear->year }}', actionUrl: '{{ route('company.year.unlock', $opYear->year) }}', redirectTo: '{{ route('company.workspace', [$opYear->year, $mWork->month]) }}' })"
+                                                    title="Buka {{ $mWork->name }} {{ $opYear->year }}"
+                                                    class="px-2 py-1.5 text-center rounded-lg text-[11px] font-semibold transition-colors truncate text-slate-300 bg-white/5 hover:bg-white/15 hover:text-white">
+                                                {{ substr($mWork->name, 0, 3) }}
+                                            </button>
+                                        @else
                                         <a href="{{ route('group.workspace', $mWork->group_id) }}"
                                            title="{{ $mWork->name }} {{ $opYear->year }}"
                                            class="px-2 py-1.5 text-center rounded-lg text-[11px] font-semibold transition-all duration-150 truncate {{ $isActiveMonth ? 'bg-[#315E91] text-white shadow-xs' : 'text-slate-300 bg-white/5 hover:bg-white/15 hover:text-white' }}">
                                             {{ substr($mWork->name, 0, 3) }}@if($opYear->is_archived) 🔒@endif
                                         </a>
+                                        @endif
                                     @else
                                         <span title="🔒 Archived — hanya Owner yang dapat membuka"
                                               aria-disabled="true"
@@ -1169,7 +1257,13 @@
          x-transition:leave="transition ease-in duration-100"
          x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0"
-         class="fixed bottom-5 right-5 z-[9999] max-w-sm w-full bg-slate-900 text-white rounded-xl shadow-2xl p-4 flex items-center gap-3 border border-slate-700" x-cloak>
+         :class="{
+            'bg-emerald-50 border-emerald-200 text-emerald-950': toastType === 'success',
+            'bg-sky-50 border-sky-200 text-sky-950': toastType === 'info',
+            'bg-rose-50 border-rose-200 text-rose-950': toastType === 'error',
+            'bg-amber-50 border-amber-200 text-amber-950': toastType === 'warning'
+         }"
+         class="fixed bottom-5 right-5 z-[9999] max-w-sm w-[calc(100%-2.5rem)] sm:w-full rounded-xl shadow-2xl p-4 flex items-center gap-3 border" x-cloak>
         <div :class="{
             'bg-emerald-500': toastType === 'success',
             'bg-sky-500': toastType === 'info',
@@ -1179,10 +1273,10 @@
             <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
         </div>
         <div class="flex-1 text-xs">
-            <p class="font-semibold text-slate-100" x-text="toastType.toUpperCase()"></p>
-            <p class="text-slate-300 mt-0.5" x-text="toastMessage"></p>
+            <p class="font-semibold" x-text="toastType.toUpperCase()"></p>
+            <p class="text-slate-600 mt-0.5" x-text="toastMessage"></p>
         </div>
-        <button @click="showToast = false" class="text-slate-400 hover:text-white">
+        <button @click="showToast = false" class="text-slate-400 hover:text-slate-900">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
         </button>
     </div>
@@ -1605,6 +1699,27 @@
         </div>
     </div>
 
+    <!-- GLOBAL FULLSCREEN WORKSPACE PASSWORD SETTINGS MODAL -->
+    <div x-show="workspacePasswordModal.show" x-cloak class="fixed inset-0 z-[10000] overflow-y-auto" role="dialog" aria-modal="true" @keydown.escape.window="closeWorkspacePasswordModal()">
+        <div class="fixed inset-0 bg-[#142B4A]/60 backdrop-blur-md" @click="closeWorkspacePasswordModal()"></div>
+        <div class="min-h-full flex items-center justify-center p-4">
+            <div class="relative z-10 w-full max-w-md rounded-2xl border border-[#E5EAF0] bg-white p-6 shadow-2xl modal-enter" @click.stop>
+                <div class="flex items-center justify-between border-b border-[#E5EAF0] pb-3">
+                    <div><h3 class="text-base font-bold text-[#263445]" x-text="'Pengaturan Password Ruang Kerja ' + workspacePasswordModal.year"></h3><p class="mt-0.5 text-[11px] text-[#7B8794]">Akses Admin dikendalikan oleh konfigurasi ini.</p></div>
+                    <button type="button" @click="closeWorkspacePasswordModal()" class="w-8 h-8 rounded-lg text-lg text-[#7B8794] hover:bg-slate-100">&times;</button>
+                </div>
+                <form :action="workspacePasswordModal.actionUrl" method="POST" class="space-y-4 pt-5" @submit="workspacePasswordModal.isSubmitting = true">
+                    @csrf
+                    <div class="rounded-xl border border-amber-200 bg-[#FEF3C7] p-3 text-xs leading-relaxed text-[#b45309]">Password baru akan membatalkan sesi Admin yang aktif. Kosongkan kedua kolom untuk menghapus konfigurasi password.</div>
+                    @if($errors->any())<div class="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">@foreach($errors->all() as $error)<p>{{ $error }}</p>@endforeach</div>@endif
+                    <div><label for="workspace_password_input" class="mb-1.5 block text-xs font-bold uppercase tracking-wider text-[#263445]">Password baru</label><input id="workspace_password_input" type="password" name="password" minlength="4" autocomplete="new-password" placeholder="Minimal 4 karakter" class="w-full rounded-xl border border-[#E5EAF0] px-3.5 py-2.5 text-sm outline-none focus:border-[#142B4A] focus:ring-2 focus:ring-[#142B4A]/10"></div>
+                    <div><label for="workspace_password_confirmation" class="mb-1.5 block text-xs font-bold uppercase tracking-wider text-[#263445]">Konfirmasi password</label><input id="workspace_password_confirmation" type="password" name="password_confirmation" autocomplete="new-password" placeholder="Ulangi password baru" class="w-full rounded-xl border border-[#E5EAF0] px-3.5 py-2.5 text-sm outline-none focus:border-[#142B4A] focus:ring-2 focus:ring-[#142B4A]/10"></div>
+                    <div class="flex justify-end gap-3 border-t border-[#E5EAF0] pt-4"><button type="button" @click="closeWorkspacePasswordModal()" class="px-4 py-2.5 rounded-xl btn-secondary-gradient text-xs font-bold">Batal</button><button type="submit" :disabled="workspacePasswordModal.isSubmitting" class="px-5 py-2.5 rounded-xl btn-primary-gradient text-xs font-bold disabled:opacity-60" x-text="workspacePasswordModal.isSubmitting ? 'Menyimpan...' : 'Simpan'"></button></div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- GLOBAL FULLSCREEN WORKSPACE INITIATION MODAL -->
     <div x-show="globalInitiateModal.show" 
          x-cloak
@@ -1684,8 +1799,9 @@
                 <p class="mt-2 text-sm leading-relaxed text-[#7B8794]" x-text="globalConfirmModal.message"></p>
                 <form :action="globalConfirmModal.action" method="POST" class="mt-6 flex justify-end gap-3">
                     @csrf
+                    <template x-if="globalConfirmModal.method !== 'POST'"><input type="hidden" name="_method" :value="globalConfirmModal.method"></template>
                     <button type="button" @click="closeGlobalConfirmModal()" class="px-4 py-2.5 rounded-xl btn-secondary-gradient text-xs font-bold">Batal</button>
-                    <button type="submit" class="px-4 py-2.5 rounded-xl bg-amber-600 text-xs font-bold text-white hover:bg-amber-700" x-text="globalConfirmModal.submitLabel"></button>
+                    <button type="submit" :class="globalConfirmModal.danger ? 'btn-danger' : 'bg-amber-600 hover:bg-amber-700'" class="px-4 py-2.5 rounded-xl text-xs font-bold text-white" x-text="globalConfirmModal.submitLabel"></button>
                 </form>
             </div>
         </div>

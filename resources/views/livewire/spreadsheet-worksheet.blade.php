@@ -1,6 +1,6 @@
 {{-- Do not poll the worksheet root: a Livewire morph replaces the interactive
      grid and caused cells to disappear after the first 10-second refresh. --}}
-<div class="relative flex-1 flex flex-col min-h-0 min-w-0 bg-white"
+<div class="spreadsheet-surface relative flex-1 flex flex-col min-h-0 min-w-0 bg-white"
      x-data="spreadsheetWorksheet($wire)"
      data-sheet-id="{{ $sheetId }}"
      style="--sheet-accent: {{ $sheet ? $sheet->identityColor()['active'] : '#315E91' }};"

@@ -77,7 +77,7 @@
 
     <?php app("livewire")->forceAssetInjection(); ?><div x-persist="<?php echo e('workspace-header-' . $group->id); ?>">
     <!-- 1. HEADER IDENTITAS WORKSPACE -->
-    <div class="sticky top-0 z-30 bg-white border-b border-slate-200 px-4 sm:px-6 py-4 shadow-2xs shrink-0">
+    <div class="workspace-app-header sticky top-0 z-30 bg-white border-b border-slate-200 px-4 sm:px-6 py-4 shadow-2xs shrink-0">
         <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             
             <!-- Left: Avatar & Nama -->
@@ -172,62 +172,6 @@
             </div>
         </div>
 
-        <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(isset($operationalYears) && $operationalYears->isNotEmpty()): ?>
-            <!-- Dynamic Year & Month Hierarchy Navigator -->
-            <div class="mt-3 pt-3 border-t border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
-                <!-- Year Selector Pills -->
-                <div class="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0">
-                    <span class="text-slate-400 font-semibold uppercase tracking-wider text-[10px] shrink-0">Tahun:</span>
-                    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php $__currentLoopData = $operationalYears; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $opY): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                        <?php
-                            $isCurrentYear = $currentMonthlyWorkspace && $currentMonthlyWorkspace->year_id === $opY->id;
-                            $targetMonthNum = $currentMonthlyWorkspace ? $currentMonthlyWorkspace->month : 10;
-                            $targetMw = $opY->monthlyWorkspaces->firstWhere("month", $targetMonthNum) ?? $opY->monthlyWorkspaces->first();
-                        ?>
-                        <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($targetMw): ?>
-                            <a href="<?php echo e(route("group.workspace", $targetMw->group_id)); ?>" 
-                               class="px-2.5 py-1 rounded-lg font-bold transition-all shrink-0 flex items-center gap-1 <?php echo e($isCurrentYear ? "bg-[#142B4A] text-white shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200"); ?>">
-                                <span><?php echo e($opY->year); ?></span>
-                                <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($opY->is_archived): ?>
-                                    <span class="text-[9px] px-1 py-0.2 rounded font-normal <?php echo e($isCurrentYear ? "bg-amber-400/20 text-amber-300" : "bg-amber-100 text-amber-700"); ?>">Arsip</span>
-                                <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
-                            </a>
-                        <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
-                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
-
-                    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(Auth::user()->isOwner()): ?>
-                        <button type="button" 
-                                @click="$dispatch('open-initiate-workspace')"
-                                class="px-2.5 py-1 rounded-lg font-bold text-xs bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-200 transition-all shrink-0 flex items-center gap-1 shadow-xs ml-1"
-                                title="Tambah Tahun Operasional Baru">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                            <span>+ Tambah Tahun</span>
-                        </button>
-                    <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
-                </div>
-
-                <!-- Month Selector Pills for Current Year -->
-                <?php
-                    $activeYearModel = $currentMonthlyWorkspace ? $currentMonthlyWorkspace->year : $operationalYears->first();
-                ?>
-                <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($activeYearModel): ?>
-                    <div class="flex items-center gap-1 overflow-x-auto pb-1 md:pb-0">
-                        <span class="text-slate-400 font-semibold uppercase tracking-wider text-[10px] shrink-0 mr-1">Bulan:</span>
-                        <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php $__currentLoopData = $activeYearModel->monthlyWorkspaces; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $mWork): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                            <?php
-                                $isCurrentMonth = $group->id === $mWork->group_id;
-                            ?>
-                            <a href="<?php echo e(route("group.workspace", $mWork->group_id)); ?>" 
-                               title="<?php echo e($mWork->name); ?> <?php echo e($activeYearModel->year); ?>"
-                               class="px-2 py-1 rounded-md text-[11px] font-semibold transition-all shrink-0 <?php echo e($isCurrentMonth ? "bg-[#142B4A] text-white shadow-xs" : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900"); ?>">
-                                <?php echo e(substr($mWork->name, 0, 3)); ?>
-
-                            </a>
-                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
-                    </div>
-                <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
-            </div>
-        <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
     </div>
     </div>
 
@@ -915,6 +859,7 @@ if (isset($__slots)) unset($__slots);
     <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
 
     <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($requiresPasswordUnlock && $group->hasPassword()): ?>
+        <span class="sr-only">Masukkan Password Workspace</span>
         <div x-init="
             if (!workspaceIsUnlocked) {
                 $dispatch('open-workspace-unlock', {
@@ -1006,7 +951,8 @@ if (isset($__slots)) unset($__slots);
                 </div>
 
                 <div class="p-0 flex-1 min-h-0">
-                    <?php
+                    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(!$requiresPasswordUnlock): ?>
+                        <?php
 $__split = function ($name, $params = []) {
     return [$name, $params];
 };
@@ -1027,6 +973,7 @@ unset($__params);
 unset($__split);
 if (isset($__slots)) unset($__slots);
 ?>
+                    <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
                 </div>
             </div>
         </div>

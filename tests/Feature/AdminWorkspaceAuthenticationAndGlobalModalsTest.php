@@ -239,4 +239,19 @@ class AdminWorkspaceAuthenticationAndGlobalModalsTest extends TestCase
         $responseMonth2 = $this->get(route('company.workspace', [2026, 2]));
         $responseMonth2->assertRedirect(route('company.year', 2026));
     }
+    public function test_only_owner_can_delete_an_operational_year_without_touching_other_years(): void
+    {
+        $this->actingAs($this->admin)
+            ->delete(route('company.years.destroy', $this->year2026))
+            ->assertForbidden();
+
+        $this->actingAs($this->owner)
+            ->delete(route('company.years.destroy', $this->year2026))
+            ->assertRedirect(route('dashboard'));
+
+        $this->assertDatabaseMissing('operational_years', ['id' => $this->year2026->id]);
+        $this->assertDatabaseMissing('monthly_workspaces', ['year_id' => $this->year2026->id]);
+        $this->assertDatabaseHas('operational_years', ['id' => $this->year2025->id]);
+        $this->assertDatabaseHas('monthly_workspaces', ['year_id' => $this->year2025->id, 'month' => 1]);
+    }
 }

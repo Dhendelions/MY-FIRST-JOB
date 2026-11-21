@@ -44,6 +44,13 @@ class GroupController extends Controller
             abort(403, 'Workspace ini telah diarsipkan dan tidak dapat diakses oleh Admin.');
         }
 
+        // Centralised monthly workspaces must never expose their sheets to an
+        // Admin before the Owner has configured the year password. This guard
+        // also protects the legacy /groups/{group}/workspace URL.
+        if ($user->isAdmin() && ($operationalYear = $group->operationalYearModel()) && !$operationalYear->hasPassword()) {
+            return redirect()->route('company.year', $operationalYear->year);
+        }
+
         $userRole = $group->getMemberRole($user->id);
 
         // Workspace lama tanpa password hanya dapat dikonfigurasi oleh pemilik
@@ -143,6 +150,12 @@ class GroupController extends Controller
             abort(403, 'Workspace tahun ini telah diarsipkan dan tidak dapat diakses oleh Admin.');
         }
 
+        // Protect direct month URLs before resolving a group/sheet or loading
+        // any workspace data. The year page renders the configuration notice.
+        if ($user && $user->isAdmin() && !$operationalYear->hasPassword()) {
+            return redirect()->route('company.year', $operationalYear->year);
+        }
+
         $monthlyWorkspace = \App\Models\MonthlyWorkspace::where('year_id', $operationalYear->id)
             ->where('month', $month)
             ->firstOrFail();
@@ -162,6 +175,17 @@ class GroupController extends Controller
         abort_unless($group->isMember(Auth::id()), 403);
         abort_if(Auth::user()->isAdmin() && (\App\Services\WorkspaceSecurityService::isGroupArchived($group) || $group->isArchived()), 403, 'Workspace ini telah diarsipkan dan tidak dapat diakses oleh Admin.');
 
+        $user = Auth::user();
+
+        if ($user->isAdmin() && !$group->hasPassword()) {
+            $message = 'Workspace belum memiliki password. Hubungi Owner atau Leader untuk mengaturnya.';
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $message], 409);
+            }
+
+            return back()->with('error', $message);
+        }
+
         $validated = $request->validate([
             'password' => ['required', 'string', 'max:100'],
             'sheet_id' => ['nullable', 'integer'],
@@ -175,17 +199,7 @@ class GroupController extends Controller
             $sheet = $group->sheets()->firstOrFail();
         }
 
-        $user = Auth::user();
         $role = $group->getMemberRole($user->id);
-
-        if ($user->isAdmin() && !$group->hasPassword()) {
-            $message = 'Workspace belum memiliki password. Hubungi Owner atau Leader untuk mengaturnya.';
-            if ($request->expectsJson()) {
-                return response()->json(['message' => $message], 409);
-            }
-
-            return back()->with('error', $message);
-        }
 
         // Workspace authentication strictly verifies the WORKSPACE PASSWORD
         if (!$group->verifyPassword($validated['password'])) {

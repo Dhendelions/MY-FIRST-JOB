@@ -7,6 +7,7 @@ use App\Services\CompanyAnalyticsService;
 use App\Services\CompanyWorkspaceInitializer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class CompanyYearController extends Controller
 {
@@ -241,8 +242,8 @@ class CompanyYearController extends Controller
 
         $user = Auth::user();
         abort_if($user->isAdmin() && (\App\Services\WorkspaceSecurityService::isYearArchived($year) || $operationalYear->isArchived()), 403, 'Workspace tahun ini telah diarsipkan dan tidak dapat diakses oleh Admin.');
-        $isUnlocked = $operationalYear->isUnlockedForUser($user?->id);
-        $requiresPasswordConfiguration = false;
+        $requiresPasswordConfiguration = $user?->isAdmin() && !$operationalYear->hasPassword();
+        $isUnlocked = !$requiresPasswordConfiguration && $operationalYear->isUnlockedForUser($user?->id);
 
         return view('company.year', compact('operationalYear', 'isUnlocked', 'user', 'requiresPasswordConfiguration'));
     }
@@ -384,6 +385,60 @@ class CompanyYearController extends Controller
             ]);
         }
 
-        return back()->with('success', $message);
+        return back()
+            ->with('success', $message)
+            ->with('open_workspace_password_modal', true);
+    }
+
+    /**
+     * Permanently remove one operational year and only its owned workspace tree.
+     * This action is intentionally owner-only and does not touch other years.
+     */
+    public function destroy(Request $request, OperationalYear $year)
+    {
+        $user = Auth::user();
+        abort_unless($user?->isOwner(), 403, 'Akses ditolak: hanya Owner yang dapat menghapus workspace tahunan.');
+
+        $deleted = DB::transaction(function () use ($year) {
+            $lockedYear = OperationalYear::query()->lockForUpdate()->findOrFail($year->id);
+            $yearNumber = $lockedYear->year;
+
+            // Delete only groups linked through this year's monthly_workspaces.
+            // Database cascades remove their memberships, sheets, rows, columns,
+            // cells and spreadsheet activities. No group from another year is selected.
+            $groupIds = $lockedYear->monthlyWorkspaces()
+                ->lockForUpdate()
+                ->pluck('group_id')
+                ->filter()
+                ->all();
+
+            if ($groupIds !== []) {
+                \App\Models\FisheriesGroup::query()->whereIn('id', $groupIds)->delete();
+            }
+
+            // Any incomplete monthly records without a group are still owned by
+            // this year and are removed by the parent FK cascade.
+            $lockedYear->delete();
+
+            return $yearNumber;
+        });
+
+        \App\Services\ActivityLogger::log(
+            'year_deleted',
+            "Tahun operasional {$deleted} beserta workspace bulanannya dihapus.",
+            null,
+            ['year' => $deleted, 'resource_type' => 'OperationalYear'],
+            $user
+        );
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'status' => 'success',
+                'message' => "Workspace tahun {$deleted} berhasil dihapus.",
+                'data' => ['year' => $deleted],
+            ]);
+        }
+
+        return redirect()->route('dashboard')->with('success', "Workspace tahun {$deleted} berhasil dihapus.");
     }
 }

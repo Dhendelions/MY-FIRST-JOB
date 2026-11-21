@@ -71,9 +71,10 @@ class OperationalYear extends Model
             return true;
         }
 
-        // When no password is set on the operational year, it is accessible without unlock
+        // An unconfigured password is not an open workspace for Admins. The
+        // Owner must configure one before any Admin can see its months/data.
         if (!$this->hasPassword()) {
-            return true;
+            return false;
         }
 
         $session = request()->hasSession() ? request()->session() : session();

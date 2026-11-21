@@ -63,9 +63,26 @@
     <style>
         [x-cloak] { display: none !important; }
         .tabular-nums { font-variant-numeric: tabular-nums; }
+
+        :root {
+            --dm-navy: #183B63;
+            --dm-deep-blue: #142E50;
+            --dm-blue: #28588A;
+            --dm-blue-light: #EAF3FC;
+            --dm-ice: #F2F7FD;
+            --dm-cyan: #E6F6FA;
+            --dm-indigo: #EEF0FF;
+            --dm-teal: #DDF5F1;
+            --dm-green: #DCFCE7;
+            --dm-amber: #FFF3D6;
+            --dm-gray: #EDF2F7;
+            --dm-border: #CFE0F1;
+            --dm-shadow: 0 8px 24px rgba(24, 59, 99, .08);
+            --dm-transition: 200ms ease-in-out;
+        }
         
         body {
-            background: linear-gradient(135deg, #F4F7FB 0%, #EEF4FA 45%, #EAF2FC 100%);
+            background: linear-gradient(135deg, var(--dm-ice) 0%, #F7FAFE 48%, var(--dm-cyan) 100%);
             background-attachment: fixed;
             color: #263445;
             min-height: 100vh;
@@ -73,24 +90,67 @@
 
         /* Sidebar: Navy blue with gentle gradient */
         .sidebar-navy-gradient {
-            background: linear-gradient(180deg, #142B4A 0%, #173052 40%, #1D3A63 100%);
+            background: linear-gradient(180deg, var(--dm-deep-blue) 0%, #173A63 44%, var(--dm-navy) 100%);
         }
 
         /* Navbar: White with subtle blue tint */
         .navbar-glass {
-            background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(246, 250, 255, 0.96) 100%);
+            background: linear-gradient(135deg, rgba(255, 255, 255, .98) 0%, var(--dm-ice) 100%);
             backdrop-filter: blur(10px);
             border-bottom: 1px solid #E2EAF3;
         }
 
         /* Clean SaaS Card with soft gradient nuance */
         .card-clean {
-            background: linear-gradient(180deg, #FFFFFF 0%, #FAFDFE 100%);
-            border: 1px solid #E2EAF3;
+            background: linear-gradient(135deg, #FFFFFF 0%, var(--dm-ice) 100%);
+            border: 1px solid var(--dm-border);
             border-radius: 14px;
             box-shadow: 0 1px 3px rgba(49, 94, 145, 0.04), 0 1px 2px rgba(49, 94, 145, 0.02);
             transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 220ms cubic-bezier(0.16, 1, 0.3, 1), border-color 220ms ease;
         }
+
+        /* Reusable corporate surfaces: only opt-in semantic classes use these accents. */
+        .dashboard-kpi-card, .company-workspace-card, .monthly-workspace-card, .workspace-overview-panel {
+            border-color: var(--dm-border) !important;
+            box-shadow: var(--dm-shadow);
+            transition: transform var(--dm-transition), box-shadow var(--dm-transition), border-color var(--dm-transition), background var(--dm-transition);
+        }
+        .dashboard-kpi-card { background: linear-gradient(135deg, #fff, var(--dm-blue-light)) !important; }
+        .dashboard-kpi-card:nth-child(2) { background: linear-gradient(135deg, #fff, var(--dm-green)) !important; }
+        .dashboard-kpi-card:nth-child(3) { background: linear-gradient(135deg, #fff, var(--dm-amber)) !important; }
+        .dashboard-kpi-card:nth-child(4) { background: linear-gradient(135deg, #fff, var(--dm-indigo)) !important; }
+        .company-workspace-card { background: linear-gradient(135deg, var(--dm-blue-light), var(--dm-ice) 60%, var(--dm-cyan)) !important; }
+        .company-workspace-card:nth-child(3n + 2) { background: linear-gradient(135deg, var(--dm-cyan), var(--dm-ice)) !important; }
+        .company-workspace-card:nth-child(3n) { background: linear-gradient(135deg, var(--dm-indigo), var(--dm-ice)) !important; }
+        .workspace-overview-panel { background: linear-gradient(135deg, rgba(255,255,255,.92), var(--dm-blue-light)) !important; }
+        .monthly-workspace-card { background: linear-gradient(135deg, var(--dm-ice), var(--dm-blue-light)) !important; }
+        .monthly-workspace-card:nth-child(3n + 2) { background: linear-gradient(135deg, var(--dm-cyan), var(--dm-ice)) !important; }
+        .monthly-workspace-card:nth-child(3n) { background: linear-gradient(135deg, var(--dm-indigo), var(--dm-ice)) !important; }
+        .company-workspace-card:hover, .monthly-workspace-card:hover, .dashboard-kpi-card:hover { border-color: #8FB4D8 !important; box-shadow: 0 12px 28px rgba(24,59,99,.13); transform: translateY(-3px); }
+        .monthly-workspace-number { background: linear-gradient(135deg, #D9ECFC, #F6FBFF); box-shadow: 0 3px 10px rgba(40,88,138,.12); }
+        .monthly-open-button { background: linear-gradient(135deg, #DCEEFF, #EAF3FC) !important; border: 1px solid #BCD7F0; box-shadow: 0 2px 6px rgba(40,88,138,.09); }
+        .monthly-open-button:hover { background: linear-gradient(135deg, var(--dm-navy), var(--dm-blue)) !important; border-color: var(--dm-navy); color: #fff !important; box-shadow: 0 7px 16px rgba(24,59,99,.22); }
+        .monthly-open-button:active { transform: scale(.98); }
+        .company-year-page .grid.grid-cols-1 > div {
+            background: linear-gradient(135deg, var(--dm-ice), var(--dm-blue-light)) !important;
+            border-color: var(--dm-border) !important;
+            box-shadow: 0 5px 16px rgba(24,59,99,.07);
+        }
+        .company-year-page .grid.grid-cols-1 > div:nth-child(3n + 2) { background: linear-gradient(135deg, var(--dm-cyan), var(--dm-ice)) !important; }
+        .company-year-page .grid.grid-cols-1 > div:nth-child(3n) { background: linear-gradient(135deg, var(--dm-indigo), var(--dm-ice)) !important; }
+        .company-year-page .grid.grid-cols-1 > div:hover { border-color: #8FB4D8 !important; box-shadow: 0 11px 24px rgba(24,59,99,.13); transform: translateY(-2px); }
+        .company-year-page .grid.grid-cols-1 > div > div:first-child .w-10.h-10 { background: linear-gradient(135deg, #D9ECFC, #F7FBFF) !important; box-shadow: 0 3px 10px rgba(40,88,138,.12); }
+        .company-year-page .grid.grid-cols-1 > div > a.w-full { background: linear-gradient(135deg, #DCEEFF, #EAF3FC) !important; border: 1px solid #BCD7F0; box-shadow: 0 2px 6px rgba(40,88,138,.09); }
+        .company-year-page .grid.grid-cols-1 > div > a.w-full:hover { background: linear-gradient(135deg, var(--dm-navy), var(--dm-blue)) !important; border-color: var(--dm-navy); color: #fff !important; box-shadow: 0 7px 16px rgba(24,59,99,.22); }
+
+        .workspace-app-header { background: linear-gradient(135deg, #fff, var(--dm-ice)) !important; border-color: var(--dm-border) !important; }
+        .spreadsheet-surface { background: linear-gradient(180deg, var(--dm-ice), #DDE9F4) !important; }
+        .formula-bar-container { background: linear-gradient(135deg, #fff, var(--dm-ice)) !important; border-bottom-color: var(--dm-border) !important; }
+        .bottom-tabs { background: linear-gradient(135deg, var(--dm-ice), var(--dm-blue-light)) !important; border-color: var(--dm-border) !important; }
+        .spreadsheet-table thead { background: #E4F0FB !important; }
+        .spreadsheet-table thead th { background: #E4F0FB !important; color: var(--dm-deep-blue); border-color: #BFD7EC !important; }
+        .spreadsheet-table .grid-cell-td { border-color: #D8E5F0 !important; }
+        .spreadsheet-table .grid-cell-td:hover { background: #F4FAFF !important; }
         .card-clean:hover {
             transform: translateY(-2px);
             box-shadow: 0 8px 20px rgba(49, 94, 145, 0.09), 0 2px 6px rgba(49, 94, 145, 0.04);
@@ -328,22 +388,37 @@
 
     <?php echo \Livewire\Mechanisms\FrontendAssets\FrontendAssets::styles(); ?>
 
+    <?php
+        $appOperationalYears = \App\Models\OperationalYear::with('monthlyWorkspaces')->orderBy('year', 'desc')->get();
+        $currentGroupYear = isset($group) ? $group->operationalYearModel() : null;
+    ?>
 </head>
 <body class="h-full flex text-slate-800 antialiased font-sans" x-data="{ 
     mobileSidebarOpen: false,
     activeModal: <?php echo \Illuminate\Support\Js::from(session('workspace_exit_target') ? 'modal-exit-verification' : (request()->query('open') === 'friends' ? 'modal-friend' : null))->toHtml() ?>,
     workspaceExitGroupId: <?php echo \Illuminate\Support\Js::from(
-        isset($group, $userRole)
-            && $userRole === 'admin'
-            && (int) session('admin_workspace_context.user_id', session('workspace_exit_context.user_id')) === (int) Auth::id()
-            && (int) session('admin_workspace_context.group_id', session('workspace_exit_context.group_id')) === (int) $group->id
-                ? $group->id
-                : null
+        isset($group, $userRole) && $userRole === 'admin'
+            ? $group->id
+            : null
     )->toHtml() ?>,
+    currentWorkspaceYear: <?php echo \Illuminate\Support\Js::from($currentGroupYear ? (int)$currentGroupYear->year : null)->toHtml() ?>,
+    groupYearMap: {
+        <?php $__currentLoopData = $appOperationalYears; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $sy): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+            <?php $__currentLoopData = $sy->monthlyWorkspaces; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $smw): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                <?php echo e((int)$smw->group_id); ?>: <?php echo e((int)$sy->year); ?>,
+            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+    },
+    yearHasPasswordMap: {
+        <?php $__currentLoopData = $appOperationalYears; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $sy): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+            <?php echo e((int)$sy->year); ?>: <?php echo e($sy->hasPassword() ? 'true' : 'false'); ?>,
+        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+    },
     get adminWorkspaceGroupId() {
         return this.workspaceExitGroupId;
     },
     workspaceExitTarget: <?php echo \Illuminate\Support\Js::from(session('workspace_exit_target', ''))->toHtml() ?>,
+    workspaceExitDestinationLabel: 'Dasbor',
     get adminExitTarget() {
         return this.workspaceExitTarget;
     },
@@ -360,31 +435,104 @@
     showToast: false,
     guardWorkspaceNavigation(event) {
         if (!this.workspaceExitGroupId) return;
-        const link = event.target.closest('a[href]');
+        const link = event.target.closest('a[href], button[data-exit-target], form button[type=\'submit\']');
         if (!link || link.target === '_blank' || event.defaultPrevented) return;
 
-        const destination = new URL(link.href, window.location.href);
+        // Check if clicking a logout form
+        const logoutForm = link.closest('form[action*=\'logout\']');
+        if (logoutForm) {
+            event.preventDefault();
+            this.requestWorkspaceExit('logout', 'Keluar Akun');
+            return;
+        }
+
+        const href = link.getAttribute('href') || link.getAttribute('data-href');
+        if (!href || href === '#' || href.startsWith('javascript:')) return;
+
+        const destination = new URL(href, window.location.href);
         if (destination.origin !== window.location.origin) return;
 
-        const workspacePath = `/groups/${this.workspaceExitGroupId}/workspace`;
-        if (destination.pathname === workspacePath || destination.pathname.startsWith(workspacePath + '/')) return;
+        // 1. Moving within sheet tabs of the same monthly workspace
+        const currentWsPath = `/groups/${this.workspaceExitGroupId}/workspace`;
+        if (destination.pathname === currentWsPath || destination.pathname.startsWith(currentWsPath + '/')) {
+            return;
+        }
 
+        // 2. Identify target operational year
+        let targetYear = null;
+        const groupMatch = destination.pathname.match(/^\/groups\/(\d+)\/workspace/);
+        if (groupMatch) {
+            const targetGroupId = parseInt(groupMatch[1]);
+            targetYear = this.groupYearMap[targetGroupId] || null;
+        } else {
+            const companyWsMatch = destination.pathname.match(/^\/company\/workspace\/(\d+)/);
+            if (companyWsMatch) {
+                targetYear = parseInt(companyWsMatch[1]);
+            } else {
+                const companyYearMatch = destination.pathname.match(/^\/company\/year\/(\d+)/);
+                if (companyYearMatch) {
+                    targetYear = parseInt(companyYearMatch[1]);
+                }
+            }
+        }
+
+        // Case A: Moving between months within the SAME operational year
+        // -> NO password required! Let navigation proceed seamlessly.
+        if (targetYear && this.currentWorkspaceYear && targetYear === this.currentWorkspaceYear) {
+            return;
+        }
+
+        // Case B: Switching to a DIFFERENT operational year
+        // -> Requires target workspace password (Workspace Password, NOT account password!)
+        if (targetYear && (!this.currentWorkspaceYear || targetYear !== this.currentWorkspaceYear)) {
+            event.preventDefault();
+            // Check if Owner has configured a password for target year
+            if (this.yearHasPasswordMap[targetYear] === false) {
+                this.openGlobalNoPasswordModal({
+                    year: targetYear,
+                    title: `Ruang Kerja ${targetYear}`
+                });
+                return;
+            }
+
+            this.openGlobalUnlockModal({
+                year: targetYear,
+                title: `Ruang Kerja ${targetYear}`,
+                actionUrl: `/company/year/${targetYear}/unlock`,
+                redirectTo: destination.href
+            });
+            return;
+        }
+
+        // Case C: Leaving workspace to outside pages (Dashboard, Friends, Profile, etc.)
+        // -> Requires Admin ACCOUNT Password!
         event.preventDefault();
-        this.requestWorkspaceExit(destination.pathname + destination.search + destination.hash);
+        let destLabel = 'Dasbor';
+        if (destination.pathname.includes('friends') || destination.search.includes('friends')) {
+            destLabel = 'Jaringan Rekan Tim';
+        } else if (destination.pathname.includes('profile')) {
+            destLabel = 'Profil Pengguna';
+        }
+        this.requestWorkspaceExit(destination.pathname + destination.search + destination.hash, destLabel);
     },
-    requestWorkspaceExit(destination) {
+    requestWorkspaceExit(destination, label = 'halaman luar') {
         if (!this.workspaceExitGroupId) {
-            if (destination.includes('open=friends')) {
+            if (destination.includes('open=friends') || destination === 'friends') {
                 this.activeModal = 'modal-friend';
             }
             return;
         }
         this.workspaceExitTarget = destination;
+        this.workspaceExitDestinationLabel = label;
         this.exitPasswordInput = '';
         this.showExitPassword = false;
         this.isSubmittingExit = false;
         this.exitErrorMessage = '';
         this.activeModal = 'modal-exit-verification';
+        this.$nextTick(() => {
+            const input = document.getElementById('admin_account_exit_password');
+            if (input) input.focus();
+        });
     },
     requestAdminExit(destination) {
         this.requestWorkspaceExit(destination);
@@ -417,7 +565,7 @@
         .then(async response => {
             const data = await response.json().catch(() => ({}));
             if (!response.ok) {
-                const errorMsg = data.message || Object.values(data.errors || {}).flat()[0] || 'Password akun salah. Silakan coba lagi.';
+                const errorMsg = data.message || Object.values(data.errors || {}).flat()[0] || 'Password akun Admin salah. Silakan coba lagi.';
                 throw new Error(errorMsg);
             }
             return data;
@@ -436,7 +584,7 @@
         .catch(err => {
             this.isSubmittingExit = false;
             this.exitPasswordInput = '';
-            this.exitErrorMessage = err.message || 'Verifikasi password gagal. Silakan coba lagi.';
+            this.exitErrorMessage = err.message || 'Verifikasi password akun Admin gagal. Silakan coba lagi.';
         });
     },
     initWorkspaceHistory() {
@@ -445,7 +593,7 @@
             window.addEventListener('popstate', (e) => {
                 if (this.workspaceExitGroupId) {
                     window.history.pushState({ inWorkspace: true, groupId: this.workspaceExitGroupId }, '');
-                    this.requestWorkspaceExit('<?php echo e(route('dashboard')); ?>');
+                    this.requestWorkspaceExit('<?php echo e(route('dashboard')); ?>', 'Dasbor');
                 }
             });
         }
@@ -561,9 +709,11 @@
         this.globalUnlockModal.groupId = detail.groupId || null;
         this.globalUnlockModal.sheetId = detail.sheetId || null;
         this.globalUnlockModal.redirectTo = detail.redirectTo || '';
-        this.globalUnlockModal.actionUrl = detail.actionUrl || (detail.year ? `/company/year/${detail.year}/unlock` : (detail.groupId ? `/groups/${detail.groupId}/unlock` : ''));
+        let action = detail.actionUrl || (detail.year ? `/company/year/${detail.year}/unlock` : (detail.groupId ? `/groups/${detail.groupId}/unlock` : ''));
+        // Clean duplicate slashes while preserving protocol
+        this.globalUnlockModal.actionUrl = action ? action.replace(/([^:]\/)\/+/g, '$1') : '';
         this.globalUnlockModal.title = detail.title || (detail.year ? `Workspace ${detail.year}` : 'Workspace');
-        this.globalUnlockModal.subtitle = detail.subtitle || 'Masukkan password workspace untuk membuka seluruh data dan lembar kerja operasional.';
+        this.globalUnlockModal.subtitle = detail.subtitle || 'Masukkan kata sandi workspace untuk membuka seluruh data dan lembar kerja operasional.';
         this.globalUnlockModal.error = detail.error || '';
         this.globalUnlockModal.isSubmitting = false;
         this.globalUnlockModal.show = true;
@@ -595,19 +745,48 @@
         this.globalInitiateModal.show = false;
         this.globalInitiateModal.error = '';
     },
-    globalConfirmModal: { show: false, action: '', title: '', message: '', submitLabel: 'Konfirmasi' },
+    workspacePasswordModal: { show: false, year: null, actionUrl: '', isSubmitting: false },
+    openWorkspacePasswordModal(detail = {}) {
+        this.workspacePasswordModal.year = detail.year || null;
+        this.workspacePasswordModal.actionUrl = detail.actionUrl || (detail.year ? `/company/year/${detail.year}/password` : '');
+        this.workspacePasswordModal.isSubmitting = false;
+        this.workspacePasswordModal.show = true;
+        this.$nextTick(() => document.getElementById('workspace_password_input')?.focus());
+    },
+    closeWorkspacePasswordModal() {
+        this.workspacePasswordModal.show = false;
+        this.workspacePasswordModal.isSubmitting = false;
+    },
+    globalConfirmModal: { show: false, action: '', method: 'POST', title: '', message: '', submitLabel: 'Konfirmasi', danger: false },
     openGlobalConfirmModal(detail = {}) {
-        this.globalConfirmModal = { show: true, action: detail.action || '', title: detail.title || 'Konfirmasi tindakan', message: detail.message || '', submitLabel: detail.submitLabel || 'Konfirmasi' };
+        this.globalConfirmModal = { show: true, action: detail.action || '', method: detail.method || 'POST', title: detail.title || 'Konfirmasi tindakan', message: detail.message || '', submitLabel: detail.submitLabel || 'Konfirmasi', danger: !!detail.danger };
     },
     closeGlobalConfirmModal() {
         this.globalConfirmModal.show = false;
         this.globalInitiateModal.isSubmitting = false;
+    },
+    globalNoPasswordModal: {
+        show: false,
+        year: null,
+        title: '',
+    },
+    openGlobalNoPasswordModal(detail = {}) {
+        this.globalNoPasswordModal.year = detail.year || null;
+        this.globalNoPasswordModal.title = detail.title || (detail.year ? `Ruang Kerja ${detail.year}` : 'Ruang Kerja');
+        this.globalNoPasswordModal.show = true;
+    },
+    closeGlobalNoPasswordModal() {
+        this.globalNoPasswordModal.show = false;
     }
 }" @toast.window="triggerToast($event.detail.message, $event.detail.type || 'info')"
    <?php if(isset($group, $userRole) && $userRole === 'admin'): ?> @click.capture="guardWorkspaceNavigation($event)" <?php endif; ?>
    @open-user-profile.window="openUserProfile($event.detail.userId)"
    @open-workspace-unlock.window="openGlobalUnlockModal($event.detail)"
    @close-workspace-unlock.window="closeGlobalUnlockModal()"
+   @open-workspace-password-settings.window="openWorkspacePasswordModal($event.detail)"
+   @close-workspace-password-settings.window="closeWorkspacePasswordModal()"
+   @open-workspace-no-password.window="openGlobalNoPasswordModal($event.detail)"
+   @close-workspace-no-password.window="closeGlobalNoPasswordModal()"
    @open-initiate-workspace.window="openGlobalInitiateModal()"
    @close-initiate-workspace.window="closeGlobalInitiateModal()"
    @open-global-confirm.window="openGlobalConfirmModal($event.detail)"
@@ -709,7 +888,11 @@
 
             <!-- Dynamic Year & Month Company Workspace Navigation -->
             <?php
-                $sidebarYears = $operationalYears ?? \App\Models\OperationalYear::with(['monthlyWorkspaces.group'])->orderBy('year', 'desc')->get();
+                $sidebarYearsQuery = \App\Models\OperationalYear::with('monthlyWorkspaces')->orderBy('year', 'desc');
+                if (Auth::user()?->isAdmin()) {
+                    $sidebarYearsQuery->where('is_archived', false);
+                }
+                $sidebarYears = $sidebarYearsQuery->get();
                 $currentGroupYearId = isset($group) && $group->monthlyWorkspace ? $group->monthlyWorkspace->year_id : null;
             ?>
             <div x-data="{ openYear: <?php echo e($currentGroupYearId ? $currentGroupYearId : ($sidebarYears->first()?->id ?? 'null')); ?> }">
@@ -718,28 +901,30 @@
                     <span class="text-[10px] font-mono text-sky-200 bg-white/10 px-2 py-0.5 rounded-full border border-white/10 font-semibold">Perusahaan</span>
                 </div>
 
-                <div class="space-y-2 max-h-72 overflow-y-auto pr-1">
+                <div class="space-y-2 max-h-72 overflow-y-auto overscroll-contain pr-1" style="scrollbar-gutter: stable;">
                     <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php $__empty_1 = true; $__currentLoopData = $sidebarYears; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $opYear): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
-                        <div class="rounded-xl bg-white/5 border border-white/10 overflow-hidden transition-all duration-200">
-                            <!-- Year Toggle Button -->
-                            <button @click="openYear = (openYear === <?php echo e($opYear->id); ?> ? null : <?php echo e($opYear->id); ?>)" 
-                                    class="w-full flex items-center justify-between px-3 py-2 text-xs font-bold transition-colors text-left"
-                                    :class="openYear === <?php echo e($opYear->id); ?> ? 'text-white bg-white/10 border-b border-white/10' : 'text-slate-300 hover:text-white hover:bg-white/10'">
-                                <div class="flex items-center gap-2">
-                                    <svg class="w-3.5 h-3.5 text-sky-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div class="rounded-xl bg-white/5 border border-white/10 overflow-hidden" style="contain: layout paint;">
+                            <!-- The year itself is only a group label. -->
+                            <div class="w-full flex items-center justify-between px-3 py-2 text-xs font-bold transition-colors"
+                                 :class="openYear === <?php echo e($opYear->id); ?> ? 'text-white bg-white/10 border-b border-white/10' : 'text-slate-300 hover:text-white hover:bg-white/10'">
+                                <span class="flex items-center gap-2 flex-1 cursor-default select-none" aria-label="Tahun operasional <?php echo e($opYear->year); ?>">
+                                    <svg class="w-3.5 h-3.5 text-sky-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                                     </svg>
                                     <span>Tahun <?php echo e($opYear->year); ?></span>
-                                </div>
-                                <div class="flex items-center gap-1.5">
+                                </span>
+                                <button type="button" 
+                                        @click="openYear = (openYear === <?php echo e($opYear->id); ?> ? null : <?php echo e($opYear->id); ?>)" 
+                                        class="flex items-center gap-1.5 text-slate-400 hover:text-white p-1 rounded transition-colors"
+                                        title="Buka / Tutup Daftar Bulan">
                                     <span class="text-[10px] text-slate-400 font-normal">12 Bulan</span>
                                     <svg class="w-3.5 h-3.5 transition-transform duration-200" 
                                          :class="openYear === <?php echo e($opYear->id); ?> ? 'rotate-180 text-white' : 'text-slate-400'" 
                                          fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                                     </svg>
-                                </div>
-                            </button>
+                                </button>
+                            </div>
 
                             <!-- Months Grid -->
                             <div x-show="openYear === <?php echo e($opYear->id); ?>" x-collapse class="p-2 grid grid-cols-3 gap-1.5 bg-[#0f223a]/80">
@@ -748,11 +933,29 @@
                                         $isActiveMonth = isset($group) && $group->id === $mWork->group_id;
                                     ?>
                                     <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(Auth::user()->isOwner() || !$opYear->is_archived): ?>
+                                        <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(Auth::user()->isAdmin() && !$opYear->hasPassword()): ?>
+                                            <button type="button"
+                                                    @click="$dispatch('open-workspace-no-password', { year: <?php echo e($opYear->year); ?>, title: 'Ruang Kerja <?php echo e($opYear->year); ?>' })"
+                                                    title="Password Ruang Kerja <?php echo e($opYear->year); ?> belum diatur"
+                                                    class="px-2 py-1.5 text-center rounded-lg text-[11px] font-semibold transition-colors truncate text-slate-300 bg-white/5 hover:bg-white/15 hover:text-white">
+                                                <?php echo e(substr($mWork->name, 0, 3)); ?>
+
+                                            </button>
+                                        <?php elseif(Auth::user()->isAdmin() && !$opYear->isUnlockedForUser(Auth::id())): ?>
+                                            <button type="button"
+                                                    @click="$dispatch('open-workspace-unlock', { year: <?php echo e($opYear->year); ?>, title: 'Ruang Kerja <?php echo e($opYear->year); ?>', actionUrl: '<?php echo e(route('company.year.unlock', $opYear->year)); ?>', redirectTo: '<?php echo e(route('company.workspace', [$opYear->year, $mWork->month])); ?>' })"
+                                                    title="Buka <?php echo e($mWork->name); ?> <?php echo e($opYear->year); ?>"
+                                                    class="px-2 py-1.5 text-center rounded-lg text-[11px] font-semibold transition-colors truncate text-slate-300 bg-white/5 hover:bg-white/15 hover:text-white">
+                                                <?php echo e(substr($mWork->name, 0, 3)); ?>
+
+                                            </button>
+                                        <?php else: ?>
                                         <a href="<?php echo e(route('group.workspace', $mWork->group_id)); ?>"
                                            title="<?php echo e($mWork->name); ?> <?php echo e($opYear->year); ?>"
                                            class="px-2 py-1.5 text-center rounded-lg text-[11px] font-semibold transition-all duration-150 truncate <?php echo e($isActiveMonth ? 'bg-[#315E91] text-white shadow-xs' : 'text-slate-300 bg-white/5 hover:bg-white/15 hover:text-white'); ?>">
                                             <?php echo e(substr($mWork->name, 0, 3)); ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($opYear->is_archived): ?> 🔒<?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
                                         </a>
+                                        <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
                                     <?php else: ?>
                                         <span title="🔒 Archived — hanya Owner yang dapat membuka"
                                               aria-disabled="true"
@@ -936,32 +1139,33 @@
     </div>
 
     <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(isset($group, $userRole) && $userRole === 'admin'): ?>
+        <!-- GLOBAL FULLSCREEN ADMIN ACCOUNT PASSWORD VERIFICATION MODAL -->
         <div x-show="activeModal === 'modal-exit-verification' || activeModal === 'modal-admin-exit'" x-transition.opacity
              class="fixed inset-0 z-[1100] overflow-y-auto" x-cloak role="dialog" aria-modal="true"
              aria-labelledby="exit-verification-title" @keydown.escape.window="cancelExit()">
-            <div class="flex min-h-screen items-center justify-center px-4 py-8">
-                <div class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm" @click="cancelExit()"></div>
-                <div class="relative w-full max-w-md rounded-2xl bg-white p-6 text-left shadow-2xl">
+            <div class="flex min-h-screen items-center justify-center p-4">
+                <div class="fixed inset-0 bg-[#142B4A]/60 backdrop-blur-md" @click="cancelExit()"></div>
+                <div class="relative w-full max-w-md rounded-2xl bg-white p-6 sm:p-7 text-left shadow-2xl border border-slate-100 z-10 space-y-4">
                     <div class="flex items-center justify-between pb-3 border-b border-slate-100">
-                        <div class="flex items-center gap-2.5">
-                            <div class="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center border border-amber-200/60 shadow-xs shrink-0">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
                             </div>
                             <div>
-                                <h2 id="exit-verification-title" class="text-base font-bold text-slate-900">Verifikasi Password</h2>
-                                <p class="text-xs text-slate-500">Autentikasi keamanan keluar ruang kerja</p>
+                                <h2 id="exit-verification-title" class="text-base font-bold text-[#263445]">Verifikasi Password Akun Admin</h2>
+                                <p class="text-[11px] text-[#7B8794]">Autentikasi akun keluar dari ruang kerja</p>
                             </div>
                         </div>
-                        <button type="button" @click="cancelExit()" class="text-slate-400 hover:text-slate-600 p-1" title="Tutup">
+                        <button type="button" @click="cancelExit()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg" title="Tutup">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                         </button>
                     </div>
 
-                    <p class="mt-3 text-sm leading-6 text-slate-600">
-                        Masukkan password ruang kerja untuk melanjutkan navigasi keluar dari ruang kerja <strong><?php echo e($group->name); ?></strong>.
+                    <p class="text-xs text-[#526780] leading-relaxed">
+                        Anda sedang meninggalkan ruang kerja untuk menuju <strong x-text="workspaceExitDestinationLabel || 'halaman luar'"></strong>. Masukkan <strong class="text-[#142B4A]">Password Akun Login Anda</strong> untuk melanjutkan.
                     </p>
 
-                    <form action="<?php echo e(route('groups.leave', $group->id)); ?>" method="POST" @submit.prevent="submitExitVerification($event)" class="mt-4 space-y-4">
+                    <form action="<?php echo e(route('groups.leave', $group->id)); ?>" method="POST" @submit.prevent="submitExitVerification($event)" class="space-y-4">
                         <?php echo csrf_field(); ?>
                         <input type="hidden" name="destination" x-model="workspaceExitTarget">
                         
@@ -972,19 +1176,20 @@
                         </div>
 
                         <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1.5">
-                                Password Ruang Kerja
+                            <label for="admin_account_exit_password" class="block text-xs font-bold text-[#263445] uppercase tracking-wider mb-1.5">
+                                Password Akun Admin
                             </label>
                             <div class="relative">
                                 <input :type="showExitPassword ? 'text' : 'password'" 
                                        name="password" 
+                                       id="admin_account_exit_password"
                                        x-model="exitPasswordInput"
                                        required 
-                                       autocomplete="off" 
+                                       autocomplete="current-password" 
                                        autofocus
-                                       placeholder="Masukkan password ruang kerja..."
+                                       placeholder="Masukkan kata sandi akun login..."
                                        :disabled="isSubmittingExit"
-                                       class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:bg-slate-50 disabled:text-slate-400">
+                                       class="w-full px-3.5 py-2.5 pr-10 rounded-xl border border-[#E5EAF0] focus:border-[#142B4A] focus:ring-2 focus:ring-[#142B4A]/10 text-sm text-[#263445] outline-none transition-all disabled:bg-slate-50 disabled:text-slate-400">
                                 <button type="button" 
                                         @click="showExitPassword = !showExitPassword"
                                         class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none"
@@ -996,19 +1201,16 @@
                             </div>
                         </div>
 
-                        <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end pt-2">
+                        <div class="flex items-center justify-end gap-3 pt-3 border-t border-[#E5EAF0]">
                             <button type="button" @click="cancelExit()"
                                     :disabled="isSubmittingExit"
-                                    class="rounded-xl px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-50">
+                                    class="px-4 py-2.5 rounded-xl btn-secondary-gradient font-bold text-xs disabled:opacity-50">
                                 Batal
                             </button>
                             <button type="submit"
                                     :disabled="isSubmittingExit"
-                                    class="rounded-xl bg-sky-600 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-sky-700 disabled:bg-sky-400 flex items-center justify-center gap-2">
-                                <svg x-show="isSubmittingExit" class="w-3.5 h-3.5 animate-spin text-white" fill="none" viewBox="0 0 24 24">
-                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
+                                    class="px-5 py-2.5 rounded-xl btn-primary-gradient font-bold text-xs flex items-center justify-center gap-2 disabled:opacity-60 shadow-xs">
+                                <span x-show="isSubmittingExit" class="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
                                 <span x-text="isSubmittingExit ? 'Memverifikasi...' : 'Verifikasi dan Lanjutkan'"></span>
                             </button>
                         </div>
@@ -1018,6 +1220,41 @@
         </div>
     <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
 
+    <!-- GLOBAL FULLSCREEN NO PASSWORD MODAL -->
+    <div x-show="globalNoPasswordModal.show" 
+         class="fixed inset-0 z-[1200] overflow-y-auto" 
+         x-cloak 
+         role="dialog" 
+         aria-modal="true"
+         @keydown.escape.window="closeGlobalNoPasswordModal()">
+        <div class="flex min-h-screen items-center justify-center p-4">
+            <div class="fixed inset-0 bg-[#142B4A]/60 backdrop-blur-md" @click="closeGlobalNoPasswordModal()"></div>
+            <div class="relative w-full max-w-md rounded-2xl bg-white p-6 sm:p-7 text-center shadow-2xl border border-slate-100 z-10 space-y-5">
+                <div class="w-14 h-14 mx-auto rounded-2xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center text-2xl shadow-xs">
+                    🔒
+                </div>
+                <div>
+                    <span class="px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 font-bold text-[10px] uppercase tracking-wider">
+                        Konfigurasi Diperlukan
+                    </span>
+                    <h3 class="text-base font-bold text-[#263445] mt-2" x-text="'Password ' + (globalNoPasswordModal.title || 'Ruang Kerja') + ' Belum Diatur'">
+                        Password Ruang Kerja Belum Diatur
+                    </h3>
+                    <p class="text-xs text-[#7B8794] mt-2 leading-relaxed">
+                        Owner perlu mengatur kata sandi untuk ruang kerja ini sebelum Admin dapat membuka atau mengakses lembar kerja operasional. Silakan hubungi Owner untuk mengonfigurasinya.
+                    </p>
+                </div>
+                <div class="pt-2">
+                    <button type="button" 
+                            @click="closeGlobalNoPasswordModal()" 
+                            class="w-full px-4 py-2.5 rounded-xl btn-primary-gradient font-bold text-xs shadow-xs">
+                        Mengerti
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- TOAST NOTIFICATION COMPONENT -->
     <div x-show="showToast" 
          x-transition:enter="transform ease-out duration-300 transition"
@@ -1026,7 +1263,13 @@
          x-transition:leave="transition ease-in duration-100"
          x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0"
-         class="fixed bottom-5 right-5 z-[9999] max-w-sm w-full bg-slate-900 text-white rounded-xl shadow-2xl p-4 flex items-center gap-3 border border-slate-700" x-cloak>
+         :class="{
+            'bg-emerald-50 border-emerald-200 text-emerald-950': toastType === 'success',
+            'bg-sky-50 border-sky-200 text-sky-950': toastType === 'info',
+            'bg-rose-50 border-rose-200 text-rose-950': toastType === 'error',
+            'bg-amber-50 border-amber-200 text-amber-950': toastType === 'warning'
+         }"
+         class="fixed bottom-5 right-5 z-[9999] max-w-sm w-[calc(100%-2.5rem)] sm:w-full rounded-xl shadow-2xl p-4 flex items-center gap-3 border" x-cloak>
         <div :class="{
             'bg-emerald-500': toastType === 'success',
             'bg-sky-500': toastType === 'info',
@@ -1036,10 +1279,10 @@
             <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
         </div>
         <div class="flex-1 text-xs">
-            <p class="font-semibold text-slate-100" x-text="toastType.toUpperCase()"></p>
-            <p class="text-slate-300 mt-0.5" x-text="toastMessage"></p>
+            <p class="font-semibold" x-text="toastType.toUpperCase()"></p>
+            <p class="text-slate-600 mt-0.5" x-text="toastMessage"></p>
         </div>
-        <button @click="showToast = false" class="text-slate-400 hover:text-white">
+        <button @click="showToast = false" class="text-slate-400 hover:text-slate-900">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
         </button>
     </div>
@@ -1424,7 +1667,7 @@
                     </template>
 
                     <p class="text-xs text-[#7B8794] leading-relaxed" x-text="globalUnlockModal.subtitle">
-                        Masukkan password ruang kerja untuk membuka seluruh data dan lembar kerja operasional.
+                        Masukkan kata sandi untuk membuka seluruh data dan lembar kerja operasional.
                     </p>
 
                     <div x-show="globalUnlockModal.error" x-cloak class="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700">
@@ -1440,7 +1683,7 @@
                                id="global_unlock_password_input" 
                                required 
                                autocomplete="current-password"
-                               placeholder="Masukkan password ruang kerja" 
+                               placeholder="Masukkan kata sandi ruang kerja" 
                                class="w-full px-3.5 py-2.5 rounded-xl border border-[#E5EAF0] focus:border-[#142B4A] focus:ring-2 focus:ring-[#142B4A]/10 text-sm text-[#263445] outline-none transition-all">
                     </div>
 
@@ -1457,6 +1700,27 @@
                             <span x-text="globalUnlockModal.isSubmitting ? 'Memverifikasi...' : 'Masuk ke Ruang Kerja'">Masuk ke Ruang Kerja</span>
                         </button>
                     </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- GLOBAL FULLSCREEN WORKSPACE PASSWORD SETTINGS MODAL -->
+    <div x-show="workspacePasswordModal.show" x-cloak class="fixed inset-0 z-[10000] overflow-y-auto" role="dialog" aria-modal="true" @keydown.escape.window="closeWorkspacePasswordModal()">
+        <div class="fixed inset-0 bg-[#142B4A]/60 backdrop-blur-md" @click="closeWorkspacePasswordModal()"></div>
+        <div class="min-h-full flex items-center justify-center p-4">
+            <div class="relative z-10 w-full max-w-md rounded-2xl border border-[#E5EAF0] bg-white p-6 shadow-2xl modal-enter" @click.stop>
+                <div class="flex items-center justify-between border-b border-[#E5EAF0] pb-3">
+                    <div><h3 class="text-base font-bold text-[#263445]" x-text="'Pengaturan Password Ruang Kerja ' + workspacePasswordModal.year"></h3><p class="mt-0.5 text-[11px] text-[#7B8794]">Akses Admin dikendalikan oleh konfigurasi ini.</p></div>
+                    <button type="button" @click="closeWorkspacePasswordModal()" class="w-8 h-8 rounded-lg text-lg text-[#7B8794] hover:bg-slate-100">&times;</button>
+                </div>
+                <form :action="workspacePasswordModal.actionUrl" method="POST" class="space-y-4 pt-5" @submit="workspacePasswordModal.isSubmitting = true">
+                    <?php echo csrf_field(); ?>
+                    <div class="rounded-xl border border-amber-200 bg-[#FEF3C7] p-3 text-xs leading-relaxed text-[#b45309]">Password baru akan membatalkan sesi Admin yang aktif. Kosongkan kedua kolom untuk menghapus konfigurasi password.</div>
+                    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($errors->any()): ?><div class="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700"><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php $__currentLoopData = $errors->all(); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $error): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?><p><?php echo e($error); ?></p><?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?></div><?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+                    <div><label for="workspace_password_input" class="mb-1.5 block text-xs font-bold uppercase tracking-wider text-[#263445]">Password baru</label><input id="workspace_password_input" type="password" name="password" minlength="4" autocomplete="new-password" placeholder="Minimal 4 karakter" class="w-full rounded-xl border border-[#E5EAF0] px-3.5 py-2.5 text-sm outline-none focus:border-[#142B4A] focus:ring-2 focus:ring-[#142B4A]/10"></div>
+                    <div><label for="workspace_password_confirmation" class="mb-1.5 block text-xs font-bold uppercase tracking-wider text-[#263445]">Konfirmasi password</label><input id="workspace_password_confirmation" type="password" name="password_confirmation" autocomplete="new-password" placeholder="Ulangi password baru" class="w-full rounded-xl border border-[#E5EAF0] px-3.5 py-2.5 text-sm outline-none focus:border-[#142B4A] focus:ring-2 focus:ring-[#142B4A]/10"></div>
+                    <div class="flex justify-end gap-3 border-t border-[#E5EAF0] pt-4"><button type="button" @click="closeWorkspacePasswordModal()" class="px-4 py-2.5 rounded-xl btn-secondary-gradient text-xs font-bold">Batal</button><button type="submit" :disabled="workspacePasswordModal.isSubmitting" class="px-5 py-2.5 rounded-xl btn-primary-gradient text-xs font-bold disabled:opacity-60" x-text="workspacePasswordModal.isSubmitting ? 'Menyimpan...' : 'Simpan'"></button></div>
                 </form>
             </div>
         </div>
@@ -1541,8 +1805,9 @@
                 <p class="mt-2 text-sm leading-relaxed text-[#7B8794]" x-text="globalConfirmModal.message"></p>
                 <form :action="globalConfirmModal.action" method="POST" class="mt-6 flex justify-end gap-3">
                     <?php echo csrf_field(); ?>
+                    <template x-if="globalConfirmModal.method !== 'POST'"><input type="hidden" name="_method" :value="globalConfirmModal.method"></template>
                     <button type="button" @click="closeGlobalConfirmModal()" class="px-4 py-2.5 rounded-xl btn-secondary-gradient text-xs font-bold">Batal</button>
-                    <button type="submit" class="px-4 py-2.5 rounded-xl bg-amber-600 text-xs font-bold text-white hover:bg-amber-700" x-text="globalConfirmModal.submitLabel"></button>
+                    <button type="submit" :class="globalConfirmModal.danger ? 'btn-danger' : 'bg-amber-600 hover:bg-amber-700'" class="px-4 py-2.5 rounded-xl text-xs font-bold text-white" x-text="globalConfirmModal.submitLabel"></button>
                 </form>
             </div>
         </div>

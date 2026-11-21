@@ -293,13 +293,18 @@ class YearBasedWorkspaceArchitectureTest extends TestCase
         $this->assertNull($this->year2026->password);
         $this->assertFalse($this->year2026->hasPassword());
 
-        // Admin A can now access without entering any password
+        // An unconfigured password is a configuration gate for Admins, not an
+        // open workspace. Owner access remains unrestricted.
         $this->actingAs($this->adminA);
-        $this->assertTrue($this->year2026->isUnlockedForUser($this->adminA->id));
+        $this->assertFalse($this->year2026->isUnlockedForUser($this->adminA->id));
 
         $response = $this->get(route('company.year', 2026));
         $response->assertStatus(200);
-        $response->assertSee('Daftar Bulan Operasional');
+        $response->assertSee('Password Workspace Belum Diatur');
+        $response->assertDontSee('Daftar Bulan Operasional');
+
+        $this->get(route('company.workspace', [2026, 1]))
+            ->assertRedirect(route('company.year', 2026));
     }
 
     public function test_direct_url_to_spreadsheet_export_requires_monthly_workspace_authentication(): void

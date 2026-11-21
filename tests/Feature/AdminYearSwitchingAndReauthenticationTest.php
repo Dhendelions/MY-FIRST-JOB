@@ -231,6 +231,18 @@ class AdminYearSwitchingAndReauthenticationTest extends TestCase
         // 1. Visiting year page renders configuration required view (200 status, not 403)
         $resp = $this->actingAs($this->admin)->get(route('company.year', 2027));
         $resp->assertStatus(200);
+        $resp->assertSee('Password Workspace Belum Diatur');
+        $resp->assertDontSee('Daftar Bulan Operasional');
+
+        // Direct company and legacy group URLs must be routed back through
+        // the configuration gate before a sheet can be resolved/rendered.
+        $month = $year2027->monthlyWorkspaces()->where('month', 1)->firstOrFail();
+        $this->actingAs($this->admin)
+            ->get(route('company.workspace', [2027, 1]))
+            ->assertRedirect(route('company.year', 2027));
+        $this->actingAs($this->admin)
+            ->get(route('group.workspace', $month->group_id))
+            ->assertRedirect(route('company.year', 2027));
 
         // 2. Attempting unlock returns 409 configuration_required (not 403)
         $unlockAttempt = $this->actingAs($this->admin)->postJson(route('company.year.unlock', 2027), [

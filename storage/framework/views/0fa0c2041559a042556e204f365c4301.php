@@ -1,5 +1,5 @@
 
-<div class="relative flex-1 flex flex-col min-h-0 min-w-0 bg-white"
+<div class="spreadsheet-surface relative flex-1 flex flex-col min-h-0 min-w-0 bg-white"
      x-data="spreadsheetWorksheet($wire)"
      data-sheet-id="<?php echo e($sheetId); ?>"
      style="--sheet-accent: <?php echo e($sheet ? $sheet->identityColor()['active'] : '#315E91'); ?>;"

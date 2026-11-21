@@ -79,7 +79,7 @@
 
     @persist('workspace-header-' . $group->id)
     <!-- 1. HEADER IDENTITAS WORKSPACE -->
-    <div class="sticky top-0 z-30 bg-white border-b border-slate-200 px-4 sm:px-6 py-4 shadow-2xs shrink-0">
+    <div class="workspace-app-header sticky top-0 z-30 bg-white border-b border-slate-200 px-4 sm:px-6 py-4 shadow-2xs shrink-0">
         <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             
             <!-- Left: Avatar & Nama -->

@@ -99,6 +99,23 @@ class FisheriesGroup extends Model
     }
 
     /**
+     * Return the numeric operational year for this workspace.
+     *
+     * Some navigation redirects only need the year number. Keeping this
+     * compatibility helper here prevents those callers from treating the
+     * relationship method as an Eloquent relation (and consequently falling
+     * through to Model::__call when it is absent).
+     */
+    public function operationalYear(): ?int
+    {
+        if ($this->operational_year !== null) {
+            return (int) $this->operational_year;
+        }
+
+        return $this->operationalYearModel()?->year;
+    }
+
+    /**
      * Determine if workspace has a password set.
      */
     public function hasPassword(): bool

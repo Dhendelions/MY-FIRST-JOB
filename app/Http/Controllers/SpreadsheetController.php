@@ -412,6 +412,13 @@ class SpreadsheetController extends Controller
             abort(403, 'Akses dibatasi: Hanya Owner yang memiliki izin untuk mengakses lembar kerja ' . $sheet->name . '.');
         }
 
+        // A missing workspace password is a configuration state, never an
+        // implicit grant for Admin API access. This closes direct export/data
+        // endpoints while the Owner has not completed the setup.
+        if ($user->isAdmin() && !$group->hasPassword()) {
+            abort(403, 'Password workspace belum dikonfigurasi oleh Owner.');
+        }
+
         if ($group->hasPassword() && !$group->isUnlockedForSession()) {
             abort(403, 'Lembar kerja ini belum diotorisasi.');
         }

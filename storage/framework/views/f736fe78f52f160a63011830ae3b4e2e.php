@@ -50,7 +50,7 @@
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         
         <!-- KPI 1: Total Workspace -->
-        <div class="group relative bg-white rounded-2xl p-5 border border-[#E5EAF0] shadow-xs hover:border-[#142B4A]/30 hover:shadow-card-hover transition-all duration-200 ease-out hover:-translate-y-1 reveal-on-scroll overflow-hidden">
+        <div class="dashboard-kpi-card group relative bg-white rounded-2xl p-5 border border-[#E5EAF0] shadow-xs hover:border-[#142B4A]/30 hover:shadow-card-hover transition-all duration-200 ease-out hover:-translate-y-1 reveal-on-scroll overflow-hidden">
             <div class="flex items-center justify-between">
                 <span class="text-xs font-bold text-[#7B8794] uppercase tracking-wider">Ruang Kerja Tim</span>
                 <div class="w-9 h-9 rounded-xl bg-[#F5F7FA] text-[#142B4A] border border-[#E5EAF0] flex items-center justify-center font-bold group-hover:scale-105 group-hover:bg-[#142B4A] group-hover:text-white transition-all duration-200">
@@ -65,7 +65,7 @@
         </div>
 
         <!-- KPI 2: Lembar Spreadsheet Aktif -->
-        <div class="group relative bg-white rounded-2xl p-5 border border-[#E5EAF0] shadow-xs hover:border-[#142B4A]/30 hover:shadow-card-hover transition-all duration-200 ease-out hover:-translate-y-1 reveal-on-scroll overflow-hidden">
+        <div class="dashboard-kpi-card group relative bg-white rounded-2xl p-5 border border-[#E5EAF0] shadow-xs hover:border-[#142B4A]/30 hover:shadow-card-hover transition-all duration-200 ease-out hover:-translate-y-1 reveal-on-scroll overflow-hidden">
             <div class="flex items-center justify-between">
                 <span class="text-xs font-bold text-[#7B8794] uppercase tracking-wider">Lembar Spreadsheet</span>
                 <div class="w-9 h-9 rounded-xl bg-[#DCFCE7] text-[#15803d] border border-emerald-200 flex items-center justify-center font-bold group-hover:scale-105 transition-all duration-200">
@@ -80,7 +80,7 @@
         </div>
 
         <!-- KPI 3: Total Sel Data Tercatat -->
-        <div class="group relative bg-white rounded-2xl p-5 border border-[#E5EAF0] shadow-xs hover:border-[#142B4A]/30 hover:shadow-card-hover transition-all duration-200 ease-out hover:-translate-y-1 reveal-on-scroll overflow-hidden">
+        <div class="dashboard-kpi-card group relative bg-white rounded-2xl p-5 border border-[#E5EAF0] shadow-xs hover:border-[#142B4A]/30 hover:shadow-card-hover transition-all duration-200 ease-out hover:-translate-y-1 reveal-on-scroll overflow-hidden">
             <div class="flex items-center justify-between">
                 <span class="text-xs font-bold text-[#7B8794] uppercase tracking-wider">Sel Data Tercatat</span>
                 <div class="w-9 h-9 rounded-xl bg-[#FEF3C7] text-[#b45309] border border-amber-200 flex items-center justify-center font-bold group-hover:scale-105 transition-all duration-200">
@@ -95,7 +95,7 @@
         </div>
 
         <!-- KPI 4: Jumlah Rekan Terhubung -->
-        <div class="group relative bg-white rounded-2xl p-5 border border-[#E5EAF0] shadow-xs hover:border-[#142B4A]/30 hover:shadow-card-hover transition-all duration-200 ease-out hover:-translate-y-1 reveal-on-scroll overflow-hidden">
+        <div class="dashboard-kpi-card group relative bg-white rounded-2xl p-5 border border-[#E5EAF0] shadow-xs hover:border-[#142B4A]/30 hover:shadow-card-hover transition-all duration-200 ease-out hover:-translate-y-1 reveal-on-scroll overflow-hidden">
             <div class="flex items-center justify-between">
                 <span class="text-xs font-bold text-[#7B8794] uppercase tracking-wider">Rekan Terhubung</span>
                 <div class="w-9 h-9 rounded-xl bg-[#F5F7FA] text-[#526780] border border-[#E5EAF0] flex items-center justify-center font-bold group-hover:scale-105 transition-all duration-200">
@@ -112,7 +112,7 @@
 
     <!-- 2.5 WORKSPACE PERUSAHAAN TERPUSAT (HIERARKI TAHUN & BULAN) -->
     <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(isset($operationalYears) && $operationalYears->isNotEmpty()): ?>
-    <div class="bg-white rounded-2xl border border-[#E5EAF0] shadow-xs p-6 space-y-6 reveal-on-scroll">
+    <div class="workspace-overview-panel bg-white rounded-2xl border border-[#E5EAF0] shadow-xs p-6 space-y-6 reveal-on-scroll">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#E5EAF0]">
             <div>
                 <div class="flex items-center gap-2">
@@ -166,11 +166,11 @@
                     $isUnlocked = $opY->isUnlockedForUser(Auth::id());
                     $isAdminArchived = $opY->is_archived && Auth::user()->isAdmin();
                 ?>
-                <div class="group relative rounded-2xl p-5 sm:p-6 transition-all duration-220 flex flex-col justify-between overflow-hidden select-none <?php echo e($isAdminArchived ? 'card-archived-disabled cursor-not-allowed' : 'card-clean hover:-translate-y-1 cursor-pointer'); ?>"
+                <div class="company-workspace-card group relative rounded-2xl p-5 sm:p-6 transition-all duration-220 flex flex-col justify-between overflow-hidden select-none <?php echo e($isAdminArchived ? 'card-archived-disabled cursor-not-allowed' : 'card-clean hover:-translate-y-1 cursor-pointer'); ?>"
                      <?php if($isAdminArchived): ?>
                          @click.prevent.stop
                      <?php else: ?>
-                         @click="<?php if(Auth::user()->isOwner() || $isUnlocked): ?> window.location.href = '<?php echo e(route('company.year', $opY->year)); ?>' <?php else: ?> openUnlockModal(<?php echo e($opY->year); ?>) <?php endif; ?>"
+                         @click="<?php if(Auth::user()->isOwner() || $isUnlocked): ?> window.location.href = '<?php echo e(route('company.year', $opY->year)); ?>' <?php elseif(Auth::user()->isAdmin() && !$opY->hasPassword()): ?> $dispatch('open-workspace-no-password', { year: <?php echo e($opY->year); ?>, title: 'Ruang Kerja <?php echo e($opY->year); ?>' }) <?php else: ?> openUnlockModal(<?php echo e($opY->year); ?>) <?php endif; ?>"
                      <?php endif; ?>>
                     
                     <div class="relative z-10 space-y-4">
@@ -259,6 +259,12 @@
                                     <span>Buka Ruang Kerja <?php echo e($opY->year); ?></span>
                                     <svg class="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                                 </a>
+                            <?php elseif(!$opY->hasPassword()): ?>
+                                <button type="button"
+                                        @click="$dispatch('open-workspace-no-password', { year: <?php echo e($opY->year); ?>, title: 'Ruang Kerja <?php echo e($opY->year); ?>' })"
+                                        class="w-full py-2.5 rounded-xl btn-secondary-gradient font-bold text-xs text-center flex items-center justify-center gap-2" aria-label="Password workspace belum diatur">
+                                    <span>Konfigurasi Password Diperlukan</span>
+                                </button>
                             <?php else: ?>
                                 <button type="button" 
                                         @click="openUnlockModal(<?php echo e($opY->year); ?>)"
